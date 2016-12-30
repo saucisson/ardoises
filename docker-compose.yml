@@ -1,0 +1,28 @@
+version: "2"
+services:
+  postgres:
+    image: postgres
+  redis:
+    image: redis:3.0.7 # because of bug in qless
+  server:
+    build: .
+    ports:
+      - "8080:8080"
+    links:
+      - postgres
+      - redis
+    logging:
+      driver: "json-file"
+    environment:
+      REDIS_PORT:         "tcp://redis:6379"
+      POSTGRES_PORT:      "tcp://postgres:5432"
+      POSTGRES_USER:      postgres
+      POSTGRES_PASSWORD:  ""
+      POSTGRES_DATABASE:  postgres
+      DOCKER_USER:        ${DOCKER_USER}
+      DOCKER_SECRET:      ${DOCKER_SECRET}
+      GH_CLIENT_ID:       ${GH_CLIENT_ID}
+      GH_CLIENT_SECRET:   ${GH_CLIENT_SECRET}
+      GH_OAUTH_STATE:     "some state"
+      GH_APP_NAME:        Ardoises
+      ARDOISES_SECRET:    "some secret"
