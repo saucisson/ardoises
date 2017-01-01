@@ -1,4 +1,3 @@
-local Colors    = require "ansicolors"
 local Copas     = require "copas"
 local Et        = require "etlua"
 local Http      = require "ardoises.jsonhttp".copas
@@ -8,7 +7,7 @@ local Patterns  = require "ardoises.patterns"
 local Url       = require "socket.url"
 local Websocket = require "websocket"
 
--- Messages:
+-- # Messages
 -- { id = ..., type = "authenticate", token = "..." }
 -- { id = ..., type = "patch"       , patches = { module = ..., code = ... } }
 -- { id = ..., type = "require"     , module = "..." }
@@ -18,14 +17,15 @@ local Websocket = require "websocket"
 -- { id = ..., type = "answer"      , success = true|false, reason = "..." }
 -- { id = ..., type = "execute"     }
 
-local Editor = {}
+local Mt     = {}
+local Editor = setmetatable ({}, Mt)
+local Client = {}
 Editor.__index = Editor
+Client.__index = Client
 
-function Editor.create (options)
-  local repository = assert (Patterns.repository:match (options.repository))
-  assert (repository.branch)
-  local editor     = setmetatable ({
-    repository   = assert (repository.full),
+function Mt.__call (_, options)
+  local editor = setmetatable ({
+    branch       = assert (options.branch),
     tokens       = {
       pull = assert (options.token),
       push = nil,
@@ -33,12 +33,14 @@ function Editor.create (options)
     timeout      = assert (options.timeout),
     port         = assert (options.port),
     application  = assert (options.application),
-    clients      = setmetatable ({}, { __mode = "k" }),
+    nopush       = options.nopush,
+    current      = nil,
     running      = false,
     last         = false,
+    clients      = {},
     tasks        = {},
     queue        = {},
-    repositories = {}, -- repository -> module -> layer
+    repositories = {}, -- branch.full_name -> module_name -> { ... }
     Layer        = setmetatable ({}, { __index = Layer }),
   }, Editor)
   editor.Layer.require = function (name)
@@ -56,7 +58,7 @@ end
 
 function Editor.start (editor)
   assert (getmetatable (editor) == Editor)
-  local repository = editor:pull (editor.repository)
+  local repository = editor:pull (editor.branch)
   if repository then
     local file = assert (io.popen (Et.render ([[ find "<%- path %>/src" -name "*.lua" 2> /dev/null ]], {
       path = repository.path,
@@ -74,10 +76,6 @@ function Editor.start (editor)
     editor.socket = socket
     editor.host, editor.port = socket:getsockname ()
     copas_addserver (socket, f)
-    print (Colors (Et.render ("%{blue}[<%- time %>]%{reset} Start editor at %{green}<%- url %>%{reset}.", {
-      time = os.date "%c",
-      url  = "ws://" .. editor.host .. ":" .. tostring (editor.port),
-    })))
     editor.last    = os.time ()
     editor.running = true
   end
@@ -87,12 +85,9 @@ function Editor.start (editor)
     default   = function () end,
     protocols = {
       ardoises = function (ws)
-        print (Colors (Et.render ("%{blue}[<%- time %>]%{reset} New connection.", {
-          time = os.date "%c",
-        })))
         editor.last  = os.time ()
-        local client = {
-          ws          = ws,
+        local client = setmetatable ({
+          websocket   = ws,
           token       = nil,
           permissions = {
             read  = nil,
@@ -101,9 +96,9 @@ function Editor.start (editor)
           handlers    = {
             authenticate = Editor.handlers.authenticate,
           },
-        }
+        }, Client)
         editor.clients [client] = true
-        while editor.running and ws.state == "OPEN" do
+        while editor.running and client.websocket.state == "OPEN" do
           editor:dispatch (client)
         end
         editor.clients [client] = nil
@@ -134,16 +129,12 @@ function Editor.start (editor)
   end)
 end
 
-function Editor.stop (editor, options)
+function Editor.stop (editor)
   assert (getmetatable (editor) == Editor)
-  options = options or {}
-  print (Colors (Et.render ("%{blue}[<%- time %>]%{reset} Stop editor.", {
-    time = os.date "%c",
-  })))
   editor.running = false
   Copas.addthread (function ()
-    if not options.nopush then
-      editor:push (editor.repository)
+    if not editor.nopush then
+      editor:push ()
     end
     editor.server:close ()
     for _, task in pairs (editor.tasks) do
@@ -152,19 +143,14 @@ function Editor.stop (editor, options)
   end)
 end
 
-function Editor.pull (editor, name)
+function Editor.pull (editor, branch)
   assert (getmetatable (editor) == Editor)
-  if editor.repositories [name] then
-    return editor.repositories [name]
-  end
-  local repo = Patterns.repository:match (name)
-  if not repo then
-    return nil, "invalid name"
+  if type (editor.repositories [branch.full_name]) == "table"
+  or editor.repositories [branch.full_name] == false then
+    return editor.repositories [branch.full_name]
   end
   local repository, status = Http {
-    url     = Et.render ("https://api.github.com/repos/<%- repository %>", {
-      repository = repo.repository,
-    }),
+    url     = Et.render ("https://api.github.com/repos/<%- owner %>/<%- repository %>", branch),
     method  = "GET",
     headers = {
       ["Accept"       ] = "application/vnd.github.v3+json",
@@ -173,7 +159,7 @@ function Editor.pull (editor, name)
     },
   }
   if status ~= 200 then
-    return nil, status
+    return nil, "unable to obtain repository information: " .. tostring (status)
   end
   local url    = Url.parse (repository.clone_url)
   url.user     = editor.tokens.pull
@@ -190,29 +176,24 @@ function Editor.pull (editor, name)
   ]], {
     url       = Url.build (url),
     directory = repository.path,
-    branch    = repo.branch or repository.default_branch,
+    branch    = branch.branch,
   })) then
-    print (Colors (Et.render ("%{blue}[<%- time %>]%{reset} %{red}Cannot pull <%- repository %>%{reset}.", {
-      time       = os.date "%c",
-      repository = name,
-    })))
-    return nil, status
+    return nil, "unable to pull repository: " .. tostring (status)
   end
   repository.modules = {}
-  editor.repositories [name] = repository
+  editor.repositories [branch.full_name] = repository
   return repository
 end
 
-function Editor.push (editor, name)
+function Editor.push (editor)
   assert (getmetatable (editor) == Editor)
-  assert (name == editor.repository)
-  local repository = editor.repositories [name]
-  if not repository then
-    return
+  local repository = editor.repositories [editor.branch.full_name]
+  if type (repository) ~= "table" then
+    return true
   end
-  local url        = Url.parse (repository.clone_url)
-  url.user         = editor.tokens.push
-  url.password     = "x-oauth-basic"
+  local url    = Url.parse (repository.clone_url)
+  url.user     = editor.tokens.push
+  url.password = "x-oauth-basic"
   if not os.execute (Et.render ([[
     cd "<%- directory %>" && \
     git push --quiet \
@@ -221,38 +202,36 @@ function Editor.push (editor, name)
     url       = Url.build (url),
     directory = repository.path,
   })) then
-    print (Colors (Et.render ("%{blue}[<%- time %>]%{reset} %{red}Cannot push <%- repository %>%{reset}.", {
-      time       = os.date "%c",
-      repository = name,
-    })))
+    return nil, "unable to push repository"
   end
   return true
 end
 
 function Editor.dispatch (editor, client)
   assert (getmetatable (editor) == Editor)
+  assert (getmetatable (client) == Client)
   local ok
-  local message = client.ws:receive ()
+  local message = client.websocket:receive ()
   if not message then
-    client.ws:close ()
+    client.websocket:close ()
     return
   end
   editor.last = os.time ()
   ok, message = pcall (Json.decode, message)
   if not ok then
-    client.ws:send (Json.encode {
+    client.websocket:send (Json.encode {
       type    = "answer",
       success = false,
       reason  = "invalid JSON",
     })
   elseif type (message) ~= "table" then
-    client.ws:send (Json.encode {
+    client.websocket:send (Json.encode {
       type    = "answer",
       success = false,
       reason  = "invalid message",
     })
   elseif not message.id or not message.type then
-    client.ws:send (Json.encode {
+    client.websocket:send (Json.encode {
       id      = message.id,
       type    = "answer",
       success = false,
@@ -274,73 +253,65 @@ function Editor.answer (editor)
   table.remove (editor.queue, 1)
   local handler = message.client.handlers [message.type]
   if not handler then
-    message.client.ws:send (Json.encode {
+    message.client.websocket:send (Json.encode {
       id      = message.id,
       type    = "answer",
       success = false,
       reason  = "unknown type",
     })
   end
-  local ok, result = pcall (handler, editor, message)
-  if ok then
-    message.client.ws:send (Json.encode {
-      id      = message.id,
-      type    = "answer",
-      success = true,
-      answer  = result,
-    })
-  else
-    message.client.ws:send (Json.encode {
-      id      = message.id,
-      type    = "answer",
-      success = false,
-      error   = result,
-    })
-  end
+  local result, err = handler (editor, message)
+  message.client.websocket:send (Json.encode {
+    id      = message.id,
+    type    = "answer",
+    success = not not result,
+    answer  = result,
+    error   = err,
+  })
 end
 
 function Editor.require (editor, x)
   assert (getmetatable (editor) == Editor)
   local req = Patterns.require:match (x)
   if not req then
-    error { reason = "invalid module" }
+    return nil, "invalid module"
   end
-  local repository = editor.repositories [req.full]
-                  or editor:pull (req.full)
+  local repository = editor.repositories [req.full_name]
+                  or editor:pull (req)
   if type (repository.modules [req.module]) == "table" then
     return repository.modules [req.module]
   elseif repository.modules [req.module] == false then
-    error { reason = "deleted" }
+    return nil, "deleted module"
   end
   -- get module within pulled data
   local filename = package.searchpath (req.module, Et.render ("<%- path %>/src/?.lua", {
     path = repository.path,
   }))
   if not filename then
-    error { reason = "not found" }
+    return nil, "missing module"
   end
   local file = io.open (filename, "r")
   if not file then
-    error { reason = "not found" }
+    return nil, "missing module"
   end
   local code = file:read "*a"
   file:close ()
   local loaded, err_loaded = _G.load (code, x, "t", _G)
   if not loaded then
-    error { reason = "invalid layer: " .. err_loaded }
+    return nil, "invalid layer: " .. err_loaded
   end
   local ok, chunk = pcall (loaded)
   if not ok then
-    error { error = "invalid layer: " .. chunk }
+    return nil, "invalid layer: " .. chunk
   end
   local remote, ref = Layer.new {
     name = x,
   }
   local oldcurrent = editor.current
-  editor.current = req.full
+  editor.current = req.full_name
   local ok_apply, err_apply = pcall (chunk, editor.Layer, remote, ref)
   if not ok_apply then
-    error { error = "invalid layer: " .. err_apply }
+    return nil, "invalid layer: " .. err_apply
   end
   editor.current = oldcurrent
   local layer = Layer.new {
@@ -372,7 +343,7 @@ function Editor.handlers.authenticate (editor, message)
       },
     }
     if status ~= 200 then
-      error { status = status }
+      return nil, "authentication failure: " .. tostring (status)
     end
     message.client.user  = user
     message.client.token = message.token
@@ -388,7 +359,7 @@ function Editor.handlers.authenticate (editor, message)
       },
     }
     if status ~= 200 then
-      error { status = status }
+      return nil, "cannot obtain email address: " .. tostring (status)
     end
     message.client.user.emails = emails
     for _, t in ipairs (emails) do
@@ -398,11 +369,9 @@ function Editor.handlers.authenticate (editor, message)
     end
   end
   do
-    local repo = Patterns.repository:match (editor.repository)
+    local repo = Patterns.repository:match (editor.branch.full_name)
     local result, status = Http {
-      url     = Et.render ("https://api.github.com/repos/<%- repository %>", {
-        repository = repo.repository,
-      }),
+      url     = Et.render ("https://api.github.com/repos/<%- owner %>/<%- repository %>", repo),
       method  = "GET",
       headers = {
         ["Accept"       ] = "application/vnd.github.v3+json",
@@ -411,21 +380,11 @@ function Editor.handlers.authenticate (editor, message)
       },
     }
     if status ~= 200 then
-      error { status = status }
+      return nil, "cannot obtain repository: " .. tostring (status)
     end
-    print (Colors (Et.render ("%{blue}[<%- time %>]%{reset} User %{green}<%- login %>%{reset} <%- pull %> and <%- push %>.", {
-      time       = os.date "%c",
-      login      = message.client.user.login,
-      pull       = result.permissions.pull
-               and "%{green}can read%{reset}"
-                or "%{red}cannot read%{reset}",
-      push       = result.permissions.push
-               and "%{green}can write%{reset}"
-                or "%{red}cannot write%{reset}",
-    })))
     if not result.permissions.pull then
       message.client.handlers.authenticate = nil
-      error (result)
+      return nil, "pull permission denied"
     end
     message.client.permissions           = result.permissions
     message.client.handlers.authenticate = nil
@@ -445,24 +404,20 @@ end
 function Editor.handlers.require (editor, message)
   assert (getmetatable (editor) == Editor)
   local result, err = editor:require (message.module)
-  if result then
-    return { code = result.code }
-  else
-    error (err)
+  if not result then
+    return nil, err
   end
+  return { code = result.code }
 end
 
 function Editor.handlers.list (editor)
   assert (getmetatable (editor) == Editor)
-  local result = {}
-  for name, repository in pairs (editor.repositories) do
-    local subresult = {}
-    for module, x in pairs (repository.modules) do
-      if x ~= false then
-        subresult [module] = module .. "@" .. name
-      end
+  local result     = {}
+  local repository = editor.repositories [editor.branch.full_name]
+  for module, x in pairs (repository.modules) do
+    if x ~= false then
+      result [module] = module .. "@" .. repository.full_name
     end
-    result [name] = subresult
   end
   return result
 end
@@ -470,18 +425,18 @@ end
 function Editor.handlers.create (editor, message)
   assert (getmetatable (editor) == Editor)
   if not message.client.permissions.push then
-    error { reason = "forbidden" }
+    return nil, "forbidden"
   end
   local req = Patterns.require:match (message.module)
   if not req then
-    error { reason = "invalid module" }
+    return nil, "invalid module"
   end
-  if req.full ~= editor.repository then
-    error { reason = "invalid repository"}
+  if req.full_name ~= editor.branch.full_name then
+    return nil, "invalid repository"
   end
-  local repository = editor.repositories [editor.repository]
+  local repository = editor.repositories [editor.branch.full_name]
   if repository.modules [req.module] then
-    error { reason = "existing module"}
+    return nil, "existing module"
   end
   local parts  = {}
   for part in req.module:gmatch "[^%.]+" do
@@ -493,11 +448,11 @@ function Editor.handlers.create (editor, message)
   if not os.execute (Et.render ([[ mkdir -p "<%- directory %>" ]], {
     directory = directory,
   })) then
-    error { reason = "failure" }
+    return nil, "directory creation failure"
   end
   local file = io.open (filename, "w")
   if not file then
-    error { reason = "failure" }
+    return nil, "module creation failure"
   end
   file:write (([[
     return function (Layer, layer, ref)
@@ -517,7 +472,7 @@ function Editor.handlers.create (editor, message)
     name     = message.client.user.name,
     email    = message.client.user.email,
   })) then
-    assert (false)
+    return nil, "commit failure"
   end
   repository.modules [req.module] = true
   for client in pairs (editor.clients) do
@@ -529,30 +484,31 @@ function Editor.handlers.create (editor, message)
     end
   end
   editor.tokens.push = message.client.token
+  return true
 end
 
 function Editor.handlers.delete (editor, message)
   assert (getmetatable (editor) == Editor)
   if not message.client.permissions.push then
-    error { reason = "forbidden" }
+    return nil, "forbidden"
   end
   local req = Patterns.require:match (message.module)
   if not req then
-    error { reason = "invalid module" }
+    return nil, "invalid module"
   end
-  if req.full ~= editor.repository then
-    error { reason = "invalid repository"}
+  if req.full_name ~= editor.branch.full_name then
+    return nil, "invalid repository"
   end
-  local repository = editor.repositories [editor.repository]
+  local repository = editor.repositories [editor.branch.full_name]
   if not repository.modules [req.module] then
-    error { reason = "unknown module"}
+    return nil, "unknown module"
   end
   local parts  = {}
   for part in req.module:gmatch "[^%.]+" do
     parts [#parts+1] = part
   end
   local filename = "src/" .. table.concat (parts, "/") .. ".lua"
-  if not os.execute (Et.render ([[
+  assert (os.execute (Et.render ([[
     cd <%- path %> && \
     git rm     --quiet \
                <%- filename %> && \
@@ -565,9 +521,7 @@ function Editor.handlers.delete (editor, message)
     filename = filename,
     name     = message.client.user.name,
     email    = message.client.user.email,
-  })) then
-    assert (false)
-  end
+  })))
   repository.modules [req.module] = false
   for client in pairs (editor.clients) do
     if client ~= message.client then
@@ -578,12 +532,13 @@ function Editor.handlers.delete (editor, message)
     end
   end
   editor.tokens.push = message.client.token
+  return true
 end
 
 function Editor.handlers.patch (editor, message)
   assert (getmetatable (editor) == Editor)
   if not message.client.permissions.push then
-    error { reason = "forbidden" }
+    return nil, "forbidden"
   end
   local errors  = {}
   local modules = {}
@@ -596,10 +551,30 @@ function Editor.handlers.patch (editor, message)
       module.current = nil
     end
   end
+  -- check modules
+  for _, patch in ipairs (message.patches) do
+    local ok, err = (function ()
+      local req = Patterns.require:match (patch.module)
+      if req.full_name ~= editor.branch.full_name then
+        return nil, "invalid module"
+      end
+      return true
+    end) ()
+    if not ok then
+      errors [patch.module] = err
+    end
+  end
+  if next (errors) then
+    rollback ()
+    return nil, errors
+  end
   -- load modules
   for _, patch in ipairs (message.patches) do
-    local ok, err = pcall (function ()
-      local module = editor:require (patch.module)
+    local ok, err = (function ()
+      local module, err = editor:require (patch.module)
+      if not module then
+        return nil, err
+      end
       modules [patch.module] = module
       module.current = Layer.new {
         temporary = true,
@@ -608,45 +583,47 @@ function Editor.handlers.patch (editor, message)
       local refines = module.layer [Layer.key.refines]
       refines [Layer.len (refines)+1] = module.current
       Layer.write_to (module.layer, module.current)
-    end)
+      return true
+    end) ()
     if not ok then
       errors [patch.module] = err
     end
   end
   if next (errors) then
     rollback ()
-    error (errors)
+    return nil, errors
   end
   -- apply patches
   for _, patch in ipairs (message.patches) do
-    local module = modules [patch.module]
-    local ok, err = pcall (function ()
+    local ok, err = (function ()
+      local module = modules [patch.module]
       if type (patch.code) ~= "string" then
-        error { reason = "patch code is not a string" }
+        return nil, "patch code is not a string"
       end
       local chunk, err_chunk = _G.load (patch.code, patch.module, "t", _G)
       if not chunk then
-        error { reason = err_chunk }
+        return nil, "invalid layer: " .. err_chunk
       end
       local ok_loaded, loaded = pcall (chunk)
       if not ok_loaded then
-        error { reason = loaded }
+        return nil, "invalid layer: " .. loaded
       end
       local ok_apply, err_apply = pcall (loaded, editor.Layer, module.layer, module.ref)
       if not ok_apply then
-        error { reason = err_apply }
+        return nil, "invalid layer: " .. err_apply
       end
-    end)
+      return true
+    end) ()
     if not ok then
       errors [patch.module] = err
     end
   end
   if next (errors) then
     rollback ()
-    error (errors)
+    return nil, errors
   end
   -- commit
-  local repository = editor.repositories [editor.repository]
+  local repository = editor.repositories [editor.branch.full_name]
   for _, patch in ipairs (message.patches) do
     local module = modules [patch.module]
     Layer.merge (module.current, module.remote)
@@ -659,15 +636,13 @@ function Editor.handlers.patch (editor, message)
     local file     = io.open (repository.path .. "/" .. filename, "w")
     file:write (Layer.dump (module.remote))
     file:close ()
-    if not os.execute (Et.render ([[
+    assert (os.execute (Et.render ([[
       cd <%- path %> && \
       git add <%- filename %>
     ]], {
       path     = repository.path,
       filename = filename,
-    })) then
-      assert (false)
-    end
+    })))
   end
   rollback ()
   local patches = {}
@@ -679,7 +654,7 @@ function Editor.handlers.patch (editor, message)
       code   = patch.code,
     })
   end
-  if not os.execute (Et.render ([[
+  assert (os.execute (Et.render ([[
     cd <%- path %> && \
     git commit --quiet \
                --author="<%- name %> <<%- email %>>" \
@@ -689,9 +664,7 @@ function Editor.handlers.patch (editor, message)
     message = string.format ("%q", table.concat (patches, "\n")),
     name    = message.client.user.name,
     email   = message.client.user.email,
-  })) then
-    assert (false)
-  end
+  })))
   -- send to other clients
   for client in pairs (editor.clients) do
     if client ~= message.client then
@@ -702,6 +675,7 @@ function Editor.handlers.patch (editor, message)
     end
   end
   editor.tokens.push = message.client.token
+  return true
 end
 
 return Editor

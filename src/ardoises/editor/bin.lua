@@ -3,13 +3,17 @@
 local Arguments = require "argparse"
 local Copas     = require "copas"
 local Editor    = require "ardoises.editor"
+local Patterns  = require "ardoises.patterns"
 
 local parser = Arguments () {
   name        = "ardoises-editor",
   description = "collaborative editor for ardoises",
 }
-parser:argument "repository" {
-  description = "repository name (in 'user/repository:branch' format)",
+parser:argument "branch" {
+  description = "branch to edit (in 'user/repository:branch' format)",
+  convert     = function (x)
+    return assert (Patterns.branch:match (x))
+  end,
 }
 parser:argument "token" {
   description = "access token",

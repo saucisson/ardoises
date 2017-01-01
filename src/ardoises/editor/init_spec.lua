@@ -8,9 +8,10 @@ local assert    = require "luassert"
 local Copas     = require "copas"
 local Et        = require "etlua"
 local Json      = require "cjson"
+local Patterns  = require "ardoises.patterns"
 local Websocket = require "websocket"
 
-describe ("editor", function ()
+describe ("#editor", function ()
 
   it ("can be required", function ()
     assert.has.no.errors (function ()
@@ -20,8 +21,8 @@ describe ("editor", function ()
 
   it ("can be instantiated", function ()
     local Editor = require "ardoises.editor"
-    local editor = Editor.create {
-      repository  = "saucisson/lua-c3:master",
+    local editor = Editor {
+      branch      = Patterns.branch:match "saucisson/lua-c3:master",
       token       = os.getenv "ARDOISES_TOKEN",
       port        = 0,
       timeout     = 1,
@@ -32,30 +33,30 @@ describe ("editor", function ()
 
   it ("can be started and explicitly stopped", function ()
     local Editor = require "ardoises.editor"
-    local editor = Editor.create {
-      repository  = "saucisson/lua-c3:master",
+    local editor = Editor {
+      branch      = Patterns.branch:match "saucisson/lua-c3:master",
       token       = os.getenv "ARDOISES_TOKEN",
       port        = 0,
       timeout     = 1,
       application = "Ardoises",
+      nopush      = true,
     }
     Copas.addthread (function ()
       editor:start ()
-      editor:stop {
-        nopush = true,
-      }
+      editor:stop  ()
     end)
     Copas.loop ()
   end)
 
   it ("can receive connections", function ()
     local Editor = require "ardoises.editor"
-    local editor = Editor.create {
-      repository  = "ardoises/formalisms:master",
+    local editor = Editor {
+      branch      = Patterns.branch:match "ardoises/formalisms:master",
       token       = os.getenv "ARDOISES_TOKEN",
       port        = 0,
       timeout     = 1,
       application = "Ardoises",
+      nopush      = true,
     }
     local connected
     Copas.addthread (function ()
@@ -67,9 +68,7 @@ describe ("editor", function ()
       })
       local client = Websocket.client.copas { timeout = 5 }
       connected    = client:connect (url, "ardoises")
-      editor:stop {
-        nopush = true,
-      }
+      editor:stop ()
     end)
     Copas.loop ()
     assert.is_truthy (connected)
@@ -77,12 +76,13 @@ describe ("editor", function ()
 
   it ("can authenticate", function ()
     local Editor = require "ardoises.editor"
-    local editor = Editor.create {
-      repository  = "ardoises/formalisms:master",
+    local editor = Editor {
+      branch      = Patterns.branch:match "ardoises/formalisms:master",
       token       = os.getenv "ARDOISES_TOKEN",
       port        = 0,
       timeout     = 1,
       application = "Ardoises",
+      nopush      = true,
     }
     local answer
     Copas.addthread (function ()
@@ -101,9 +101,7 @@ describe ("editor", function ()
       })
       answer = client:receive ()
       answer = Json.decode (answer)
-      editor:stop {
-        nopush = true,
-      }
+      editor:stop ()
     end)
     Copas.loop ()
     assert.are.same (answer, {
@@ -119,12 +117,13 @@ describe ("editor", function ()
 
   it ("cannot authenticate with wrong token", function ()
     local Editor = require "ardoises.editor"
-    local editor = Editor.create {
-      repository  = "ahamez/foo:master",
+    local editor = Editor {
+      branch      = Patterns.branch:match "ahamez/foo:master",
       token       = os.getenv "ARDOISES_TOKEN",
       port        = 0,
       timeout     = 1,
       application = "Ardoises",
+      nopush      = true,
     }
     local answer
     Copas.addthread (function ()
@@ -143,29 +142,26 @@ describe ("editor", function ()
       })
       answer = client:receive ()
       answer = Json.decode (answer)
-      editor:stop {
-        nopush = true,
-      }
+      editor:stop ()
     end)
     Copas.loop ()
     assert.are.same (answer, {
       id      = 1,
       type    = "answer",
       success = false,
-      error  = {
-        status = 404,
-      }
+      error  = "cannot obtain repository: 404",
     })
   end)
 
   it ("can require after authenticate", function ()
     local Editor = require "ardoises.editor"
-    local editor = Editor.create {
-      repository  = "ardoises/formalisms:master",
+    local editor = Editor {
+      branch      = Patterns.branch:match "ardoises/formalisms:master",
       token       = os.getenv "ARDOISES_TOKEN",
       port        = 0,
       timeout     = 1,
       application = "Ardoises",
+      nopush      = true,
     }
     local answers = {}
     Copas.addthread (function ()
@@ -191,9 +187,7 @@ describe ("editor", function ()
       })
       answers.require = client:receive ()
       answers.require = Json.decode (answers.require)
-      editor:stop {
-        nopush = true,
-      }
+      editor:stop ()
     end)
     Copas.loop ()
     answers.require.answer = nil
@@ -206,12 +200,13 @@ describe ("editor", function ()
 
   it ("can list after authenticate", function ()
     local Editor = require "ardoises.editor"
-    local editor = Editor.create {
-      repository  = "ardoises/formalisms:dev",
+    local editor = Editor {
+      branch      = Patterns.branch:match "ardoises/formalisms:dev",
       token       = os.getenv "ARDOISES_TOKEN",
       port        = 0,
       timeout     = 1,
       application = "Ardoises",
+      nopush      = true,
     }
     local answers = {}
     Copas.addthread (function ()
@@ -236,9 +231,7 @@ describe ("editor", function ()
       })
       answers.list = client:receive ()
       answers.list = Json.decode (answers.list)
-      editor:stop {
-        nopush = true,
-      }
+      editor:stop ()
     end)
     Copas.loop ()
     answers.list.answer = nil
@@ -251,12 +244,13 @@ describe ("editor", function ()
 
   it ("can create after authenticate", function ()
     local Editor = require "ardoises.editor"
-    local editor = Editor.create {
-      repository  = "ardoises/formalisms:dev",
+    local editor = Editor {
+      branch      = Patterns.branch:match "ardoises/formalisms:dev",
       token       = os.getenv "ARDOISES_TOKEN",
       port        = 0,
       timeout     = 1,
       application = "Ardoises",
+      nopush      = true,
     }
     local answers = {}
     Copas.addthread (function ()
@@ -282,26 +276,26 @@ describe ("editor", function ()
       })
       answers.create = client:receive ()
       answers.create = Json.decode (answers.create)
-      editor:stop {
-        nopush = true,
-      }
+      editor:stop ()
     end)
     Copas.loop ()
     assert.are.same (answers.create, {
       id      = 2,
       type    = "answer",
       success = true,
+      answer  = true,
     })
   end)
 
   it ("can delete after authenticate", function ()
     local Editor = require "ardoises.editor"
-    local editor = Editor.create {
-      repository  = "ardoises/formalisms:dev",
+    local editor = Editor {
+      branch      = Patterns.branch:match "ardoises/formalisms:dev",
       token       = os.getenv "ARDOISES_TOKEN",
       port        = 0,
       timeout     = 1,
       application = "Ardoises",
+      nopush      = true,
     }
     local answers = {}
     Copas.addthread (function ()
@@ -334,26 +328,26 @@ describe ("editor", function ()
       })
       answers.delete = client:receive ()
       answers.delete = Json.decode (answers.delete)
-      editor:stop {
-        nopush = true,
-      }
+      editor:stop ()
     end)
     Copas.loop ()
     assert.are.same (answers.delete, {
       id      = 3,
       type    = "answer",
       success = true,
+      answer  = true,
     })
   end)
 
   it ("can patch after authenticate", function ()
     local Editor = require "ardoises.editor"
-    local editor = Editor.create {
-      repository  = "ardoises/formalisms:dev",
+    local editor = Editor {
+      branch      = Patterns.branch:match "ardoises/formalisms:dev",
       token       = os.getenv "ARDOISES_TOKEN",
       port        = 0,
       timeout     = 1,
       application = "Ardoises",
+      nopush      = true,
     }
     local answers = {}
     Copas.addthread (function ()
@@ -386,15 +380,14 @@ describe ("editor", function ()
       })
       answers.patch = client:receive ()
       answers.patch = Json.decode (answers.patch)
-      editor:stop {
-        nopush = true,
-      }
+      editor:stop ()
     end)
     Copas.loop ()
     assert.are.same (answers.patch, {
       id      = 2,
       type    = "answer",
       success = true,
+      answer  = true,
     })
   end)
 
