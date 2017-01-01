@@ -8,20 +8,34 @@ Patterns.identifier =
   (Patterns.alnum + Lpeg.P"-")^1 / tostring
 Patterns.repository =
   Lpeg.Ct (
-    (Patterns.identifier * Lpeg.P"/" * Patterns.identifier)
-    * (Lpeg.P":" * Patterns.identifier)^-1
+      Patterns.identifier
+    * Lpeg.P"/"
+    * Patterns.identifier
   ) / function (t)
     return {
       owner      = t [1],
-      name       = t [2],
+      repository = t [2],
+      full_name  = t [1] .. "/" .. t [2],
+    }
+  end
+Patterns.branch =
+  Lpeg.Ct (
+      Patterns.identifier
+    * Lpeg.P"/"
+    * Patterns.identifier
+    * Lpeg.P":"
+    * Patterns.identifier
+  ) / function (t)
+    return {
+      owner      = t [1],
+      repository = t [2],
       branch     = t [3],
-      repository = t [1] .. "/" .. t [2],
-      full       = t [1] .. "/" .. t [2] .. (t [3] and ":" .. t [3] or ""),
+      full_name  = t [1] .. "/" .. t [2] .. ":" .. t [3],
     }
   end
 Patterns.require =
   Lpeg.Ct (
-    Patterns.module * Lpeg.P"@" * Patterns.repository
+    Patterns.module * Lpeg.P"@" * Patterns.branch
   ) / function (t)
     t [2].module = t [1]
     return t [2]
