@@ -10,23 +10,26 @@ local app  = Lapis.Application ()
 app.layout = false
 app:enable "etlua"
 
-local function check_scopes (self)
-  local redirect = {
+local function get_token ()
+  return {
     redirect_to = Et.render ("https://github.com/login/oauth/authorize?state=<%- state %>&scope=<%- scope %>&client_id=<%- client_id %>", {
       client_id = Config.gh_client_id,
       state     = Config.gh_oauth_state,
       scope     = Util.escape "user:email repo",
     })
   }
+end
+
+local function get_scopes (self)
   if not self.session.gh_id then
-    return nil, redirect
+    return nil
   end
   self.account = Model.accounts:find {
     id = self.session.gh_id,
   }
   if not self.account
   or not self.account.token then
-    return nil, redirect
+    return nil
   end
   local user, status, headers = Http {
     url     = "https://api.github.com/user",
@@ -38,7 +41,7 @@ local function check_scopes (self)
     },
   }
   if status ~= 200 then
-    return nil, redirect
+    return nil
   end
   self.user = user
   local header = headers ["X-OAuth-Scopes"] or ""
@@ -46,11 +49,7 @@ local function check_scopes (self)
   for scope in header:gmatch "[^,%s]+" do
     scopes [scope] = true
   end
-  if scopes ["user:email"] == nil
-  or scopes ["repo"      ] == nil then
-    return nil, redirect
-  end
-  return true
+  return scopes
 end
 
 app.handle_error = function (_, error, trace)
@@ -63,10 +62,12 @@ app.handle_404 = function ()
   return { status = 404 }
 end
 
-app:match ("root", "/", function (self)
-  local ok, err = check_scopes (self)
-  if not ok then
-    return err
+app:match ("/", "/", function (self)
+  local scopes = get_scopes (self)
+  if not scopes
+  or scopes ["user:email"] == nil
+  or scopes ["repo"      ] == nil then
+    return get_token ()
   end
   return {
     status = 200,
@@ -75,10 +76,12 @@ app:match ("root", "/", function (self)
   }
 end)
 
-app:match ("editor", "/editors/:owner/:repository(/:branch)", function (self)
-  local ok, err = check_scopes (self)
-  if not ok then
-    return err
+app:match ("/editors/", "/editors/:owner/:repository(/:branch)", function (self)
+  local scopes = get_scopes (self)
+  if not scopes
+  or scopes ["user:email"] == nil
+  or scopes ["repo"      ] == nil then
+    return get_token ()
   end
   local repository, status = Http {
     url     = Et.render ("https://api.github.com/repos/<%- owner %>/<%- repository %>", {
@@ -100,7 +103,7 @@ app:match ("editor", "/editors/:owner/:repository(/:branch)", function (self)
   end
   if not self.params.branch then
     return {
-      redirect_to = self:url_for ("editor", {
+      redirect_to = self:url_for ("/editors/", {
         owner      = self.params.owner,
         repository = self.params.repository,
         branch     = repository.default_branch,
@@ -130,7 +133,7 @@ app:match ("editor", "/editors/:owner/:repository(/:branch)", function (self)
   end
 end)
 
-app:match ("/newuser", function (self)
+app:match ("/newuser", "/newuser", function (self)
   if self.params.state ~= Config.gh_oauth_state then
     return { status = 400 }
   end
@@ -150,7 +153,7 @@ app:match ("/newuser", function (self)
     },
   }
   assert (status == 200, status)
-  local token = result.access_token
+  local token = assert (result.access_token)
   result, status = Http {
     url     = "https://api.github.com/user",
     method  = "GET",

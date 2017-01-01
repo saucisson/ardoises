@@ -86,7 +86,7 @@ function Start.perform (job)
               endpoint = endpoint:sub (1, #endpoint-1)
             end
             editor:update {
-              url = endpoint,
+              url = endpoint:gsub ("^http", "ws"),
             }
             return
           end
