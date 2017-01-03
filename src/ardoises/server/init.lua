@@ -15,7 +15,7 @@ local function get_token ()
     redirect_to = Et.render ("https://github.com/login/oauth/authorize?state=<%- state %>&scope=<%- scope %>&client_id=<%- client_id %>", {
       client_id = Config.gh_client_id,
       state     = Config.gh_oauth_state,
-      scope     = Util.escape "user:email repo",
+      scope     = Util.escape "user:email repo delete_repo",
     })
   }
 end
@@ -65,8 +65,9 @@ end
 app:match ("/", "/", function (self)
   local scopes = get_scopes (self)
   if not scopes
-  or scopes ["user:email"] == nil
-  or scopes ["repo"      ] == nil then
+  or scopes ["user:email" ] == nil
+  or scopes ["repo"       ] == nil
+  or scopes ["delete_repo"] == nil then
     return get_token ()
   end
   return {
@@ -79,8 +80,9 @@ end)
 app:match ("/editors/", "/editors/:owner/:repository(/:branch)", function (self)
   local scopes = get_scopes (self)
   if not scopes
-  or scopes ["user:email"] == nil
-  or scopes ["repo"      ] == nil then
+  or scopes ["user:email" ] == nil
+  or scopes ["repo"       ] == nil
+  or scopes ["delete_repo"] == nil then
     return get_token ()
   end
   local repository, status = Http {
