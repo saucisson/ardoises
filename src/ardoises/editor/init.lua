@@ -544,9 +544,11 @@ function Editor.handlers.patch (editor, message)
   local modules = {}
   local function rollback ()
     for _, module in pairs (modules) do
-      Layer.write_to (module.layer, nil)
-      local refines = module.layer [Layer.key.refines]
-      refines [Layer.len (refines)] = nil
+      if module.current then
+        Layer.write_to (module.layer, nil)
+        local refines = module.layer [Layer.key.refines]
+        refines [Layer.len (refines)] = nil
+      end
       Layer.write_to (module.layer, false)
       module.current = nil
     end
@@ -576,13 +578,6 @@ function Editor.handlers.patch (editor, message)
         return nil, err
       end
       modules [patch.module] = module
-      module.current = Layer.new {
-        temporary = true,
-      }
-      Layer.write_to (module.layer, nil)
-      local refines = module.layer [Layer.key.refines]
-      refines [Layer.len (refines)+1] = module.current
-      Layer.write_to (module.layer, module.current)
       return true
     end) ()
     if not ok then
@@ -597,6 +592,13 @@ function Editor.handlers.patch (editor, message)
   for _, patch in ipairs (message.patches) do
     local ok, err = (function ()
       local module = modules [patch.module]
+      module.current = Layer.new {
+        temporary = true,
+      }
+      Layer.write_to (module.layer, nil)
+      local refines = module.layer [Layer.key.refines]
+      refines [Layer.len (refines)+1] = module.current
+      Layer.write_to (module.layer, module.current)
       if type (patch.code) ~= "string" then
         return nil, "patch code is not a string"
       end
@@ -632,9 +634,10 @@ function Editor.handlers.patch (editor, message)
     for part in req.module:gmatch "[^%.]+" do
       parts [#parts+1] = part
     end
+    module.code    = Layer.dump (module.remote)
     local filename = "src/" .. table.concat (parts, "/") .. ".lua"
     local file     = io.open (repository.path .. "/" .. filename, "w")
-    file:write (Layer.dump (module.remote))
+    file:write (module.code)
     file:close ()
     assert (os.execute (Et.render ([[
       cd <%- path %> && \
