@@ -1,12 +1,14 @@
-local Copas  = require "copas"
-local Client = require "ardoises.client"
+local Copas   = require "copas"
+local Client  = require "ardoises.client"
+local Gettime = require "socket".gettime
+local Mime    = require "mime"
 
-describe ("Ardoises client", function ()
+describe ("#client", function ()
 
   it ("can be instantiated", function ()
     local client
     Copas.addthread (function ()
-      client = Client.new {
+      client = Client {
         server = "http://localhost:8080",
         token  = os.getenv "ARDOISES_TOKEN",
       }
@@ -16,10 +18,9 @@ describe ("Ardoises client", function ()
   end)
 
   it ("can list and search existing ardoises", function ()
-    local client
     local ardoises = {}
     Copas.addthread (function ()
-      client = Client.new {
+      local client = Client {
         server = "http://localhost:8080",
         token  = os.getenv "ARDOISES_TOKEN",
       }
@@ -31,18 +32,20 @@ describe ("Ardoises client", function ()
     assert.is_truthy (#ardoises > 0)
   end)
 
-  it ("can create a new ardoise", function ()
-    local client
+  it ("can create and delete an ardoise", function ()
+    local created, deleted
     Copas.addthread (function ()
-      client = Client.new {
+      local client = Client {
         server = "http://localhost:8080",
         token  = os.getenv "ARDOISES_TOKEN",
       }
-      client:create {
-        name = "test-ardoise",
-      }
+      local name = Mime.b64 (Gettime ())
+      created = client:create ("ardoises-test/" .. name .. ":test")
+      deleted = created:delete ()
     end)
     Copas.loop ()
+    assert.is_truthy (created)
+    assert.is_truthy (deleted)
   end)
 
 end)
