@@ -591,14 +591,6 @@ function Editor.handlers.patch (editor, message)
   -- apply patches
   for _, patch in ipairs (message.patches) do
     local ok, err = (function ()
-      local module = modules [patch.module]
-      module.current = Layer.new {
-        temporary = true,
-      }
-      Layer.write_to (module.layer, nil)
-      local refines = module.layer [Layer.key.refines]
-      refines [Layer.len (refines)+1] = module.current
-      Layer.write_to (module.layer, module.current)
       if type (patch.code) ~= "string" then
         return nil, "patch code is not a string"
       end
@@ -610,7 +602,16 @@ function Editor.handlers.patch (editor, message)
       if not ok_loaded then
         return nil, "invalid layer: " .. loaded
       end
+      local module = modules [patch.module]
+      module.current = Layer.new {
+        temporary = true,
+      }
+      Layer.write_to (module.layer, nil)
+      local refines = module.layer [Layer.key.refines]
+      refines [Layer.len (refines)+1] = module.current
+      Layer.write_to (module.layer, module.current)
       local ok_apply, err_apply = pcall (loaded, editor.Layer, module.layer, module.ref)
+      Layer.write_to (module.layer, false)
       if not ok_apply then
         return nil, "invalid layer: " .. err_apply
       end
