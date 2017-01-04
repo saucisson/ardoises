@@ -4,8 +4,9 @@ services:
     image: postgres
   redis:
     image: redis:3.0.7 # because of bug in qless
-  server:
+  ardoises:
     build: .
+    entrypoint: ardoises-server
     ports:
       - "8080:8080"
     links:

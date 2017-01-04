@@ -20,5 +20,3 @@ RUN   apk add --no-cache --virtual .build-deps \
   &&  luarocks make     rockspec/ardoises-master-1.rockspec \
   &&  rm -rf            /src/ardoises \
   &&  apk del .build-deps
-
-ENTRYPOINT ["ardoises-server"]
