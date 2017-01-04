@@ -40,5 +40,9 @@ Patterns.require =
     t [2].module = t [1]
     return t [2]
   end
+Patterns.authorization =
+    Lpeg.P"token"
+  * Lpeg.S"\r\n\f\t "^1
+  * (Patterns.alnum^1 / tostring)
 
 return Patterns
