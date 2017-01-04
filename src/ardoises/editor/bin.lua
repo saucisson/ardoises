@@ -34,7 +34,7 @@ parser:option "--port" {
 }
 
 local arguments = parser:parse ()
-local editor    = Editor.create (arguments)
+local editor    = Editor (arguments)
 Copas.addthread (function ()
   editor:start ()
 end)
