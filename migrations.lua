@@ -11,12 +11,10 @@ return {
   end,
   function ()
     Schema.create_table ("editors", {
-      { "repository", Schema.types.text    },
-      { "branch"    , Schema.types.text    },
+      { "repository", Schema.types.text    { primary_key = true } },
       { "docker"    , Schema.types.text    { null        = true } },
       { "url"       , Schema.types.text    { null        = true } },
       { "starting"  , Schema.types.boolean { default     = true } },
-      "PRIMARY KEY (repository, branch)",
     })
   end,
 }

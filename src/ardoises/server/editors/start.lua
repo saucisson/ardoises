@@ -10,8 +10,7 @@ local Start = {}
 
 function Start.perform (job)
   local editor = Model.editors:create {
-    repository = job.data.repository.full_name,
-    branch     = job.data.branch,
+    repository = Et.render ("<%- owner %>/<%- repository %>:<%- branch %>", job.data),
     starting   = true,
   }
   if not editor then
@@ -22,13 +21,9 @@ function Start.perform (job)
   local headers = {
     ["Authorization"] = "Basic " .. Mime.b64 (Config.docker.username .. ":" .. Config.docker.api_key),
   }
-  local arguments = Et.render ([[ --application=<%- application %> <%- repository %> <%- token %> ]], {
-    application = Config.gh_app_name,
+  local arguments = Et.render ([["<%- repository %>" "<%- token %>"]], {
+    repository  = Et.render ("<%- owner %>/<%- repository %>:<%- branch %>", job.data),
     token       = job.data.token,
-    repository  = Et.render ("<%- repository %>:<%- branch %>", {
-      repository = job.data.repository.full_name,
-      branch     = job.data.branch,
-    }),
   })
   pcall (function ()
     -- Create service:
@@ -37,7 +32,8 @@ function Start.perform (job)
       method  = "POST",
       headers = headers,
       body    = {
-        image           = "ardoises/editor:dev",
+        image           = "ardoises/ardoises:dev", -- FIXME: switch to master branch
+        entrypoint      = "ardoises-editor",
         run_command     = arguments,
         autorestart     = "OFF",
         autodestroy     = "ALWAYS",

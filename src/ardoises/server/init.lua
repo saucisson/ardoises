@@ -1,10 +1,11 @@
-local Config = require "lapis.config".get ()
-local Et     = require "etlua"
-local Http   = require "ardoises.jsonhttp".resty
-local Lapis  = require "lapis"
-local Model  = require "ardoises.server.model"
-local Qless  = require "resty.qless"
-local Util   = require "lapis.util"
+local Config   = require "lapis.config".get ()
+local Et       = require "etlua"
+local Http     = require "ardoises.jsonhttp".resty
+local Lapis    = require "lapis"
+local Model    = require "ardoises.server.model"
+local Patterns = require "ardoises.patterns"
+local Qless    = require "resty.qless"
+local Util     = require "lapis.util"
 
 local app  = Lapis.Application ()
 app.layout = false
@@ -20,15 +21,17 @@ local function get_token ()
   }
 end
 
-local function get_scopes (self)
-  if not self.session.gh_id then
-    return nil
+local function get_scopes (self, authorization)
+  if self.session.gh_id then
+    self.account = Model.accounts:find {
+      id = self.session.gh_id,
+    }
+    authorization = self.account.token
+  elseif not authorization then
+    authorization = self.req.headers ["Authorization"] or ""
+    authorization = Patterns.authorization:match (authorization)
   end
-  self.account = Model.accounts:find {
-    id = self.session.gh_id,
-  }
-  if not self.account
-  or not self.account.token then
+  if not authorization then
     return nil
   end
   local user, status, headers = Http {
@@ -36,14 +39,28 @@ local function get_scopes (self)
     method  = "GET",
     headers = {
       ["Accept"       ] = "application/vnd.github.v3+json",
-      ["Authorization"] = "token " .. self.account.token,
+      ["Authorization"] = "token " .. authorization,
       ["User-Agent"   ] = Config.gh_app_name,
     },
   }
   if status ~= 200 then
     return nil
   end
-  self.user = user
+  local account = Model.accounts:find {
+    id = user.id,
+  }
+  if account and account.token ~= authorization then
+    account:update {
+      token = authorization,
+    }
+  elseif not account then
+    account = Model.accounts:create {
+      id    = user.id,
+      token = authorization,
+    }
+  end
+  self.account = account
+  self.user    = user
   local header = headers ["X-OAuth-Scopes"] or ""
   local scopes = {}
   for scope in header:gmatch "[^,%s]+" do
@@ -113,8 +130,7 @@ app:match ("/editors/", "/editors/:owner/:repository(/:branch)", function (self)
     }
   end
   local editor = Model.editors:find {
-    repository = repository.full_name,
-    branch     = self.params.branch,
+    repository = Et.render ("<%- owner %>/<%- repository %>:<%- branch %>", self.params)
   }
   if editor and editor.url then
     return { redirect_to = editor.url }
@@ -124,7 +140,8 @@ app:match ("/editors/", "/editors/:owner/:repository(/:branch)", function (self)
     local qless = Qless.new (Config.redis)
     local queue = qless.queues ["ardoises"]
     queue:put ("ardoises.server.editors.start", {
-      repository = repository,
+      owner      = self.params.owner,
+      repository = self.params.repository,
       branch     = self.params.branch,
       token      = self.account.token,
     })
@@ -155,32 +172,11 @@ app:match ("/newuser", "/newuser", function (self)
     },
   }
   assert (status == 200, status)
-  local token = assert (result.access_token)
-  result, status = Http {
-    url     = "https://api.github.com/user",
-    method  = "GET",
-    headers = {
-      ["Accept"       ] = "application/vnd.github.v3+json",
-      ["Authorization"] = "token " .. token,
-      ["User-Agent"   ] = Config.gh_app_name,
-    },
-  }
-  assert (status == 200, status)
-  local account = Model.accounts:find {
-    id = result.id,
-  }
-  if account then
-    account:update {
-      token = token,
-    }
-  else
-    account = Model.accounts:create {
-      id    = result.id,
-      token = token,
-    }
+  if not get_scopes (self, result.access_token) then
+    return { status = 403 }
   end
-  self.session.gh_id    = account.id
-  self.session.gh_token = account.token
+  self.session.gh_id    = self.account.id
+  self.session.gh_token = self.account.token
   return { redirect_to = "/" }
 end)
 

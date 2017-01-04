@@ -1,6 +1,6 @@
 local Config   = require "lapis.config".get ()
 local Database = require "lapis.db"
-local Http     = require "ardoises.server.http"
+local Http     = require "ardoises.jsonhttp".resty
 local Mime     = require "mime"
 local Model    = require "ardoises.server.model"
 
