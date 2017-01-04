@@ -84,7 +84,7 @@ function Editor.start (editor)
     port      = editor.port,
     default   = function () end,
     protocols = {
-      ardoises = function (ws)
+      ardoise = function (ws)
         editor.last  = os.time ()
         local client = setmetatable ({
           websocket   = ws,

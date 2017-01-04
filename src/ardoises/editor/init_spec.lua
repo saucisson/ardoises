@@ -67,7 +67,7 @@ describe ("#editor", function ()
         port = editor.port,
       })
       local client = Websocket.client.copas { timeout = 5 }
-      connected    = client:connect (url, "ardoises")
+      connected    = client:connect (url, "ardoise")
       editor:stop ()
     end)
     Copas.loop ()
@@ -93,7 +93,7 @@ describe ("#editor", function ()
         port = editor.port,
       })
       local client = Websocket.client.copas { timeout = 5 }
-      client:connect (url, "ardoises")
+      client:connect (url, "ardoise")
       client:send (Json.encode {
         id    = 1,
         type  = "authenticate",
@@ -134,7 +134,7 @@ describe ("#editor", function ()
         port = editor.port,
       })
       local client = Websocket.client.copas { timeout = 5 }
-      client:connect (url, "ardoises")
+      client:connect (url, "ardoise")
       client:send (Json.encode {
         id    = 1,
         type  = "authenticate",
@@ -172,7 +172,7 @@ describe ("#editor", function ()
         port = editor.port,
       })
       local client = Websocket.client.copas { timeout = 5 }
-      client:connect (url, "ardoises")
+      client:connect (url, "ardoise")
       client:send (Json.encode {
         id    = 1,
         type  = "authenticate",
@@ -217,7 +217,7 @@ describe ("#editor", function ()
         port = editor.port,
       })
       local client = Websocket.client.copas { timeout = 5 }
-      client:connect (url, "ardoises")
+      client:connect (url, "ardoise")
       client:send (Json.encode {
         id    = 1,
         type  = "authenticate",
@@ -261,7 +261,7 @@ describe ("#editor", function ()
         port = editor.port,
       })
       local client = Websocket.client.copas { timeout = 5 }
-      client:connect (url, "ardoises")
+      client:connect (url, "ardoise")
       client:send (Json.encode {
         id    = 1,
         type  = "authenticate",
@@ -306,7 +306,7 @@ describe ("#editor", function ()
         port = editor.port,
       })
       local client = Websocket.client.copas { timeout = 5 }
-      client:connect (url, "ardoises")
+      client:connect (url, "ardoise")
       client:send (Json.encode {
         id    = 1,
         type  = "authenticate",
@@ -358,7 +358,7 @@ describe ("#editor", function ()
         port = editor.port,
       })
       local client = Websocket.client.copas { timeout = 5 }
-      client:connect (url, "ardoises")
+      client:connect (url, "ardoise")
       client:send (Json.encode {
         id    = 1,
         type  = "authenticate",
