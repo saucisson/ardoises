@@ -115,7 +115,7 @@ describe ("#editor", function ()
     })
   end)
 
-  it ("cannot authenticate with wrong token", function ()
+  it ("cannot start with wrong token", function ()
     local Editor = require "ardoises.editor"
     local editor = Editor {
       branch      = Patterns.branch:match "ahamez/foo:master",
@@ -125,32 +125,12 @@ describe ("#editor", function ()
       application = "Ardoises",
       nopush      = true,
     }
-    local answer
+    local started
     Copas.addthread (function ()
-      editor:start ()
-      Copas.sleep (1)
-      local url = Et.render ("ws://<%- host %>:<%- port %>", {
-        host = editor.host,
-        port = editor.port,
-      })
-      local client = Websocket.client.copas { timeout = 5 }
-      client:connect (url, "ardoise")
-      client:send (Json.encode {
-        id    = 1,
-        type  = "authenticate",
-        token = assert (os.getenv "ARDOISES_TOKEN"),
-      })
-      answer = client:receive ()
-      answer = Json.decode (answer)
-      editor:stop ()
+      started = editor:start ()
     end)
     Copas.loop ()
-    assert.are.same (answer, {
-      id      = 1,
-      type    = "answer",
-      success = false,
-      error  = "cannot obtain repository: 404",
-    })
+    assert.is_falsy (started)
   end)
 
   it ("can require after authenticate", function ()

@@ -58,19 +58,20 @@ end
 
 function Editor.start (editor)
   assert (getmetatable (editor) == Editor)
-  local repository = editor:pull (editor.branch)
-  if repository then
-    local file = assert (io.popen (Et.render ([[ find "<%- path %>/src" -name "*.lua" 2> /dev/null ]], {
-      path = repository.path,
-    }), "r"))
-    repeat
-      local line = file:read "*l"
-      if line and not line:match "_spec%.lua$" then
-        local module = line:match ("^" .. repository.path .. "/src/(.*)%.lua$"):gsub ("/", ".")
-        repository.modules [module] = true
-      end
-    until not line
+  local repository, err = editor:pull (editor.branch)
+  if not repository then
+    return nil, err
   end
+  local file = assert (io.popen (Et.render ([[ find "<%- path %>/src" -name "*.lua" 2> /dev/null ]], {
+    path = repository.path,
+  }), "r"))
+  repeat
+    local line = file:read "*l"
+    if line and not line:match "_spec%.lua$" then
+      local module = line:match ("^" .. repository.path .. "/src/(.*)%.lua$"):gsub ("/", ".")
+      repository.modules [module] = true
+    end
+  until not line
   local copas_addserver = Copas.addserver
   local addserver       = function (socket, f)
     editor.socket = socket
@@ -127,13 +128,15 @@ function Editor.start (editor)
       end
     end
   end)
+  return true
 end
 
 function Editor.stop (editor)
   assert (getmetatable (editor) == Editor)
   editor.running = false
   Copas.addthread (function ()
-    if not editor.nopush then
+    if  not editor.nopush
+    and editor.tokens.push then
       editor:push ()
     end
     editor.server:close ()
@@ -141,6 +144,7 @@ function Editor.stop (editor)
       Copas.wakeup (task)
     end
   end)
+  return true
 end
 
 function Editor.pull (editor, branch)
