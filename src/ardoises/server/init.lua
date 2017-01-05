@@ -21,52 +21,46 @@ local function get_token ()
   }
 end
 
-local function get_scopes (self, authorization)
+local function authenticate (self)
   if self.session.gh_id then
     self.account = Model.accounts:find {
       id = self.session.gh_id,
     }
-    authorization = self.account.token
-  elseif not authorization then
-    authorization = self.req.headers ["Authorization"] or ""
-    authorization = Patterns.authorization:match (authorization)
+    return true
   end
+  local authorization = self.req.headers ["Authorization"] or ""
+  authorization = Patterns.authorization:match (authorization)
   if not authorization then
     return nil
   end
-  local user, status, headers = Http {
-    url     = "https://api.github.com/user",
-    method  = "GET",
-    headers = {
-      ["Accept"       ] = "application/vnd.github.v3+json",
-      ["Authorization"] = "token " .. authorization,
-      ["User-Agent"   ] = Config.gh_app_name,
-    },
-  }
-  if status ~= 200 then
-    return nil
-  end
   local account = Model.accounts:find {
-    id = user.id,
+    token = authorization,
   }
-  if account and account.token ~= authorization then
-    account:update {
-      token = authorization,
+  if not account then
+    local user, status = Http {
+      url     = "https://api.github.com/user",
+      method  = "GET",
+      headers = {
+        ["Accept"       ] = "application/vnd.github.v3+json",
+        ["Authorization"] = "token " .. authorization,
+        ["User-Agent"   ] = Config.gh_app_name,
+      },
     }
-  elseif not account then
-    account = Model.accounts:create {
-      id    = user.id,
-      token = authorization,
+    if status ~= 200 then
+      return nil
+    end
+    account = Model.accounts:find {
+      id = user.id,
     }
+    if not account then
+      account = Model.accounts:create {
+        id    = user.id,
+        token = authorization,
+      }
+    end
   end
   self.account = account
-  self.user    = user
-  local header = headers ["X-OAuth-Scopes"] or ""
-  local scopes = {}
-  for scope in header:gmatch "[^,%s]+" do
-    scopes [scope] = true
-  end
-  return scopes
+  return true
 end
 
 app.handle_error = function (_, error, trace)
@@ -80,11 +74,7 @@ app.handle_404 = function ()
 end
 
 app:match ("/", "/", function (self)
-  local scopes = get_scopes (self)
-  if not scopes
-  or scopes ["user:email" ] == nil
-  or scopes ["repo"       ] == nil
-  or scopes ["delete_repo"] == nil then
+  if not authenticate (self) then
     return get_token ()
   end
   return {
@@ -95,11 +85,7 @@ app:match ("/", "/", function (self)
 end)
 
 app:match ("/editors/", "/editors/:owner/:repository(/:branch)", function (self)
-  local scopes = get_scopes (self)
-  if not scopes
-  or scopes ["user:email" ] == nil
-  or scopes ["repo"       ] == nil
-  or scopes ["delete_repo"] == nil then
+  if not authenticate (self) then
     return get_token ()
   end
   local repository, status = Http {
@@ -156,7 +142,7 @@ app:match ("/newuser", "/newuser", function (self)
   if self.params.state ~= Config.gh_oauth_state then
     return { status = 400 }
   end
-  local result, status
+  local user, result, status
   result, status = Http {
     url     = "https://github.com/login/oauth/access_token",
     method  = "POST",
@@ -172,9 +158,32 @@ app:match ("/newuser", "/newuser", function (self)
     },
   }
   assert (status == 200, status)
-  if not get_scopes (self, result.access_token) then
-    return { status = 403 }
+  user, status = Http {
+    url     = "https://api.github.com/user",
+    method  = "GET",
+    headers = {
+      ["Accept"       ] = "application/vnd.github.v3+json",
+      ["Authorization"] = "token " .. result.access_token,
+      ["User-Agent"   ] = Config.gh_app_name,
+    },
+  }
+  if status ~= 200 then
+    return nil
   end
+  local account = Model.accounts:find {
+    id = user.id,
+  }
+  if account then
+    account:update {
+      token = result.access_token,
+    }
+  elseif not account then
+    account = Model.accounts:create {
+      id    = user.id,
+      token = result.access_token,
+    }
+  end
+  self.account          = account
   self.session.gh_id    = self.account.id
   self.session.gh_token = self.account.token
   return { redirect_to = "/" }
