@@ -24,23 +24,19 @@ function Clean.perform ()
         }
       end
     end
-    if  editor.docker
-    and not editor.url then
-      local _, status = Http {
+    if editor.docker and not editor.url then
+      Http {
         url     = editor.docker,
         method  = "DELETE",
         headers = {
           ["Authorization"] = "Basic " .. Mime.b64 (Config.docker.username .. ":" .. Config.docker.api_key),
         },
       }
-      if (status >= 200 and status < 300) or status == 404 then
-        editor:update {
-          docker = Database.NULL,
-        }
-      end
+      editor:update {
+        docker = Database.NULL,
+      }
     end
-    if  not editor.url
-    and not editor.docker then
+    if not editor.url and not editor.docker then
       editor:delete ()
     end
   end
