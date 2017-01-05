@@ -243,14 +243,14 @@ Base64 "https://github.com/ardoises"
   assert (os.execute (Et.render ([[
     cd <%- path %>
     git init     --quiet
-    git checkout -b "<%- branch %>"
+    git checkout -b "<%- branch %>" 2> /dev/null
     git add      README.md
     git commit   --quiet \
                  --author="<%- name %> <<%- email %>>" \
                  --message="Create new ardoise."
     git remote   add origin <%- url %> > /dev/null
     git push     --quiet \
-                 --set-upstream origin "<%- branch %>"
+                 --set-upstream origin "<%- branch %>" 2> /dev/null
   ]], {
     url    = Url.build (url),
     path   = path,
@@ -351,10 +351,6 @@ function Ardoise.edit (ardoise)
     current   = nil,
     observers = {},
   }, Editor)
-  assert (websocket:send (Json.encode {
-    id   = 1,
-    type = "list",
-  }))
   editor.Layer.require = function (name)
     if not Patterns.require:match (name) then
       name = name .. "@" .. assert (editor.current)
@@ -370,12 +366,16 @@ function Ardoise.edit (ardoise)
       pcall (Editor.receive, editor)
     end
   end)
-  editor.patcher  = Copas.addthread (function ()
-    while editor.running do
-      pcall (Editor.patch, editor)
-    end
-  end)
   return editor
+end
+
+function Editor.__tostring (editor)
+  assert (getmetatable (editor) == Editor)
+  return Et.render ("<%- owner %>/<%- repository %>:<%- branch %>", {
+    owner      = editor.ardoise.owner.login,
+    repository = editor.ardoise.name,
+    branch     = editor.ardoise.branch,
+  })
 end
 
 function Editor.list (editor)
@@ -454,6 +454,7 @@ function Editor.patch (editor, what)
   if type (what) ~= "table" then
     return nil, "argument must be a table"
   end
+  local modules = {}
   local function rollback ()
     for _, module in pairs (editor.modules) do
       if module.current then
@@ -465,7 +466,6 @@ function Editor.patch (editor, what)
       module.current = nil
     end
   end
-  local modules = {}
   for name, code in pairs (what) do
     local module = editor.modules [name]
     if not module then
@@ -518,10 +518,6 @@ function Editor.patch (editor, what)
   editor.callbacks [request.id] = coroutine.running ()
   assert (editor.client.websocket:send (Json.encode (request)))
   Copas.sleep (-math.huge)
-  if not request.success then
-    rollback ()
-    return nil, request.error
-  end
   for module, layer in pairs (modules) do
     Layer.write_to (module.layer, nil)
     local refines = module.layer [Layer.key.refines]
@@ -531,6 +527,11 @@ function Editor.patch (editor, what)
       end
     end
     Layer.write_to (module.layer, false)
+  end
+  if not request.success then
+    return nil, request.error
+  end
+  for module, layer in pairs (modules) do
     if type (what [module.name] == "string") then
       Layer.merge (layer, module.remote)
     elseif type (what [module.name] == "function") then
@@ -644,7 +645,6 @@ function Editor.close (editor)
   editor.running = false
   editor.websocket:close ()
   Copas.wakeup (editor.receiver)
-  Copas.wakeup (editor.patcher)
 end
 
 return Client

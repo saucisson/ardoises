@@ -111,9 +111,6 @@ function Editor.start (editor)
   editor.tasks.answer = Copas.addthread (function ()
     while editor.running do
       editor:answer ()
-      if #editor.queue == 0 then
-        Copas.sleep (-math.huge)
-      end
     end
   end)
   editor.tasks.stop = Copas.addthread (function ()
