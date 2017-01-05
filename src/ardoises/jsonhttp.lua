@@ -52,8 +52,11 @@ function JsonHttp.copas (options)
   options.headers ["Content-type"  ] = options.body and "application/json"
   options.headers ["Accept"        ] = options.headers ["Accept"] or "application/json"
   local _, status, headers = Httpc.request (options)
-  result = #result ~= 0
-       and Json.decode (table.concat (result))
+  result = table.concat (result)
+  local ok, json = pcall (Json.decode, result)
+  if ok then
+    result = json
+  end
   return result, status, headers
 end
 
@@ -79,8 +82,11 @@ function JsonHttp.default (options)
   options.headers ["Accept"        ] = options.headers ["Accept"] or "application/json"
   local http = options.url:match "https://" and Https or Httpn
   local _, status, headers = http.request (options)
-  result = #result ~= 0
-       and Json.decode (table.concat (result))
+  result = table.concat (result)
+  local ok, json = pcall (Json.decode, result)
+  if ok then
+    result = json
+  end
   return result, status, headers
 end
 
