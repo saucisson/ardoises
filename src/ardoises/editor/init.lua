@@ -34,6 +34,7 @@ function Mt.__call (_, options)
     port         = assert (options.port),
     application  = assert (options.application),
     nopush       = options.nopush,
+    force_stop   = options.force_stop,
     current      = nil,
     running      = false,
     last         = false,
@@ -45,7 +46,7 @@ function Mt.__call (_, options)
   }, Editor)
   editor.Layer.require = function (name)
     if not Patterns.require:match (name) then
-      name = name .. "@" .. editor.current
+      name = tostring (name) .. "@" .. editor.current.full_name
     end
     local result, err = editor:require (name)
     if not result then
@@ -124,6 +125,9 @@ function Editor.start (editor)
         Copas.sleep (editor.timeout / 2)
       end
     end
+    if editor.force_stop then
+      os.exit (0)
+    end
   end)
   return true
 end
@@ -155,7 +159,7 @@ function Editor.pull (editor, branch)
     method  = "GET",
     headers = {
       ["Accept"       ] = "application/vnd.github.v3+json",
-      ["Authorization"] = "token " .. editor.tokens.pull,
+      ["Authorization"] = "token " .. tostring (editor.tokens.pull),
       ["User-Agent"   ] = editor.application,
     },
   }
@@ -299,11 +303,11 @@ function Editor.require (editor, x)
   file:close ()
   local loaded, err_loaded = _G.load (code, x, "t", _G)
   if not loaded then
-    return nil, "invalid layer: " .. err_loaded
+    return nil, "invalid layer: " .. tostring (err_loaded)
   end
   local ok, chunk = pcall (loaded)
   if not ok then
-    return nil, "invalid layer: " .. chunk
+    return nil, "invalid layer: " .. tostring (chunk)
   end
   local remote, ref = Layer.new {
     name = x,
@@ -312,7 +316,7 @@ function Editor.require (editor, x)
   editor.current = req.full_name
   local ok_apply, err_apply = pcall (chunk, editor.Layer, remote, ref)
   if not ok_apply then
-    return nil, "invalid layer: " .. err_apply
+    return nil, "invalid layer: " .. tostring (err_apply)
   end
   editor.current = oldcurrent
   local layer = Layer.new {
@@ -339,7 +343,7 @@ function Editor.handlers.authenticate (editor, message)
       method  = "GET",
       headers = {
         ["Accept"       ] = "application/vnd.github.v3+json",
-        ["Authorization"] = "token " .. message.token,
+        ["Authorization"] = "token " .. tostring (message.token),
         ["User-Agent"   ] = editor.application,
       },
     }
@@ -355,7 +359,7 @@ function Editor.handlers.authenticate (editor, message)
       method  = "GET",
       headers = {
         ["Accept"       ] = "application/vnd.github.v3+json",
-        ["Authorization"] = "token " .. message.token,
+        ["Authorization"] = "token " .. tostring (message.token),
         ["User-Agent"   ] = editor.application,
       },
     }
@@ -376,7 +380,7 @@ function Editor.handlers.authenticate (editor, message)
       method  = "GET",
       headers = {
         ["Accept"       ] = "application/vnd.github.v3+json",
-        ["Authorization"] = "token " .. message.token,
+        ["Authorization"] = "token " .. tostring (message.token),
         ["User-Agent"   ] = editor.application,
       },
     }
@@ -597,11 +601,11 @@ function Editor.handlers.patch (editor, message)
       end
       local chunk, err_chunk = _G.load (patch.code, patch.module, "t", _G)
       if not chunk then
-        return nil, "invalid layer: " .. err_chunk
+        return nil, "invalid layer: " .. tostring (err_chunk)
       end
       local ok_loaded, loaded = pcall (chunk)
       if not ok_loaded then
-        return nil, "invalid layer: " .. loaded
+        return nil, "invalid layer: " .. tostring (loaded)
       end
       local module = modules [patch.module]
       module.current = Layer.new {
@@ -614,7 +618,7 @@ function Editor.handlers.patch (editor, message)
       local ok_apply, err_apply = pcall (loaded, editor.Layer, module.layer, module.ref)
       Layer.write_to (module.layer, false)
       if not ok_apply then
-        return nil, "invalid layer: " .. err_apply
+        return nil, "invalid layer: " .. tostring (err_apply)
       end
       return true
     end) ()

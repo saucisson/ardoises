@@ -1,5 +1,17 @@
 #! /usr/bin/env lua
 
+local oldprint = print
+_G.print = function (...)
+  oldprint (...)
+  io.stdout:flush ()
+end
+
+local oldexecute = os.execute
+_G.os.execute = function (...)
+  print (...)
+  return oldexecute (...)
+end
+
 local Arguments = require "argparse"
 local Copas     = require "copas"
 local Editor    = require "ardoises.editor"
@@ -31,6 +43,9 @@ parser:option "--port" {
   description = "port",
   convert     = tonumber,
   default     = 8080,
+}
+parser:flag "--force-stop" {
+  description = "force editor stop",
 }
 
 local arguments = parser:parse ()
