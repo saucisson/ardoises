@@ -42,6 +42,7 @@ build = {
     ["ardoises.editor"              ] = "src/ardoises/editor/init.lua",
     ["ardoises.server"              ] = "src/ardoises/server/init.lua",
     ["ardoises.server.config"       ] = "src/ardoises/server/config.lua",
+    ["ardoises.server.instance"     ] = "src/ardoises/server/instance.lua",
     ["ardoises.server.model"        ] = "src/ardoises/server/model.lua",
     ["ardoises.server.editors.clean"] = "src/ardoises/server/editors/clean.lua",
     ["ardoises.server.editors.start"] = "src/ardoises/server/editors/start.lua",

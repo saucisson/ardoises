@@ -250,7 +250,7 @@ Base64 "https://github.com/ardoises"
                  --message="Create new ardoise."
     git remote   add origin <%- url %> > /dev/null
     git push     --quiet \
-                 --set-upstream origin "<%- branch %>" 2> /dev/null
+                 --set-upstream origin "<%- branch %>" > /dev/null
   ]], {
     url    = Url.build (url),
     path   = path,
