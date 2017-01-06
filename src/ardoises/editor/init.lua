@@ -117,11 +117,11 @@ function Editor.start (editor)
     while editor.running do
       if  next (editor.clients) == nil
       and #editor.queue == 0
-      and editor.last + editor.timeout < os.time ()
+      and editor.last + editor.timeout <= os.time ()
       then
         editor:stop ()
       else
-        Copas.sleep (editor.timeout / 2)
+        Copas.sleep (editor.timeout / 2 + 1)
       end
     end
   end)

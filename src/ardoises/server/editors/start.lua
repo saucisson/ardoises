@@ -44,6 +44,14 @@ function Start.perform (job)
             published  = true,
           },
         },
+        container_envvars = {
+          { key   = "DOCKER_USER",
+            value = Config.docker.username,
+          },
+          { key   = "DOCKER_SECRET",
+            value = Config.docker.api_key,
+          },
+        },
       },
     }
     assert (service_status == 201, service_status)
