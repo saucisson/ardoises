@@ -44,9 +44,6 @@ parser:option "--port" {
   convert     = tonumber,
   default     = 8080,
 }
-parser:flag "--force-stop" {
-  description = "force editor stop",
-}
 
 local arguments = parser:parse ()
 local editor    = Editor (arguments)

@@ -34,7 +34,6 @@ function Mt.__call (_, options)
     port         = assert (options.port),
     application  = assert (options.application),
     nopush       = options.nopush,
-    force_stop   = options.force_stop,
     current      = nil,
     running      = false,
     last         = false,
@@ -124,9 +123,6 @@ function Editor.start (editor)
       else
         Copas.sleep (editor.timeout / 2)
       end
-    end
-    if editor.force_stop then
-      os.exit (0)
     end
   end)
   return true
