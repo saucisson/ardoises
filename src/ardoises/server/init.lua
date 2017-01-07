@@ -16,7 +16,7 @@ local function get_token ()
     redirect_to = Et.render ("https://github.com/login/oauth/authorize?state=<%- state %>&scope=<%- scope %>&client_id=<%- client_id %>", {
       client_id = Config.gh_client_id,
       state     = Config.gh_oauth_state,
-      scope     = Util.escape "user:email repo delete_repo",
+      scope     = Util.escape "user:email repo", -- delete_repo
     })
   }
 end
