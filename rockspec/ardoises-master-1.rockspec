@@ -18,6 +18,7 @@ dependencies = {
   "argparse",
   "ansicolors",
   "copas",
+  "dkjson",
   "etlua",
   "lapis",
   "layeredata",
@@ -25,11 +26,11 @@ dependencies = {
   "luaposix",
   "luasec",
   "luasocket",
-  "lua-cjson",
   "lua-resty-exec",
   "lua-resty-http",
   "lua-resty-qless", -- FIXME: remove rockspec, fix wercker.yml and Dockerfile
   "lua-websockets",
+  "rapidjson",
   "serpent",
   "yaml",
 }

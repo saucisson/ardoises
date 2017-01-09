@@ -1,7 +1,7 @@
 local Config  = require "lapis.config".get ()
 local Et      = require "etlua"
 local Http    = require "ardoises.jsonhttp".resty
-local Json    = require "cjson"
+local Json    = require "rapidjson"
 local Mime    = require "mime"
 local Model   = require "ardoises.server.model"
 local gettime = require "socket".gettime

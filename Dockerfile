@@ -4,9 +4,11 @@ MAINTAINER Alban Linard <alban@linard.fr>
 ADD . /src/ardoises
 RUN   apk add --no-cache --virtual .build-deps \
           build-base \
+          cmake \
           make \
           perl \
           openssl-dev \
+  &&  apk add --no-cache libstdc++ \
   &&  cd /src/ardoises/ \
   &&  cp config.lua     /config.lua \
   &&  cp mime.types     /mime.types \

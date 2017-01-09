@@ -1,6 +1,6 @@
 local Mime    = require "mime"
 local Hashids = require "hashids"
-local Json    = require "cjson"
+local Json    = require "rapidjson"
 local Http    = require "ardoises.jsonhttp".default
 
 local url = "https://cloud.docker.com"
