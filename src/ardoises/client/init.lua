@@ -303,7 +303,7 @@ function Ardoise.edit (ardoise)
     }),
   }
   local wsurl, status, headers
-  for _ = 1, 60 do
+  for _ = 1, 10 do
     _, status, headers = Http {
       redirect = false,
       url      = url,
@@ -320,7 +320,7 @@ function Ardoise.edit (ardoise)
     elseif status == 302 then
       url = headers.location
     end
-    Copas.sleep (1)
+    Copas.sleep (10)
   end
   if not wsurl then
     return nil, "unable to open websocket connection: " .. tostring (status)

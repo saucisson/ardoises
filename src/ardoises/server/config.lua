@@ -5,15 +5,17 @@ local postgres_url = assert (Url.parse (os.getenv "POSTGRES_PORT"))
 local redis_url    = assert (Url.parse (os.getenv "REDIS_PORT"   ))
 
 local common = {
-  host             = "localhost",
-  port             = 8080,
-  num_workers      = 1,
-  gh_client_id     = assert (os.getenv "GH_CLIENT_ID"),
-  gh_client_secret = assert (os.getenv "GH_CLIENT_SECRET"),
-  gh_oauth_state   = assert (os.getenv "GH_OAUTH_STATE"),
-  gh_app_name      = assert (os.getenv "GH_APP_NAME"),
-  session_name     = "ardoises",
-  secret           = assert (os.getenv "ARDOISES_SECRET"),
+  host         = "localhost",
+  port         = 8080,
+  num_workers  = 1,
+  session_name = "ardoises",
+  application = {
+    id     = assert (os.getenv "APPLICATION_ID"    ),
+    name   = assert (os.getenv "APPLICATION_NAME"  ),
+    secret = assert (os.getenv "APPLICATION_SECRET"),
+    state  = assert (os.getenv "APPLICATION_STATE" ),
+    token  = assert (os.getenv "ARDOISES_TOKEN"    ),
+  },
   postgres = {
     backend  = "pgmoon",
     host     = assert (postgres_url.host),

@@ -23,11 +23,13 @@ dependencies = {
   "lapis",
   "layeredata",
   "lpeg",
+  "luaossl",
   "luaposix",
   "luasec",
   "luasocket",
   "lua-resty-exec",
   "lua-resty-http",
+  "lua-resty-jwt",
   "lua-resty-qless", -- FIXME: remove rockspec, fix wercker.yml and Dockerfile
   "lua-websockets",
   "rapidjson",

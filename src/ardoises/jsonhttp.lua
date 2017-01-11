@@ -1,14 +1,15 @@
-local Json = require "rapidjson"
-local Util = require "lapis.util"
+local Json  = require "rapidjson"
+local Util  = require "lapis.util"
 local JsonHttp = {}
 
 local function wrap (what)
   return function (options)
     assert (type (options) == "table")
     local request  = {}
+    local answer   = {}
     request.url    = options.url
-    request.method = options.method  or "GET"
-    request.body   = options.body    and Json.encode (options.body, {
+    request.method = options.method or "GET"
+    request.body   = options.body   and Json.encode (options.body, {
       sort_keys = true,
     })
     request.headers = {}
@@ -23,30 +24,46 @@ local function wrap (what)
     request.headers ["Content-length"] = request.body and #request.body
     request.headers ["Content-type"  ] = request.body and "application/json"
     request.headers ["Accept"        ] = request.headers ["Accept"] or "application/json"
-    local result = what (request)
-    if result.body then
-      local ok, json = pcall (Json.decode, result.body)
-      if ok then
-        result.body = json
+    repeat
+      local result = what (request, not options.nocache)
+      print (result.status, " ", result.body)
+      if result.body then
+        local ok, json = pcall (Json.decode, result.body)
+        if ok then
+          result.body = json
+        end
       end
-    end
-    return result.body, result.status, result.headers
+      answer.status  = answer.status  or result.status
+      answer.headers = answer.headers or result.headers
+      if not answer.body then
+        answer.body  = result.body
+      else
+        for _, entry in ipairs (result.body) do
+          answer.body [#answer.body+1] = entry
+        end
+      end
+      request.url   = nil
+      request.query = nil
+      request.body  = nil
+      for link in (result.headers ["Link"] or ""):gmatch "[^,]+" do
+        request.url = link:match [[<([^>]+)>;%s*rel="next"]] or request.url
+      end
+    until not request.url
+    return answer.body, answer.status, answer.headers
   end
 end
 
-JsonHttp.resty = wrap (function (request)
+JsonHttp.resty = wrap (function (request, cache)
   assert (type (request) == "table")
   local Config = require "lapis.config".get ()
-  local Httpr  = require "resty.http"
+  local Http   = require "resty.http"
   local Redis  = require "resty.redis"
   local json   = {}
-  local redis
+  local redis  = Redis:new ()
+  assert (redis:connect (Config.redis.host, Config.redis.port))
+  assert (redis:select  (Config.redis.database))
   request.ssl_verify = false
-  if request.method == "GET" then
-    redis = Redis:new ()
-    redis:set_timeout (1000) -- milliseconds
-    assert (redis:connect (Config.redis.host, Config.redis.port))
-    assert (redis:select  (Config.redis.database))
+  if cache and request.method == "GET" then
     json.request = Json.encode (request, {
       sort_keys = true,
     })
@@ -57,14 +74,14 @@ JsonHttp.resty = wrap (function (request)
       request.headers ["If-Modified-Since"] = json.answer.headers ["Last-Modified"]
     end
   end
-  local client = Httpr.new ()
+  local client = Http.new ()
   client:set_timeout (1000) -- milliseconds
   local result = assert (client:request_uri (request.url, request))
   if result.status == 304 then
     redis:expire (json.request, 86400) -- 1 day
     return json.answer
   end
-  if request.method == "GET" then
+  if cache and request.method == "GET" then
     json.answer = Json.encode ({
       status  = result.status,
       headers = result.headers,
@@ -72,9 +89,10 @@ JsonHttp.resty = wrap (function (request)
     }, {
       sort_keys = false,
     })
-    redis:set (json.request, json.answer)
+    redis:set    (json.request, json.answer)
     redis:expire (json.request, 86400) -- 1 day
   end
+  redis:set_keepalive (10 * 1000, 100)
   return result
 end)
 
