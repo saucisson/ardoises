@@ -26,7 +26,6 @@ local function wrap (what)
     request.headers ["Accept"        ] = request.headers ["Accept"] or "application/json"
     repeat
       local result = what (request, not options.nocache)
-      print (result.status, " ", result.body)
       if result.body then
         local ok, json = pcall (Json.decode, result.body)
         if ok then

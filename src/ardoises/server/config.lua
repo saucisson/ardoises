@@ -34,8 +34,11 @@ local common = {
     api_key  = assert (os.getenv "DOCKER_SECRET"),
   },
   clean = {
-    delay = 10,
-  }
+    delay = 60,
+  },
+  invitation = {
+    delay = 60,
+  },
 }
 
 Config ({ "test", "development", "production" }, common)
