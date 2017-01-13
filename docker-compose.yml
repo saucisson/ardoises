@@ -12,6 +12,11 @@ services:
     links:
       - postgres
       - redis
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     logging:
       driver: "json-file"
     environment:
@@ -26,4 +31,5 @@ services:
       APPLICATION_SECRET: ${APPLICATION_SECRET}
       APPLICATION_STATE:  ${APPLICATION_STATE}
       APPLICATION_NAME:   Ardoises
+      ARDOISES_USER:      ardoises
       ARDOISES_TOKEN:     ${ARDOISES_TOKEN}

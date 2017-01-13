@@ -68,8 +68,8 @@ end
 app:match ("/", function (self)
   local qless = Qless.new (Config.redis)
   local queue = qless.queues ["ardoises"]
-  queue:recur ("ardoises.server.editors.clean", {}, Config.clean.delay, {
-    jid = "ardoises.server.editors.clean",
+  queue:recur ("ardoises.server.job.editor.clean", {}, Config.clean.delay, {
+    jid = "ardoises.server.job.editor.clean",
   })
   queue:recur ("ardoises.server.invitation", {}, Config.invitation.delay, {
     jid = "ardoises.server.invitation",
@@ -201,7 +201,8 @@ app:match ("/editors/", "/editors/:owner/:repository(/:branch)", function (self)
   if not authenticate (self) then
     return { redirect_to = "/overview.html" }
   end
-  local repository, status = Http {
+  local repository, status
+  repository, status = Http {
     url     = Et.render ("https://api.github.com/repos/<%- owner %>/<%- repository %>", {
       owner      = self.params.owner,
       repository = self.params.repository,
@@ -213,9 +214,29 @@ app:match ("/editors/", "/editors/:owner/:repository(/:branch)", function (self)
       ["User-Agent"   ] = Config.application.name,
     },
   }
-  if status ~= 200 then
+  if status == 404 then
     return { status = 404 }
   end
+  assert (status == 200, status)
+  if not repository.permissions.pull then
+    return { status = 403 }
+  end
+  repository, status = Http {
+    url     = Et.render ("https://api.github.com/repos/<%- owner %>/<%- repository %>", {
+      owner      = self.params.owner,
+      repository = self.params.repository,
+    }),
+    method  = "GET",
+    headers = {
+      ["Accept"       ] = "application/vnd.github.v3+json",
+      ["Authorization"] = "token " .. Config.application.token,
+      ["User-Agent"   ] = Config.application.name,
+    },
+  }
+  if status == 404 then
+    return { status = 404 }
+  end
+  assert (status == 200, status)
   if not repository.permissions.pull then
     return { status = 403 }
   end
@@ -238,11 +259,10 @@ app:match ("/editors/", "/editors/:owner/:repository(/:branch)", function (self)
   else
     local qless = Qless.new (Config.redis)
     local queue = qless.queues ["ardoises"]
-    queue:put ("ardoises.server.editors.start", {
+    queue:put ("ardoises.server.job.editor.start", {
       owner      = self.params.owner,
       repository = self.params.repository,
       branch     = self.params.branch,
-      token      = self.account.token,
     })
     return { status = 201 }
   end

@@ -26,6 +26,7 @@ dependencies = {
   "luaposix",
   "luasec",
   "luasocket",
+  "luasocket-unix",
   "lua-resty-exec",
   "lua-resty-http",
   "lua-resty-qless", -- FIXME: remove rockspec, fix wercker.yml and Dockerfile

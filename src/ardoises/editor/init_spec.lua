@@ -21,27 +21,31 @@ describe ("#editor", function ()
 
   it ("can be instantiated", function ()
     local Editor = require "ardoises.editor"
-    local editor = Editor {
-      branch      = Patterns.branch:match "saucisson/lua-c3:master",
-      token       = os.getenv "ARDOISES_TOKEN",
-      port        = 0,
-      timeout     = 1,
-      application = "Ardoises",
-    }
+    local editor
+    Copas.addthread (function ()
+      editor = Editor {
+        branch      = Patterns.branch:match "saucisson/lua-c3:master",
+        token       = os.getenv "ARDOISES_TOKEN",
+        port        = 0,
+        timeout     = 1,
+        application = "Ardoises",
+      }
+    end)
+    Copas.loop ()
     assert.is_not_nil (editor)
   end)
 
   it ("can be started and explicitly stopped", function ()
     local Editor = require "ardoises.editor"
-    local editor = Editor {
-      branch      = Patterns.branch:match "saucisson/lua-c3:master",
-      token       = os.getenv "ARDOISES_TOKEN",
-      port        = 0,
-      timeout     = 1,
-      application = "Ardoises",
-      nopush      = true,
-    }
     Copas.addthread (function ()
+      local editor = Editor {
+        branch      = Patterns.branch:match "saucisson/lua-c3:master",
+        token       = os.getenv "ARDOISES_TOKEN",
+        port        = 0,
+        timeout     = 1,
+        application = "Ardoises",
+        nopush      = true,
+      }
       editor:start ()
       editor:stop  ()
     end)
@@ -50,16 +54,16 @@ describe ("#editor", function ()
 
   it ("can receive connections", function ()
     local Editor = require "ardoises.editor"
-    local editor = Editor {
-      branch      = Patterns.branch:match "ardoises/formalisms:master",
-      token       = os.getenv "ARDOISES_TOKEN",
-      port        = 0,
-      timeout     = 1,
-      application = "Ardoises",
-      nopush      = true,
-    }
     local connected
     Copas.addthread (function ()
+      local editor = Editor {
+        branch      = Patterns.branch:match "ardoises/formalisms:master",
+        token       = os.getenv "ARDOISES_TOKEN",
+        port        = 0,
+        timeout     = 1,
+        application = "Ardoises",
+        nopush      = true,
+      }
       editor:start ()
       Copas.sleep (1)
       local url = Et.render ("ws://<%- host %>:<%- port %>", {
@@ -76,16 +80,16 @@ describe ("#editor", function ()
 
   it ("can authenticate", function ()
     local Editor = require "ardoises.editor"
-    local editor = Editor {
-      branch      = Patterns.branch:match "ardoises/formalisms:master",
-      token       = os.getenv "ARDOISES_TOKEN",
-      port        = 0,
-      timeout     = 1,
-      application = "Ardoises",
-      nopush      = true,
-    }
     local answer
     Copas.addthread (function ()
+      local editor = Editor {
+        branch      = Patterns.branch:match "ardoises/formalisms:master",
+        token       = os.getenv "ARDOISES_TOKEN",
+        port        = 0,
+        timeout     = 1,
+        application = "Ardoises",
+        nopush      = true,
+      }
       editor:start ()
       Copas.sleep (1)
       local url = Et.render ("ws://<%- host %>:<%- port %>", {
@@ -117,16 +121,16 @@ describe ("#editor", function ()
 
   it ("cannot start with wrong token", function ()
     local Editor = require "ardoises.editor"
-    local editor = Editor {
-      branch      = Patterns.branch:match "ahamez/foo:master",
-      token       = os.getenv "ARDOISES_TOKEN",
-      port        = 0,
-      timeout     = 1,
-      application = "Ardoises",
-      nopush      = true,
-    }
     local started
     Copas.addthread (function ()
+      local editor = Editor {
+        branch      = Patterns.branch:match "ahamez/foo:master",
+        token       = os.getenv "ARDOISES_TOKEN",
+        port        = 0,
+        timeout     = 1,
+        application = "Ardoises",
+        nopush      = true,
+      }
       started = editor:start ()
     end)
     Copas.loop ()
@@ -135,16 +139,16 @@ describe ("#editor", function ()
 
   it ("can require after authenticate", function ()
     local Editor = require "ardoises.editor"
-    local editor = Editor {
-      branch      = Patterns.branch:match "ardoises/formalisms:master",
-      token       = os.getenv "ARDOISES_TOKEN",
-      port        = 0,
-      timeout     = 1,
-      application = "Ardoises",
-      nopush      = true,
-    }
     local answers = {}
     Copas.addthread (function ()
+      local editor = Editor {
+        branch      = Patterns.branch:match "ardoises/formalisms:master",
+        token       = os.getenv "ARDOISES_TOKEN",
+        port        = 0,
+        timeout     = 1,
+        application = "Ardoises",
+        nopush      = true,
+      }
       editor:start ()
       Copas.sleep (1)
       local url = Et.render ("ws://<%- host %>:<%- port %>", {
@@ -180,16 +184,16 @@ describe ("#editor", function ()
 
   it ("can list after authenticate", function ()
     local Editor = require "ardoises.editor"
-    local editor = Editor {
-      branch      = Patterns.branch:match "ardoises/formalisms:dev",
-      token       = os.getenv "ARDOISES_TOKEN",
-      port        = 0,
-      timeout     = 1,
-      application = "Ardoises",
-      nopush      = true,
-    }
     local answers = {}
     Copas.addthread (function ()
+      local editor = Editor {
+        branch      = Patterns.branch:match "ardoises/formalisms:dev",
+        token       = os.getenv "ARDOISES_TOKEN",
+        port        = 0,
+        timeout     = 1,
+        application = "Ardoises",
+        nopush      = true,
+      }
       editor:start ()
       Copas.sleep (1)
       local url = Et.render ("ws://<%- host %>:<%- port %>", {
@@ -224,16 +228,16 @@ describe ("#editor", function ()
 
   it ("can create after authenticate", function ()
     local Editor = require "ardoises.editor"
-    local editor = Editor {
-      branch      = Patterns.branch:match "ardoises/formalisms:dev",
-      token       = os.getenv "ARDOISES_TOKEN",
-      port        = 0,
-      timeout     = 1,
-      application = "Ardoises",
-      nopush      = true,
-    }
     local answers = {}
     Copas.addthread (function ()
+      local editor = Editor {
+        branch      = Patterns.branch:match "ardoises/formalisms:dev",
+        token       = os.getenv "ARDOISES_TOKEN",
+        port        = 0,
+        timeout     = 1,
+        application = "Ardoises",
+        nopush      = true,
+      }
       editor:start ()
       Copas.sleep (1)
       local url = Et.render ("ws://<%- host %>:<%- port %>", {
@@ -269,16 +273,16 @@ describe ("#editor", function ()
 
   it ("can delete after authenticate", function ()
     local Editor = require "ardoises.editor"
-    local editor = Editor {
-      branch      = Patterns.branch:match "ardoises/formalisms:dev",
-      token       = os.getenv "ARDOISES_TOKEN",
-      port        = 0,
-      timeout     = 1,
-      application = "Ardoises",
-      nopush      = true,
-    }
     local answers = {}
     Copas.addthread (function ()
+      local editor = Editor {
+        branch      = Patterns.branch:match "ardoises/formalisms:dev",
+        token       = os.getenv "ARDOISES_TOKEN",
+        port        = 0,
+        timeout     = 1,
+        application = "Ardoises",
+        nopush      = true,
+      }
       editor:start ()
       Copas.sleep (1)
       local url = Et.render ("ws://<%- host %>:<%- port %>", {
@@ -321,16 +325,16 @@ describe ("#editor", function ()
 
   it ("can patch after authenticate", function ()
     local Editor = require "ardoises.editor"
-    local editor = Editor {
-      branch      = Patterns.branch:match "ardoises/formalisms:dev",
-      token       = os.getenv "ARDOISES_TOKEN",
-      port        = 0,
-      timeout     = 1,
-      application = "Ardoises",
-      nopush      = true,
-    }
     local answers = {}
     Copas.addthread (function ()
+      local editor = Editor {
+        branch      = Patterns.branch:match "ardoises/formalisms:dev",
+        token       = os.getenv "ARDOISES_TOKEN",
+        port        = 0,
+        timeout     = 1,
+        application = "Ardoises",
+        nopush      = true,
+      }
       editor:start ()
       Copas.sleep (1)
       local url = Et.render ("ws://<%- host %>:<%- port %>", {

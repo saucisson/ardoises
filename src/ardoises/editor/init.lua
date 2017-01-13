@@ -26,14 +26,12 @@ Client.__index = Client
 function Mt.__call (_, options)
   local editor = setmetatable ({
     branch       = assert (options.branch),
-    tokens       = {
-      pull = assert (options.token),
-      push = nil,
-    },
+    token        = assert (options.token),
     timeout      = assert (options.timeout),
     port         = assert (options.port),
     application  = assert (options.application),
     nopush       = options.nopush,
+    permissions  = nil,
     current      = nil,
     running      = false,
     last         = false,
@@ -43,6 +41,22 @@ function Mt.__call (_, options)
     repositories = {}, -- branch.full_name -> module_name -> { ... }
     Layer        = setmetatable ({}, { __index = Layer }),
   }, Editor)
+  local repository, status = Http {
+    url     = Et.render ("https://api.github.com/repos/<%- owner %>/<%- repository %>", editor.branch),
+    method  = "GET",
+    headers = {
+      ["Accept"       ] = "application/vnd.github.v3+json",
+      ["Authorization"] = "token " .. tostring (editor.token),
+      ["User-Agent"   ] = editor.application,
+    },
+  }
+  if status ~= 200 then
+    return nil, "unable to obtain repository information: " .. tostring (status)
+  end
+  editor.permissions = repository.permissions
+  if not editor.permissions.pull then
+    return nil, "missing permission to read repository"
+  end
   editor.Layer.require = function (name)
     if not Patterns.require:match (name) then
       name = tostring (name) .. "@" .. editor.current.full_name
@@ -133,7 +147,7 @@ function Editor.stop (editor)
   editor.running = false
   Copas.addthread (function ()
     if  not editor.nopush
-    and editor.tokens.push then
+    and editor.permissions.push then
       editor:push ()
     end
     editor.server:close ()
@@ -155,7 +169,7 @@ function Editor.pull (editor, branch)
     method  = "GET",
     headers = {
       ["Accept"       ] = "application/vnd.github.v3+json",
-      ["Authorization"] = "token " .. tostring (editor.tokens.pull),
+      ["Authorization"] = "token " .. tostring (editor.token),
       ["User-Agent"   ] = editor.application,
     },
   }
@@ -163,7 +177,7 @@ function Editor.pull (editor, branch)
     return nil, "unable to obtain repository information: " .. tostring (status)
   end
   local url    = Url.parse (repository.clone_url)
-  url.user     = editor.tokens.pull
+  url.user     = editor.token
   url.password = "x-oauth-basic"
   repository.path = os.tmpname ()
   if not os.execute (Et.render ([[
@@ -193,7 +207,7 @@ function Editor.push (editor)
     return true
   end
   local url    = Url.parse (repository.clone_url)
-  url.user     = editor.tokens.push
+  url.user     = editor.token
   url.password = "x-oauth-basic"
   if not os.execute (Et.render ([[
     cd "<%- directory %>" && \
@@ -484,7 +498,6 @@ function Editor.handlers.create (editor, message)
       })
     end
   end
-  editor.tokens.push = message.client.token
   return true
 end
 
@@ -532,7 +545,6 @@ function Editor.handlers.delete (editor, message)
       })
     end
   end
-  editor.tokens.push = message.client.token
   return true
 end
 
@@ -679,7 +691,6 @@ function Editor.handlers.patch (editor, message)
       })
     end
   end
-  editor.tokens.push = message.client.token
   return true
 end
 

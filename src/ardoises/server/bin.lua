@@ -29,6 +29,9 @@ end
 
 local mode = os.getenv "ARDOISES_MODE" or "development"
 
+print "Fixing permissions on docker socket..."
+os.execute "chmod a+w /var/run/docker.sock"
+
 print "Applying database migrations..."
 assert (os.execute ("lapis migrate " .. mode))
 

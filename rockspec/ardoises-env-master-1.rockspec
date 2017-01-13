@@ -18,7 +18,6 @@ dependencies = {
   "busted",
   "cluacov",
   "copas",
-  "cosy-instance",
   "etlua",
   "hashids",
   "jwt",

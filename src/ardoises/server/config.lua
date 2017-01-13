@@ -14,6 +14,7 @@ local common = {
     name   = assert (os.getenv "APPLICATION_NAME"  ),
     secret = assert (os.getenv "APPLICATION_SECRET"),
     state  = assert (os.getenv "APPLICATION_STATE" ),
+    user   = assert (os.getenv "ARDOISES_USER"     ),
     token  = assert (os.getenv "ARDOISES_TOKEN"    ),
   },
   postgres = {
