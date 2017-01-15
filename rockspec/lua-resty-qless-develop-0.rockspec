@@ -1,7 +1,7 @@
 package = "lua-resty-qless"
 version = "develop-0"
 source  = {
-  url = "git://github.com/pintsized/lua-resty-qless",
+  url = "git+https://github.com/pintsized/lua-resty-qless.git",
   branch = "develop"
 }
 description = {
