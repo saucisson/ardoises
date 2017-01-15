@@ -85,7 +85,6 @@ JsonHttp.resty = wrap (function (request, cache)
     result = assert (client:request (request))
     if result.has_body then
       result.body = result:read_body ()
-      print (result.status, " ", result.body)
     end
     client:set_keepalive ()
   else
