@@ -15,7 +15,6 @@ RUN   apk add --no-cache --virtual .build-deps \
   &&  cp nginx.conf     /nginx.conf \
   &&  cp models.lua     /models.lua \
   &&  cp migrations.lua /migrations.lua \
-  &&  cp -r views       /views \
   &&  cp -r static      /static \
   &&  luarocks install  rockspec/lua-resty-qless-develop-0.rockspec \
   &&  luarocks install  rockspec/lua-websockets-develop-0.rockspec \

@@ -5,6 +5,7 @@ services:
   redis:
     image: redis:3.0.7 # because of bug in qless
   ardoises:
+    env_file: .environment
     build: .
     entrypoint: ardoises-server
     ports:
@@ -25,11 +26,5 @@ services:
       POSTGRES_USER:      postgres
       POSTGRES_PASSWORD:  ""
       POSTGRES_DATABASE:  postgres
-      DOCKER_USER:        ${DOCKER_USER}
-      DOCKER_SECRET:      ${DOCKER_SECRET}
-      APPLICATION_ID:     ${APPLICATION_ID}
-      APPLICATION_SECRET: ${APPLICATION_SECRET}
-      APPLICATION_STATE:  ${APPLICATION_STATE}
       APPLICATION_NAME:   Ardoises
       ARDOISES_USER:      ardoises
-      ARDOISES_TOKEN:     ${ARDOISES_TOKEN}
