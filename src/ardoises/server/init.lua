@@ -9,7 +9,7 @@ local Util     = require "lapis.util"
 
 local app  = Lapis.Application ()
 app.layout = false
-app:enable "etlua"
+-- app:enable "etlua"
 
 local function authenticate (self)
   if self.session.gh_id then
@@ -129,7 +129,7 @@ app:match ("/register", function (self)
       token = result.access_token,
     }
   elseif not account then
-    return Model.accounts:create {
+    Model.accounts:create {
       id    = user.id,
       token = result.access_token,
     }
@@ -137,7 +137,7 @@ app:match ("/register", function (self)
   self.account          = account
   self.session.gh_id    = self.account.id
   self.session.gh_token = self.account.token
-  return { redirect_to = "/dashboard.html" }
+  return { redirect_to = "/dashboard" }
 end)
 
 app:match ("/search(/:what)", function (self)
