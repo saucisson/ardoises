@@ -18,7 +18,7 @@ local function wrap (what)
     end
     local query = {}
     for key, value in pairs (options.query or {}) do
-      query [#query+1] = Util.encode (key) .. "=" .. Util.encode (value)
+      query [#query+1] = Util.escape (key) .. "=" .. Util.escape (value)
     end
     request.query = #query ~= 0 and table.concat (query, "&")
     request.headers ["Content-length"] = request.body and #request.body
