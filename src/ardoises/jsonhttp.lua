@@ -20,8 +20,9 @@ local function wrap (what)
     request.headers ["Content-length"] = request.body and #request.body
     request.headers ["Content-type"  ] = request.body and "application/json"
     request.headers ["Accept"        ] = request.headers ["Accept"] or "application/json"
+    local cache = not options.nocache
     repeat
-      local result = what (request, not options.nocache)
+      local result = what (request, cache)
       if result.body then
         local ok, json = pcall (Json.decode, result.body)
         if ok then
@@ -40,6 +41,9 @@ local function wrap (what)
       request.url   = nil
       request.query = nil
       request.body  = nil
+      if result.headers ["Link"] and result.status == 304 then
+        cache = "only"
+      end
       for link in (result.headers ["Link"] or ""):gmatch "[^,]+" do
         request.url = link:match [[<([^>]+)>;%s*rel="next"]] or request.url
       end
@@ -70,21 +74,28 @@ JsonHttp.resty = wrap (function (request, cache)
       request.headers ["If-Modified-Since"] = json.answer.headers ["Last-Modified"]
     end
   end
-  local client = Http.new ()
-  client:set_timeout (1000) -- milliseconds
   local result
-  local url = Url.parse (request.url)
-  if url.scheme == "docker" then
-    client:connect "unix:/var/run/docker.sock"
-    request.path = url.path
-    request.headers ["Host"] = "localhost"
-    result = assert (client:request (request))
-    if result.has_body then
-      result.body = result:read_body ()
+  if cache ~= "only" then
+    local client = Http.new ()
+    client:set_timeout (1000) -- milliseconds
+    local url = Url.parse (request.url)
+    if url.scheme == "docker" then
+      client:connect "unix:/var/run/docker.sock"
+      request.path = url.path
+      request.headers ["Host"] = "localhost"
+      result = assert (client:request (request))
+      if result.has_body then
+        result.body = result:read_body ()
+      end
+      client:set_keepalive ()
+    else
+      result = assert (client:request_uri (request.url, request))
+      -- if result.status ~= 304 then
+      --   print (tostring (result.status) .. " -> " .. request.url)
+      -- end
     end
-    client:set_keepalive ()
   else
-    result = assert (client:request_uri (request.url, request))
+    result = json.answer
   end
   if result.status == 304 then
     redis:expire (json.request, 86400) -- 1 day

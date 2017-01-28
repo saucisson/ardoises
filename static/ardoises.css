@@ -53,7 +53,7 @@ p {
   margin-bottom: 20px;
 }
 .whole {
-  height: 100%;
+  min-height: 100%;
   width: 100%;
 }
 .bg-primary {
@@ -71,8 +71,17 @@ p {
   /*background-color: #222222;
   color: white;*/
 }
-.text-faded {
-  color: rgba(255, 255, 255, 0.7);
+.list-group-item-heading {
+  color: white;
+}
+.list-group-item-heading:hover {
+  color: black;
+}
+.list-group-item {
+  background-color: transparent;
+}
+.list-group-item:hover {
+  color: black;
 }
 section {
   padding: 100px 0;
