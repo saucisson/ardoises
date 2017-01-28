@@ -26,5 +26,4 @@ services:
       POSTGRES_USER:      postgres
       POSTGRES_PASSWORD:  ""
       POSTGRES_DATABASE:  postgres
-      APPLICATION_NAME:   Ardoises
       ARDOISES_USER:      ardoises

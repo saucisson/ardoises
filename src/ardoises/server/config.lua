@@ -9,11 +9,11 @@ local common = {
   port         = 8080,
   num_workers  = 1,
   session_name = "ardoises",
+  secret       = assert (os.getenv "ARDOISES_SECRET"),
   application = {
+    name   = "Ardoises",
     id     = assert (os.getenv "APPLICATION_ID"    ),
-    name   = assert (os.getenv "APPLICATION_NAME"  ),
     secret = assert (os.getenv "APPLICATION_SECRET"),
-    state  = assert (os.getenv "APPLICATION_STATE" ),
     user   = assert (os.getenv "ARDOISES_USER"     ),
     token  = assert (os.getenv "ARDOISES_TOKEN"    ),
   },

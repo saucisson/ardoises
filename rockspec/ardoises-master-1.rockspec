@@ -39,6 +39,7 @@ dependencies = {
 build = {
   type    = "builtin",
   modules = {
+    ["ardoises.js"                     ] = "src/ardoises/js.lua",
     ["ardoises.jsonhttp"               ] = "src/ardoises/jsonhttp.lua",
     ["ardoises.patterns"               ] = "src/ardoises/patterns.lua",
     ["ardoises.editor"                 ] = "src/ardoises/editor/init.lua",

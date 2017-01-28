@@ -1,7 +1,9 @@
 local Config   = require "lapis.config".get ()
+local Csrf     = require "lapis.csrf"
 local Et       = require "etlua"
 local Http     = require "ardoises.jsonhttp".resty
 local Lapis    = require "lapis"
+local Mime     = require "mime"
 local Model    = require "ardoises.server.model"
 local Patterns = require "ardoises.patterns"
 local Qless    = require "resty.qless"
@@ -9,7 +11,7 @@ local Util     = require "lapis.util"
 
 local app  = Lapis.Application ()
 app.layout = false
--- app:enable "etlua"
+app:enable "etlua"
 
 local function authenticate (self)
   if self.session.gh_id then
@@ -75,24 +77,37 @@ app:match ("/", function (self)
     jid = "ardoises.server.invitation",
   })
   if authenticate (self) then
-    return { redirect_to = "/dashboard.html" }
+    return {
+      layout = "ardoises",
+      render = "dashboard",
+    }
   else
-    return { redirect_to = "/overview.html" }
+    return {
+      layout = "ardoises",
+      render = "overview",
+    }
   end
 end)
 
-app:match ("/login", function ()
+app:match ("/login", function (self)
   return {
     redirect_to = Et.render ("https://github.com/login/oauth/authorize?state=<%- state %>&scope=<%- scope %>&client_id=<%- client_id %>", {
       client_id = Config.application.id,
-      state     = Config.application.state,
+      state     = Mime.b64 (Csrf.generate_token (self)),
       scope     = Util.escape "user:email",
     })
   }
 end)
 
+app:match ("/logout", function (self)
+  self.session.gh_id    = nil
+  self.session.gh_token = nil
+  return { redirect_to = "/" }
+end)
+
 app:match ("/register", function (self)
-  if self.params.state ~= Config.application.state then
+  self.params.csrf_token = Mime.unb64 (self.params.state)
+  if not Csrf.validate_token (self) then
     return { status = 400 }
   end
   local user, result, status
@@ -129,7 +144,7 @@ app:match ("/register", function (self)
       token = result.access_token,
     }
   elseif not account then
-    Model.accounts:create {
+    account = Model.accounts:create {
       id    = user.id,
       token = result.access_token,
     }
@@ -137,7 +152,7 @@ app:match ("/register", function (self)
   self.account          = account
   self.session.gh_id    = self.account.id
   self.session.gh_token = self.account.token
-  return { redirect_to = "/dashboard" }
+  return { redirect_to = "/" }
 end)
 
 app:match ("/search(/:what)", function (self)
@@ -249,14 +264,11 @@ app:match ("/editors/", "/editors/:owner/:repository(/:branch)", function (self)
       })
     }
   end
+  local repository_name = Et.render ("<%- owner %>/<%- repository %>:<%- branch %>", self.params)
   local editor = Model.editors:find {
-    repository = Et.render ("<%- owner %>/<%- repository %>:<%- branch %>", self.params)
+    repository = repository_name,
   }
-  if editor and editor.url then
-    return { redirect_to = editor.url }
-  elseif editor then
-    return { status = 202 }
-  else
+  if not editor then
     local qless = Qless.new (Config.redis)
     local queue = qless.queues ["ardoises"]
     queue:put ("ardoises.server.job.editor.start", {
@@ -264,8 +276,17 @@ app:match ("/editors/", "/editors/:owner/:repository(/:branch)", function (self)
       repository = self.params.repository,
       branch     = self.params.branch,
     })
-    return { status = 201 }
   end
+  repeat
+    _G.ngx.sleep (1)
+    editor = editor and editor:update () or Model.editors:find {
+               repository = repository_name,
+             }
+  until editor and editor.url
+  return {
+    layout = "ardoises",
+    render = "editor",
+  }
 end)
 
 return app

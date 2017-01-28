@@ -1,5 +1,5 @@
-local Mt       = {}
-local Adapter  = setmetatable ({}, Mt)
+local Mt      = {}
+local Adapter = setmetatable ({}, Mt)
 
 function _G.print (...)
   Adapter.window.console:log (...)

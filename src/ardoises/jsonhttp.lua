@@ -16,11 +16,7 @@ local function wrap (what)
     for name, header in pairs (options.headers or  {}) do
       request.headers [name] = header
     end
-    local query = {}
-    for key, value in pairs (options.query or {}) do
-      query [#query+1] = Util.escape (key) .. "=" .. Util.escape (value)
-    end
-    request.query = #query ~= 0 and table.concat (query, "&")
+    request.query = Util.encode_query_string (options.query or {})
     request.headers ["Content-length"] = request.body and #request.body
     request.headers ["Content-type"  ] = request.body and "application/json"
     request.headers ["Accept"        ] = request.headers ["Accept"] or "application/json"
