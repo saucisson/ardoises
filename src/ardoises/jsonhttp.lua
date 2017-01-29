@@ -70,6 +70,9 @@ JsonHttp.resty = wrap (function (request, cache)
     local answer = redis:get (json.request)
     if answer ~= _G.ngx.null then
       json.answer = Json.decode (answer)
+      if Config.jsonhttp.delay - redis:ttl (json.request) < 60 then
+        return json.answer
+      end
       request.headers ["If-None-Match"    ] = json.answer.headers ["ETag"         ]
       request.headers ["If-Modified-Since"] = json.answer.headers ["Last-Modified"]
     end
@@ -90,15 +93,12 @@ JsonHttp.resty = wrap (function (request, cache)
       client:set_keepalive ()
     else
       result = assert (client:request_uri (request.url, request))
-      -- if result.status ~= 304 then
-      --   print (tostring (result.status) .. " -> " .. request.url)
-      -- end
     end
   else
     result = json.answer
   end
   if result.status == 304 then
-    redis:expire (json.request, 86400) -- 1 day
+    redis:expire (json.request, Config.jsonhttp.delay) -- 1 day
     return json.answer
   end
   if cache and request.method == "GET" then

@@ -1,5 +1,6 @@
 local Config   = require "lapis.config".get ()
 local Csrf     = require "lapis.csrf"
+local Database = require "lapis.db"
 local Et       = require "etlua"
 local Http     = require "ardoises.jsonhttp".resty
 local Json     = require "rapidjson"
@@ -73,7 +74,6 @@ app:match ("/", function (self)
     })
   end
   if authenticate (self) then
-    local search = self.params.search or ""
     local starred, status = Http {
       url     = Et.render ("https://api.github.com/users/<%- user %>/starred", {
         user = self.session.user.login,
@@ -91,25 +91,37 @@ app:match ("/", function (self)
       stars [repository.id] = 1
     end
     local result = {}
-    for _, t in ipairs (Model.permissions:select ([[ WHERE account = ? ]], self.session.user.id)) do
-      local repo = Model.repositories:find {
-        id = t.repository,
-      }
-      local repository   = Json.decode (repo.contents)
-      result [#result+1] = repository
-      repository.permission       = t.permission
-      repository.user_permissions = {
-        pull = t.permission == "read"
-            or t.permission == "write",
-        push = t.permission == "write",
-      }
+    local request = Et.render ([[
+      permissions.permission, repositories.contents
+      FROM permissions, repositories
+      WHERE permissions.account = <%- account %>
+        AND permissions.repository = repositories.id
+    ]], {
+      account = self.session.user.id,
+    })
+    for _, t in ipairs (Database.select (request)) do
+      local repository = Json.decode (t.contents)
+      repository.description = repository.description == Json.null
+                           and ""
+                            or repository.description
+      if repository.full_name  :match (self.params.search or "")
+      or repository.description:match (self.params.search or "") then
+        result [#result+1] = repository
+        repository.permission       = t.permission
+        repository.user_permissions = {
+          pull = t.permission == "read"
+              or t.permission == "write",
+          push = t.permission == "write",
+        }
+      end
     end
     table.sort (result, function (l, r)
       return l.permission > r.permission -- write > read
          and (stars [l.id] or 0) > (stars [r.id] or 0) -- stars
+         and l.pushed_at > r.pushed_at
          and l.full_name < r.full_name -- name
     end)
-    self.search       = search or "search"
+    self.search       = self.params.search or "search"
     self.repositories = result
     return {
       layout = "ardoises",

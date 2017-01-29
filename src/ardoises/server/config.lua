@@ -37,6 +37,9 @@ local common = {
   clean = {
     delay = 5 * 60,
   },
+  jsonhttp = {
+    delay = 24 * 60 * 60,
+  },
   permissions = {
     delay = 5 * 60,
   },
