@@ -38,12 +38,14 @@
     </div>
     <div class="list-group">
     <% for _, repository in ipairs (repositories) do %>
-      <a href="/editors/<%- repository.full_name %>" class="list-group-item justify-content-between"  aria-label="Editor for <%- repository.full_name %>">
+      <a href="/editors/<%- repository.full_name %>"
+         class="list-group-item justify-content-between"
+         aria-label="Editor for <%- repository.full_name %>">
         <span>
           <h4 class="list-group-item-heading"><%= repository.full_name %></h4>
           <p class="list-group-item-text"><%= repository.description %>Text</p>
         </span>
-        <% if repository.can_write.user then %>
+        <% if repository.user_permissions.push then %>
         <span class="fa-stack fa-lg">
           <i class="fa fa-pencil fa-flip-horizontal fa-inverse fa-stack-1x"></i>
         </span>
@@ -53,7 +55,7 @@
           <i class="fa fa-ban fa-stack-2x text-danger"></i>
         </span>
         <% end %>
-        <% if repository.can_write.ardoises then %>
+        <% if repository.permissions.push then %>
         <span class="fa-stack fa-lg">
           <i class="fa fa-pencil fa-flip-horizontal fa-inverse fa-stack-1x"></i>
         </span>

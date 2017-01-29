@@ -15,46 +15,37 @@ app.layout = false
 app:enable "etlua"
 
 local function authenticate (self)
-  if self.session.gh_id then
-    self.account = Model.accounts:find {
-      id = self.session.gh_id,
-    }
+  if self.session.user then
+    return true
   end
-  local authorization
-  if not self.account then
-    authorization = self.req.headers ["Authorization"] or ""
-    authorization = Patterns.authorization:match (authorization)
-    if not authorization then
-      return nil
-    end
-    self.account = Model.accounts:find {
-      token = authorization,
-    }
+  local authorization = Patterns.authorization:match (self.req.headers ["Authorization"] or "")
+  if not authorization then
+    return nil
   end
+  local account = Model.accounts:find {
+    token = authorization,
+  }
   local user, status = Http {
     url     = "https://api.github.com/user",
     method  = "GET",
     headers = {
       ["Accept"       ] = "application/vnd.github.v3+json",
-      ["Authorization"] = "token " .. (authorization or self.account.token or ""),
+      ["Authorization"] = "token " .. (authorization or ""),
       ["User-Agent"   ] = Config.application.name,
     },
   }
   if status ~= 200 then
     return nil
   end
-  if not self.account then
-    self.account = Model.accounts:find {
-      id = user.id,
-    }
-  end
-  if not self.account then
-    self.account = Model.accounts:create {
-      id    = user.id,
+  self.session.user = user
+  if not account or Model.accounts:find {
+    id = self.session.user.id,
+  } then
+    Model.accounts:create {
+      id    = self.session.user.id,
       token = authorization,
     }
   end
-  self.user = user
   return true
 end
 
@@ -76,18 +67,16 @@ app:match ("/", function (self)
       jid = "ardoises.server.job.editor.clean",
     })
   end
-  if not qless.jobs:get "ardoises.server.job.invitation" then
-    queue:recur ("ardoises.server.job.invitation", {}, Config.invitation.delay, {
-      jid = "ardoises.server.job.invitation",
+  if not qless.jobs:get "ardoises.server.job.permissions" then
+    queue:recur ("ardoises.server.job.permissions", {}, Config.permissions.delay, {
+      jid = "ardoises.server.job.permissions",
     })
   end
   if authenticate (self) then
     local search = self.params.search or ""
-    local result = {}
-    local repositories, collaborator, starred, status
-    starred, status = Http {
+    local starred, status = Http {
       url     = Et.render ("https://api.github.com/users/<%- user %>/starred", {
-        user = self.user.login,
+        user = self.session.user.login,
       }),
       method  = "GET",
       headers = {
@@ -98,62 +87,27 @@ app:match ("/", function (self)
     }
     assert (status == 200, status)
     local stars = {}
-    for _, star in ipairs (starred) do
-      stars [star.id] = star
+    for _, repository in ipairs (starred) do
+      stars [repository.id] = 1
     end
-    repositories, status = Http {
-      url     = "https://api.github.com/user/repos",
-      method  = "GET",
-      headers = {
-        ["Accept"       ] = "application/vnd.github.v3+json",
-        ["Authorization"] = "token " .. Config.application.token,
-        ["User-Agent"   ] = Config.application.name,
-      },
-    }
-    assert (status == 200, status)
-    local threads = {}
-    for _, repository in ipairs (repositories) do
-      threads [#threads+1] = _G.ngx.thread.spawn (function ()
-        collaborator, status = Http {
-          url     = Et.render ("https://api.github.com/repos/<%- owner %>/<%- repository %>/collaborators/<%- user %>/permission", {
-            owner      = repository.owner.login,
-            repository = repository.name,
-            user       = self.user.login,
-          }),
-          method  = "GET",
-          headers = {
-            ["Accept"       ] = "application/vnd.github.korra-preview+json",
-            ["Authorization"] = "token " .. Config.application.token,
-            ["User-Agent"   ] = Config.application.name,
-          },
-        }
-        assert (status == 200, status)
-        if collaborator.permission == "none" then
-          return
-        end
-        if  not repository.full_name  :match (search)
-        and not repository.description:match (search) then
-          return
-        end
-        repository.can_write = {
-          ardoises = repository.permissions.push,
-          user     = collaborator.permission == "admin"
-                  or collaborator.permission == "write"
-        }
-        repository.description = repository.description == Json.null
-                             and ""
-                              or repository.description
-        result [#result+1] = repository
-      end)
-    end
-    for _, co in ipairs (threads) do
-      _G.ngx.thread.wait (co)
+    local result = {}
+    for _, t in ipairs (Model.permissions:select ([[ WHERE account = ? ]], self.session.user.id)) do
+      local repo = Model.repositories:find {
+        id = t.repository,
+      }
+      local repository   = Json.decode (repo.contents)
+      result [#result+1] = repository
+      repository.permission       = t.permission
+      repository.user_permissions = {
+        pull = t.permission == "read"
+            or t.permission == "write",
+        push = t.permission == "write",
+      }
     end
     table.sort (result, function (l, r)
-      return l.pushed_at > r.pushed_at
-    end)
-    table.sort (result, function (l, r)
-      return (stars [l.id] or 0) > (stars [r.id] or 0)
+      return l.permission > r.permission -- write > read
+         and (stars [l.id] or 0) > (stars [r.id] or 0) -- stars
+         and l.full_name < r.full_name -- name
     end)
     self.search       = search or "search"
     self.repositories = result
@@ -180,8 +134,7 @@ app:match ("/login", function (self)
 end)
 
 app:match ("/logout", function (self)
-  self.session.gh_id    = nil
-  self.session.gh_token = nil
+  self.session.user = nil
   return { redirect_to = "/" }
 end)
 
@@ -216,22 +169,21 @@ app:match ("/register", function (self)
     },
   }
   assert (status == 200, status)
+  user.token = result.access_token
   local account = Model.accounts:find {
     id = user.id,
   }
   if account then
     account:update {
-      token = result.access_token,
+      token = user.token,
     }
   elseif not account then
-    account = Model.accounts:create {
+    Model.accounts:create {
       id    = user.id,
-      token = result.access_token,
+      token = user.token,
     }
   end
-  self.account          = account
-  self.session.gh_id    = self.account.id
-  self.session.gh_token = self.account.token
+  self.session.user = user
   return { redirect_to = "/" }
 end)
 
@@ -248,7 +200,7 @@ app:match ("/editors/", "/editors/:owner/:repository(/:branch)", function (self)
     method  = "GET",
     headers = {
       ["Accept"       ] = "application/vnd.github.v3+json",
-      ["Authorization"] = "token " .. self.account.token,
+      ["Authorization"] = "token " .. self.session.user.token,
       ["User-Agent"   ] = Config.application.name,
     },
   }

@@ -35,10 +35,10 @@ local common = {
     api_key  = assert (os.getenv "DOCKER_SECRET"),
   },
   clean = {
-    delay = 60,
+    delay = 5 * 60,
   },
-  invitation = {
-    delay = 60,
+  permissions = {
+    delay = 5 * 60,
   },
 }
 

@@ -49,7 +49,7 @@ build = {
     ["ardoises.server.model"           ] = "src/ardoises/server/model.lua",
     ["ardoises.server.job.editor.clean"] = "src/ardoises/server/job/editor/clean.lua",
     ["ardoises.server.job.editor.start"] = "src/ardoises/server/job/editor/start.lua",
-    ["ardoises.server.job.invitation"  ] = "src/ardoises/server/job/invitation.lua",
+    ["ardoises.server.job.permissions" ] = "src/ardoises/server/job/permissions.lua",
   },
   install = {
     bin = {
