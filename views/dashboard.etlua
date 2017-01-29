@@ -43,7 +43,7 @@
          aria-label="Editor for <%- repository.full_name %>">
         <span>
           <h4 class="list-group-item-heading"><%= repository.full_name %></h4>
-          <p class="list-group-item-text"><%= repository.description %>Text</p>
+          <p class="list-group-item-text"><%= repository.description %></p>
         </span>
         <% if repository.user_permissions.push then %>
         <span class="fa-stack fa-lg">
