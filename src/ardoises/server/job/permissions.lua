@@ -2,12 +2,12 @@ local Config   = require "lapis.config".get ()
 local Database = require "lapis.db"
 local Et       = require "etlua"
 local Http     = require "ardoises.jsonhttp".resty
-local Json     = require "rapidjson"
+local Json     = require "cjson"
 local Model    = require "ardoises.server.model"
 
 local Permissions = {}
 
-function Permissions.perform ()
+function Permissions.perform (job)
   local repositories, collaborators, status
   repositories, status = Http {
     url     = "https://api.github.com/user/repos",
@@ -20,6 +20,7 @@ function Permissions.perform ()
   }
   assert (status == 200, status)
   for _, repository in ipairs (repositories) do
+    job:heartbeat ()
     local repo = Model.repositories:find {
       id = repository.id,
     }

@@ -3,7 +3,7 @@ local Csrf     = require "lapis.csrf"
 local Database = require "lapis.db"
 local Et       = require "etlua"
 local Http     = require "ardoises.jsonhttp".resty
-local Json     = require "rapidjson"
+local Json     = require "cjson"
 local Lapis    = require "lapis"
 local Mime     = require "mime"
 local Model    = require "ardoises.server.model"
@@ -26,6 +26,11 @@ local function authenticate (self)
   local account = Model.accounts:find {
     token = authorization,
   }
+  if account then
+    self.session.user = Json.decode (account.contents)
+    self.session.user.token = authorization
+    return true
+  end
   local user, status = Http {
     url     = "https://api.github.com/user",
     method  = "GET",
@@ -38,26 +43,48 @@ local function authenticate (self)
   if status ~= 200 then
     return nil
   end
+  Model.accounts:create {
+    id       = user.id,
+    token    = authorization,
+    contents = Json.encode (user),
+  }
   self.session.user = user
-  if not account or Model.accounts:find {
-    id = self.session.user.id,
-  } then
-    Model.accounts:create {
-      id    = self.session.user.id,
-      token = authorization,
-    }
-  end
+  self.session.user.token = authorization
   return true
 end
 
-app.handle_error = function (_, error, trace)
+app.handle_error = function (self, error, trace)
   print (error)
   print (trace)
-  return { status = 500 }
+  if self.req.headers.accept == "application/json" then
+    return {
+      status = 500,
+      json   = {},
+    }
+  else
+    self.status = 500
+    return {
+      status = 500,
+      layout = "ardoises",
+      render = "error",
+    }
+  end
 end
 
-app.handle_404 = function ()
-  return { status = 404 }
+app.handle_404 = function (self)
+  if self.req.headers.accept == "application/json" then
+    return {
+      status = 500,
+      json   = {},
+    }
+  else
+    self.status = 404
+    return {
+      status = 404,
+      layout = "ardoises",
+      render = "error",
+    }
+  end
 end
 
 app:match ("/", function (self)
@@ -74,22 +101,6 @@ app:match ("/", function (self)
     })
   end
   if authenticate (self) then
-    local starred, status = Http {
-      url     = Et.render ("https://api.github.com/users/<%- user %>/starred", {
-        user = self.session.user.login,
-      }),
-      method  = "GET",
-      headers = {
-        ["Accept"       ] = "application/vnd.github.v3+json",
-        ["Authorization"] = "token " .. Config.application.token,
-        ["User-Agent"   ] = Config.application.name,
-      },
-    }
-    assert (status == 200, status)
-    local stars = {}
-    for _, repository in ipairs (starred) do
-      stars [repository.id] = 1
-    end
     local result = {}
     local request = Et.render ([[
       permissions.permission, repositories.contents
@@ -117,21 +128,36 @@ app:match ("/", function (self)
     end
     table.sort (result, function (l, r)
       return l.permission > r.permission -- write > read
-         and (stars [l.id] or 0) > (stars [r.id] or 0) -- stars
          and l.pushed_at > r.pushed_at
          and l.full_name < r.full_name -- name
     end)
-    self.search       = self.params.search or "search"
-    self.repositories = result
-    return {
-      layout = "ardoises",
-      render = "dashboard",
-    }
+    if self.req.headers.accept == "application/json" then
+      return {
+        status = 200,
+        json   = result,
+      }
+    else
+      self.search       = self.params.search or "search"
+      self.repositories = result
+      return {
+        status = 200,
+        layout = "ardoises",
+        render = "dashboard",
+      }
+    end
   else
-    return {
-      layout = "ardoises",
-      render = "overview",
-    }
+    if self.req.headers.accept == "application/json" then
+      return {
+        status = 200,
+        json   = {},
+      }
+    else
+      return {
+        status = 200,
+        layout = "ardoises",
+        render = "overview",
+      }
+    end
   end
 end)
 
@@ -152,9 +178,7 @@ end)
 
 app:match ("/register", function (self)
   self.params.csrf_token = Mime.unb64 (self.params.state)
-  if not Csrf.validate_token (self) then
-    return { status = 400 }
-  end
+  assert (Csrf.validate_token (self))
   local user, result, status
   result, status = Http {
     url     = "https://github.com/login/oauth/access_token",
@@ -181,21 +205,23 @@ app:match ("/register", function (self)
     },
   }
   assert (status == 200, status)
-  user.token = result.access_token
   local account = Model.accounts:find {
     id = user.id,
   }
   if account then
     account:update {
-      token = user.token,
+      token    = user.token,
+      contents = Json.encode (user),
     }
   elseif not account then
     Model.accounts:create {
-      id    = user.id,
-      token = user.token,
+      id       = user.id,
+      token    = user.token,
+      contents = Json.encode (user),
     }
   end
   self.session.user = user
+  self.session.user.token = result.access_token
   return { redirect_to = "/" }
 end)
 
@@ -204,43 +230,28 @@ app:match ("/editors/", "/editors/:owner/:repository(/:branch)", function (self)
     return { redirect_to = "/overview.html" }
   end
   local repository, status
-  repository, status = Http {
-    url     = Et.render ("https://api.github.com/repos/<%- owner %>/<%- repository %>", {
-      owner      = self.params.owner,
-      repository = self.params.repository,
-    }),
-    method  = "GET",
-    headers = {
-      ["Accept"       ] = "application/vnd.github.v3+json",
-      ["Authorization"] = "token " .. self.session.user.token,
-      ["User-Agent"   ] = Config.application.name,
-    },
-  }
-  if status == 404 then
-    return { status = 404 }
-  end
-  assert (status == 200, status)
-  if not repository.permissions.pull then
-    return { status = 403 }
-  end
-  repository, status = Http {
-    url     = Et.render ("https://api.github.com/repos/<%- owner %>/<%- repository %>", {
-      owner      = self.params.owner,
-      repository = self.params.repository,
-    }),
-    method  = "GET",
-    headers = {
-      ["Accept"       ] = "application/vnd.github.v3+json",
-      ["Authorization"] = "token " .. Config.application.token,
-      ["User-Agent"   ] = Config.application.name,
-    },
-  }
-  if status == 404 then
-    return { status = 404 }
-  end
-  assert (status == 200, status)
-  if not repository.permissions.pull then
-    return { status = 403 }
+  for _, token in ipairs { self.session.user.token, Config.application.token } do
+    repository, status = Http {
+      url     = Et.render ("https://api.github.com/repos/<%- owner %>/<%- repository %>", {
+        owner      = self.params.owner,
+        repository = self.params.repository,
+      }),
+      method  = "GET",
+      headers = {
+        ["Accept"       ] = "application/vnd.github.v3+json",
+        ["Authorization"] = "token " .. tostring (token),
+        ["User-Agent"   ] = Config.application.name,
+      },
+    }
+    print (status)
+    print (Json.encode (repository))
+    if status == 404 then
+      return { status = 404 }
+    end
+    assert (status == 200, status)
+    if not repository.permissions.pull then
+      return { status = 403 }
+    end
   end
   if not self.params.branch then
     return {
@@ -266,14 +277,26 @@ app:match ("/editors/", "/editors/:owner/:repository(/:branch)", function (self)
   end
   repeat
     _G.ngx.sleep (1)
-    editor = editor and editor:update () or Model.editors:find {
+    editor = editor
+         and editor:update ()
+          or Model.editors:find {
                repository = repository_name,
              }
   until editor and editor.url
-  return {
-    layout = "ardoises",
-    render = "editor",
-  }
+  repository.editor_url = editor.url
+  if self.req.headers.accept == "application/json" then
+    return {
+      status = 200,
+      json   = repository,
+    }
+  else
+    self.repository = repository
+    return {
+      status = 200,
+      layout = "ardoises",
+      render = "editor",
+    }
+  end
 end)
 
 return app

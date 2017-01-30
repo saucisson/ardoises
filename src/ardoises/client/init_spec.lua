@@ -1,28 +1,19 @@
-local Copas    = require "copas"
-local Client   = require "ardoises.client"
-local Gettime  = require "socket".gettime
-local Instance = require "ardoises.server.instance"
-local Mime     = require "mime"
+local Copas  = require "copas"
+local Client = require "ardoises.client"
 
 describe ("#client", function ()
 
-  local instance
-
-  setup (function ()
-    instance = Instance.create ()
-  end)
-
-  teardown (function ()
-    instance:delete ()
-  end)
+  local instance = {
+    server = "http://localhost:8080",
+  }
 
   it ("can be instantiated", function ()
     local client
     Copas.addthread (function ()
-      client = Client {
+      client = assert (Client {
         server = instance.server,
         token  = os.getenv "ARDOISES_TOKEN",
-      }
+      })
     end)
     Copas.loop ()
     assert.is_not_nil (client)
@@ -31,10 +22,10 @@ describe ("#client", function ()
   it ("can list and search existing ardoises", function ()
     local ardoises = {}
     Copas.addthread (function ()
-      local client = Client {
+      local client = assert (Client {
         server = instance.server,
         token  = os.getenv "ARDOISES_TOKEN",
-      }
+      })
       for ardoise in client:ardoises () do
         ardoises [#ardoises+1] = ardoise
       end
@@ -43,20 +34,17 @@ describe ("#client", function ()
     assert.is_truthy (#ardoises > 0)
   end)
 
-  it ("can create and delete an ardoise", function ()
-    local created, deleted
+  it ("can get an ardoise", function ()
+    local ardoise
     Copas.addthread (function ()
-      local client = Client {
+      local client = assert (Client {
         server = instance.server,
         token  = os.getenv "ARDOISES_TOKEN",
-      }
-      local name = Mime.b64 (Gettime ())
-      created = client:create ("ardoises-test/" .. name .. ":test")
-      deleted = created:delete ()
+      })
+      ardoise = client:ardoise "ardoises/test-ardoise"
     end)
     Copas.loop ()
-    assert.is_truthy (created)
-    assert.is_truthy (deleted)
+    assert.is_truthy (ardoise)
   end)
 
   it ("can edit an ardoise", function ()
@@ -66,12 +54,10 @@ describe ("#client", function ()
         server = instance.server,
         token  = os.getenv "ARDOISES_TOKEN",
       }
-      local name    = Mime.b64 (Gettime ())
-      local ardoise = client:create ("ardoises-test/" .. name .. ":test")
+      local ardoise = client:ardoise "ardoises/test-ardoise"
       local editor  = ardoise:edit ()
       edited = not not editor
       editor:close ()
-      ardoise:delete ()
     end)
     Copas.loop ()
     assert.is_truthy (edited)

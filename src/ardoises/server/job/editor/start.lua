@@ -1,7 +1,7 @@
 local Config  = require "lapis.config".get ()
 local Et      = require "etlua"
 local Http    = require "ardoises.jsonhttp".resty
-local Json    = require "rapidjson"
+local Json    = require "cjson"
 local Mime    = require "mime"
 local Model   = require "ardoises.server.model"
 local gettime = require "socket".gettime
@@ -33,7 +33,7 @@ if os.getenv "DOCKERCLOUD_SERVICE_API_URL" then
         method  = "POST",
         headers = headers,
         body    = {
-          image           = "ardoises/ardoises:dev", -- FIXME: switch to master branch
+          image           = Config.application.image,
           entrypoint      = "ardoises-editor",
           run_command     = arguments,
           autorestart     = "OFF",
@@ -126,7 +126,7 @@ else
             Et.render ("<%- owner %>/<%- repository %>:<%- branch %>", job.data),
             Config.application.token,
           },
-          Image        = "ardoises/ardoises",
+          Image        = Config.application.image,
           ExposedPorts = {
             ["8080/tcp"] = {},
           },

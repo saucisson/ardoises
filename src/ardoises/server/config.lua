@@ -16,6 +16,7 @@ local common = {
     secret = assert (os.getenv "APPLICATION_SECRET"),
     user   = assert (os.getenv "ARDOISES_USER"     ),
     token  = assert (os.getenv "ARDOISES_TOKEN"    ),
+    image  = assert (os.getenv "ARDOISES_IMAGE"    ),
   },
   postgres = {
     backend  = "pgmoon",
@@ -38,7 +39,7 @@ local common = {
     delay = 5 * 60,
   },
   jsonhttp = {
-    delay = 24 * 60 * 60,
+    delay = 24 * 50 * 60,
   },
   permissions = {
     delay = 5 * 60,

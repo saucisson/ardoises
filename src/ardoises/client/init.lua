@@ -18,7 +18,6 @@ Client .__index = Client
 Ardoise.__index = Ardoise
 Editor .__index = Editor
 
-Client.accept     = "application/vnd.github.v3+json"
 Client.user_agent = "Ardoises Client"
 Client.tag        = Mime.b64 "https://github.com/ardoises"
 
@@ -43,7 +42,7 @@ function Mt.__call (_, options)
     url      = "https://api.github.com/user",
     method   = "GET",
     headers  = {
-      ["Accept"       ] = Client.accept,
+      ["Accept"       ] = "application/vnd.github.v3+json",
       ["User-Agent"   ] = Client.user_agent,
       ["Authorization"] = "token " .. token,
     },
@@ -56,13 +55,13 @@ function Mt.__call (_, options)
       url     = "https://api.github.com/user/emails",
       method  = "GET",
       headers = {
-        ["Accept"       ] = Client.accept,
+        ["Accept"       ] = "application/vnd.github.v3+json",
         ["User-Agent"   ] = Client.user_agent,
         ["Authorization"] = "token " .. token,
       },
     }
     if estatus ~= 200 then
-      return nil, "unable to obtain email address: " .. tostring (status)
+      return nil, "unable to obtain email address: " .. tostring (estatus)
     end
     user.emails = emails
     for _, t in ipairs (emails) do
@@ -88,15 +87,23 @@ function Client.ardoise (client, what)
   if type (what) ~= "string" then
     return nil, "argument must be a string"
   end
-  what = Patterns.branch:match (what) or Patterns.repository:match (what)
-  if not what then
+  local parsed = Patterns.branch    :match (what)
+              or Patterns.repository:match (what)
+  if not parsed then
     return nil, "argument must be in format: 'owner/repository(:branch)?'"
   end
   local repository, status = Http {
-    url     = Et.render ("https://api.github.com/repos/<%- owner %>/<%- repository %>", what),
+    url     = Url.build {
+      scheme = client.server.scheme,
+      host   = client.server.host,
+      port   = client.server.port,
+      path   = Et.render (parsed.branch
+           and "/editors/<%- owner %>/<%- repository %>/<%- branch %>"
+            or "/editors/<%- owner %>/<%- repository %>", parsed),
+    },
     method  = "GET",
     headers = {
-      ["Accept"       ] = Client.accept,
+      ["Accept"       ] = "application/json",
       ["User-Agent"   ] = Client.user_agent,
       ["Authorization"] = "token " .. client.token,
     },
@@ -104,13 +111,9 @@ function Client.ardoise (client, what)
   if status ~= 200 then
     return nil, "unable to obtain repository: " .. tostring (status)
   end
-  if not repository.permissions.pull then
-    return nil, "unable to read repository"
-  end
-  local result  = setmetatable (repository, Ardoise)
-  result.branch = what.branch or result.default_branch
-  result.client = client
-  return result
+  repository.client = client
+  repository.branch = parsed.branch or repository.default_branch
+  return setmetatable (repository, Ardoise)
 end
 
 function Client.ardoises (client, what)
@@ -118,166 +121,34 @@ function Client.ardoises (client, what)
   if what ~= nil and type (what) ~= "string" then
     return nil, "argument must be either nil or a string"
   end
-  local coroutine = Coromake ()
-  local threads   = 1
-  local results   = {}
-  Copas.addthread (function ()
-    local url   = "https://api.github.com/search/code"
-               .. "?per_page=100"
-               .. "&sort=updated"
-               .. "&order=desc"
-               .. "&q=" .. (what and what .. "+" or "") .. Client.tag .. "+language=Lua+filename:readme"
-    repeat
-      local answer, status, headers = Http {
-        url     = url,
-        method  = "GET",
-        headers = {
-          ["Accept"       ] = Client.accept,
-          ["User-Agent"   ] = Client.user_agent,
-          ["Authorization"] = "token " .. client.token,
-        },
-      }
-      if status ~= 200 then
-        return nil, "unable to obtain search results: " .. tostring (status)
-      end
-      for _, item in ipairs (answer.items) do
-        threads = threads+1
-        Copas.addthread (function ()
-          local repository = client:ardoise (item.repository.full_name)
-          if repository then
-            results [#results+1] = setmetatable (repository, Ardoise)
-          else
-            results [#results+1] = false
-          end
-          threads = threads-1
-        end)
-      end
-      url = nil
-      for link in (headers ["Link"] or ""):gmatch "[^,]+" do
-        url = link:match [[<([^>]+)>;%s*rel="next"]] or url
-      end
-    until not url
-    threads = threads-1
-  end)
-  return coroutine.wrap (function ()
-    local i = 1
-    while threads ~= 0 do
-      while results [i] == nil do
-        Copas.sleep (0.01)
-      end
-      if results [i] then
-        coroutine.yield (results [i])
-      end
-      i = i+1
-    end
-  end)
-end
-
-function Client.create (client, what, options)
-  assert (getmetatable (client) == Client)
-  options = options or {}
-  if type (what) ~= "string" then
-    return nil, "argument must be a string"
-  end
-  what = Patterns.branch:match (what) or Patterns.repository:match (what)
-  if not what then
-    return nil, "arguement must be in format: 'owner/repository(:branch)?'"
-  end
-  local create_url
-  if what.owner.id == client.user.id then
-    create_url = "https://api.github.com/user/repos"
-  else
-    create_url = Et.render ("https://api.github.com/orgs/<%- org %>/repos", {
-      org = what.owner,
-    })
-  end
-  local repository, status = Http {
-    url     = create_url,
-    method  = "POST",
+  local results, status = Http {
+    url     = Url.build {
+      scheme = client.server.scheme,
+      host   = client.server.host,
+      port   = client.server.port,
+      path   = "/",
+    },
+    method  = "GET",
+    query   = {
+      search = what or "",
+    },
     headers = {
-      ["Accept"       ] = Client.accept,
+      ["Accept"       ] = "application/json",
       ["User-Agent"   ] = Client.user_agent,
       ["Authorization"] = "token " .. client.token,
     },
-    body    = {
-      name          = what.repository,
-      description   = options.description or "An Ardoise",
-      homepage      = options.homepage    or "https://github.com/ardoises",
-      private       = options.private,
-      has_issues    = true,
-      has_wiki      = false,
-      has_downloads = false,
-      auto_init     = false,
-    },
   }
-  if status ~= 201 then
-    return nil, "unable to create ardoise: " .. tostring (status)
+  if status ~= 200 then
+    return nil, "unable to obtain repository: " .. tostring (status)
   end
-  repository.branch = what.branch or repository.default_branch
-  local path = os.tmpname ()
-  assert (os.execute (Et.render ([[
-    rm    -rf "<%- directory %>"
-    mkdir -p  "<%- directory %>"
-  ]], {
-    directory = path,
-  })))
-  local readme = assert (io.open (Et.render ([[<%- directory %>/README.md]], {
-    directory = path,
-  }), "w"))
-  readme:write (Et.render ([[
-# Ardoise <%- name %>
-
-See documentation in [the reference guide](...).
-<!---
-Ardoise tag: <%- tag %>
-Base64 "https://github.com/ardoises"
--->
-]], {
-    name = repository.name,
-    tag  = Mime.b64 "https://github.com/ardoises"
-  }))
-  readme:close ()
-  local url    = Url.parse (repository.clone_url)
-  url.user     = client.token
-  url.password = "x-oauth-basic"
-  assert (os.execute (Et.render ([[
-    cd <%- path %>
-    git init     --quiet
-    git checkout -b "<%- branch %>" 2> /dev/null
-    git add      README.md
-    git commit   --quiet \
-                 --author="<%- name %> <<%- email %>>" \
-                 --message="Create new ardoise."
-    git remote   add origin <%- url %> > /dev/null
-    git push     --quiet \
-                 --set-upstream origin "<%- branch %>" > /dev/null
-  ]], {
-    url    = Url.build (url),
-    path   = path,
-    name   = client.user.name,
-    email  = client.user.email,
-    branch = repository.branch,
-  })))
-  local result  = setmetatable (repository, Ardoise)
-  result.client = client
-  return result
-end
-
-function Ardoise.delete (ardoise)
-  assert (getmetatable (ardoise) == Ardoise)
-  local _, status = Http {
-    url     = ardoise.url,
-    method  = "DELETE",
-    headers = {
-      ["Accept"       ] = Client.accept,
-      ["User-Agent"   ] = Client.user_agent,
-      ["Authorization"] = "token " .. ardoise.client.token,
-    },
-  }
-  if status ~= 204 then
-    return nil, "unable to delete ardoise: " .. tostring (status)
-  end
-  return true
+  local coroutine = Coromake ()
+  return coroutine.wrap (function ()
+    for _, repository in ipairs (results) do
+      repository.client = client
+      repository.branch = repository.default_branch
+      coroutine.yield (setmetatable (repository, Ardoise))
+    end
+  end)
 end
 
 function Ardoise.__tostring (ardoise)
@@ -302,31 +173,26 @@ function Ardoise.edit (ardoise)
       branch     = ardoise.branch,
     }),
   }
-  local wsurl, status, headers
-  for _ = 1, 10 do
-    _, status, headers = Http {
+  local status
+  local before = os.time ()
+  while not ardoise.editor_url do
+    ardoise, status = Http {
       redirect = false,
       url      = url,
       method   = "GET",
       headers  = {
-        ["Accept"       ] = Client.accept,
+        ["Accept"       ] = "application/json",
         ["User-Agent"   ] = Client.user_agent,
         ["Authorization"] = "token " .. client.token,
       },
     }
-    if status == 302 and headers.location:match "^wss?://" then
-      wsurl = headers.location
-      break
-    elseif status == 302 then
-      url = headers.location
+    if os.time () - before > 60 then
+      return nil, "unable to open websocket connection: " .. tostring (status)
     end
-    Copas.sleep (10)
-  end
-  if not wsurl then
-    return nil, "unable to open websocket connection: " .. tostring (status)
+    Copas.sleep (5)
   end
   local websocket = Websocket.client.copas {}
-  assert (websocket:connect (wsurl, "ardoise"))
+  assert (websocket:connect (ardoise.editor_url, "ardoise"))
   assert (websocket:send (Json.encode {
     id    = 1,
     type  = "authenticate",
@@ -341,7 +207,7 @@ function Ardoise.edit (ardoise)
     Layer     = setmetatable ({}, { __index = Layer }),
     ardoise   = ardoise,
     client    = client,
-    url       = wsurl,
+    url       = ardoise.editor_url,
     websocket = websocket,
     running   = true,
     modules   = {},
@@ -523,7 +389,10 @@ function Editor.patch (editor, what)
     local refines = module.layer [Layer.key.refines]
     for i, l in ipairs (refines) do
       if layer == l then
-        table.remove (refines, i)
+        for j = i+1, #refines do
+          refines [j-1] = refines [j]
+        end
+        refines [#refines] = nil
       end
     end
     Layer.write_to (module.layer, false)

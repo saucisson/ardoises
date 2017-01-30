@@ -5,8 +5,9 @@ local permission = [[ permission NOT NULL ]]
 return {
   function ()
     Schema.create_table ("accounts", {
-      { "id"   , Schema.types.integer { primary_key = true } },
-      { "token", Schema.types.text    { null        = true } },
+      { "id"      , Schema.types.integer { primary_key = true } },
+      { "token"   , Schema.types.text    { null        = true } },
+      { "contents", Schema.types.text },
     })
   end,
   function ()
