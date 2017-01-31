@@ -17,9 +17,42 @@ package.preload ["rapidjson"] = function ()
   return require "dkjson"
 end
 
-local Coromake = require "coroutine.make"
+package.preload ["socket.url"] = function ()
+  local Et  = require "etlua"
+  local Url = {}
+  function Url.parse (url)
+    local parser = Adapter.document:createElement "a"
+    parser.href = url
+    return {
+      url       = url,
+      scheme    = parser.protocol:match "%w+",
+      authority = nil,
+      path      = parser.pathname,
+      params    = nil,
+      query     = parser.search,
+      fragment  = nil,
+      userinfo  = nil,
+      host      = parser.hostname,
+      port      = parser.port,
+      user      = nil,
+      password  = nil,
+    }
+  end
+  function Url.build (t)
+    local result
+    if t.port then
+      result = Et.render ("<%- scheme %>://<%- host %>:<%- port %><%- path %>", t)
+    else
+      result = Et.render ("<%- scheme %>://<%- host %><%- path %>", t)
+    end
+    assert (not t.query)
+    return result
+  end
+  return Url
+end
 
 package.preload ["copas"] = function ()
+  local Coromake = require "coroutine.make"
   local copas    = {
     co        = nil,
     running   = nil,
@@ -63,38 +96,101 @@ package.preload ["copas"] = function ()
     end
   end
   function copas.loop ()
-    copas.co = coroutine.running ()
-    while true do
-      for to_run, t in pairs (copas.ready) do
-        if copas.coroutine.status (to_run) == "suspended" then
-          copas.running = to_run
-          local ok, err = copas.coroutine.resume (to_run, type (t) == "table" and table.unpack (t.parameters))
-          copas.running = nil
-          if not ok then
-            Adapter.window.console:log (err)
+    copas.co = coroutine.create (function ()
+      while true do
+        for to_run, t in pairs (copas.ready) do
+          if copas.coroutine.status (to_run) == "suspended" then
+            copas.running = to_run
+            local ok, err = copas.coroutine.resume (to_run, type (t) == "table" and table.unpack (t.parameters))
+            copas.running = nil
+            if not ok then
+              Adapter.window.console:log (err)
+            end
           end
         end
-      end
-      for co in pairs (copas.ready) do
-        if copas.coroutine.status (co) == "dead" then
-          copas.waiting [co] = nil
-          copas.ready   [co] = nil
+        for co in pairs (copas.ready) do
+          if copas.coroutine.status (co) == "dead" then
+            copas.waiting [co] = nil
+            copas.ready   [co] = nil
+          end
+        end
+        if  not next (copas.ready  )
+        and not next (copas.waiting) then
+          copas.co = nil
+          return
+        elseif not next (copas.ready) then
+          coroutine.yield ()
         end
       end
-      if  not next (copas.ready  )
-      and not next (copas.waiting) then
-        copas.co = nil
-        return
-      elseif not next (copas.ready) then
-        coroutine.yield ()
-      end
-    end
+    end)
+    coroutine.resume (copas.co)
   end
   return copas
 end
 
 package.preload ["websocket"] = function ()
-  -- FIXME
+  local Copas     = require "copas"
+  local Websocket = {}
+  Websocket.__index = Websocket
+  Websocket.client  = {}
+  function Websocket.client.copas (options)
+    return setmetatable ({
+      websocket = nil,
+      error     = nil,
+      receiver  = nil,
+      messages  = {},
+      timeout   = options.timeout or 30, -- seconds
+    }, Websocket)
+  end
+  function Websocket.connect (what, url, protocol)
+    local websocket = Adapter.js.new (Adapter.window.WebSocket, url, protocol)
+    local co        = coroutine.running ()
+    function websocket.onopen ()
+      what.websocket = websocket
+      Copas.wakeup (co)
+    end
+    function websocket.onmessage (_, event)
+      what.messages [#what.messages+1] = event.data
+      Copas.wakeup (what.receiver)
+    end
+    function websocket.onerror (_, event)
+      what.websocket = nil
+      what.error     = event
+      Copas.wakeup (co)
+    end
+    function websocket.onclose (_, event)
+      what.websocket = nil
+      what.error     = event
+      Copas.wakeup (co)
+    end
+    Copas.sleep (what.timeout)
+    if not what.websocket then
+      return nil, what.error
+    end
+    return what
+  end
+  function Websocket:send (text)
+    self.websocket:send (text)
+    return true
+  end
+  function Websocket:receive ()
+    local message
+    repeat
+      self.receiver = coroutine.running ()
+      message = self.messages [1]
+      if message then
+        table.remove (self.messages, 1)
+      else
+        Copas.sleep (-math.huge)
+      end
+    until message
+    return message
+  end
+  function Websocket:close ()
+    self.websocket:close ()
+    return true
+  end
+  return Websocket
 end
 
 Adapter.js        = _G.js
@@ -121,6 +217,28 @@ function Adapter.tojs (t)
     end
     return result
   end
+end
+
+function Mt.__call (_, parameters)
+  xpcall (function ()
+    local Copas    = require "copas"
+    local Jsonhttp = require "ardoises.jsonhttp"
+    Jsonhttp.copas = Jsonhttp.js
+    local Client   = require "ardoises.client"
+    Copas.addthread (function ()
+      local client = Client {
+        server = Adapter.origin,
+        token  = parameters.token,
+      }
+      local ardoise = client:ardoise (parameters.repository)
+      local editor  = ardoise:edit ()
+      editor:close ()
+    end)
+    Copas.loop ()
+  end, function (err)
+    print ("error:", err)
+    print (debug.traceback ())
+  end)
 end
 
 return Adapter

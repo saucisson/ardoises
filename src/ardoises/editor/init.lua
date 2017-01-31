@@ -1,7 +1,7 @@
 local Copas     = require "copas"
 local Et        = require "etlua"
 local Http      = require "ardoises.jsonhttp".copas
-local Json      = require "cjson"
+local Json      = require "rapidjson"
 local Layer     = require "layeredata"
 local Patterns  = require "ardoises.patterns"
 local Url       = require "socket.url"

@@ -2,7 +2,7 @@ local Config   = require "lapis.config".get ()
 local Database = require "lapis.db"
 local Et       = require "etlua"
 local Http     = require "ardoises.jsonhttp".resty
-local Json     = require "cjson"
+local Json     = require "rapidjson"
 local Model    = require "ardoises.server.model"
 
 local Permissions = {}

@@ -2,8 +2,7 @@ local Coromake  = require "coroutine.make"
 _G.coroutine    = Coromake ()
 local Copas     = require "copas"
 local Et        = require "etlua"
-local Json      = require "cjson"
-local Mime      = require "mime"
+local Json      = require "rapidjson"
 local Url       = require "socket.url"
 local Layer     = require "layeredata"
 local Http      = require "ardoises.jsonhttp".copas
@@ -19,7 +18,6 @@ Ardoise.__index = Ardoise
 Editor .__index = Editor
 
 Client.user_agent = "Ardoises Client"
-Client.tag        = Mime.b64 "https://github.com/ardoises"
 
 local Mt = {}
 setmetatable (Client, Mt)
@@ -191,8 +189,17 @@ function Ardoise.edit (ardoise)
     end
     Copas.sleep (5)
   end
+  local start     = os.time ()
   local websocket = Websocket.client.copas {}
-  assert (websocket:connect (ardoise.editor_url, "ardoise"))
+  repeat
+    if os.time () - start > 30 then
+      return nil, "connection refused"
+    end
+    local connected = websocket:connect (ardoise.editor_url, "ardoise")
+    if not connected then
+      Copas.sleep (1)
+    end
+  until connected
   assert (websocket:send (Json.encode {
     id    = 1,
     type  = "authenticate",

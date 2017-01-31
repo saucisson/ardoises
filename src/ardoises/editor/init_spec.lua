@@ -7,7 +7,7 @@ end
 local assert    = require "luassert"
 local Copas     = require "copas"
 local Et        = require "etlua"
-local Json      = require "cjson"
+local Json      = require "rapidjson"
 local Patterns  = require "ardoises.patterns"
 local Websocket = require "websocket"
 

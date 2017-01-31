@@ -3,7 +3,7 @@ local Csrf     = require "lapis.csrf"
 local Database = require "lapis.db"
 local Et       = require "etlua"
 local Http     = require "ardoises.jsonhttp".resty
-local Json     = require "cjson"
+local Json     = require "rapidjson"
 local Lapis    = require "lapis"
 local Mime     = require "mime"
 local Model    = require "ardoises.server.model"
@@ -243,8 +243,6 @@ app:match ("/editors/", "/editors/:owner/:repository(/:branch)", function (self)
         ["User-Agent"   ] = Config.application.name,
       },
     }
-    print (status)
-    print (Json.encode (repository))
     if status == 404 then
       return { status = 404 }
     end
@@ -290,6 +288,7 @@ app:match ("/editors/", "/editors/:owner/:repository(/:branch)", function (self)
       json   = repository,
     }
   else
+    self.user       = self.session.user
     self.repository = repository
     return {
       status = 200,

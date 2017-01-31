@@ -139,7 +139,7 @@ JsonHttp.default = wrap (function (request)
   request.sink   = Ltn12.sink.table (result)
   request.source = request.body  and Ltn12.source.string (request.body)
   local url = Url.parse (request.url)
-  local _, status, headers, line
+  local _, status, headers
   if url.scheme == "docker" then
     local t = {
       scheme = "http",
@@ -153,10 +153,10 @@ JsonHttp.default = wrap (function (request)
     t.headers = t.headers or {}
     t.headers.Host = "localhost"
     t.url    = nil
-    _, status, headers, line = Httpn.request (t)
+    _, status, headers = Httpn.request (t)
   else
     local http = request.url:match "https://" and Https or Httpn
-    _, status, headers, line = http.request (request)
+    _, status, headers = http.request (request)
   end
   return {
     status  = status,
@@ -174,6 +174,9 @@ JsonHttp.js = wrap (function (request)
     co    = coroutine.running (),
   }
   local response, json, err
+  if request.headers then
+    request.headers ["User-Agent"] = nil
+  end
   local r1 = Adapter.window:fetch (request.url, Adapter.tojs {
     method   = request.method or "GET",
     headers  = request.headers,

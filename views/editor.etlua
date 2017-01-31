@@ -58,7 +58,7 @@
     elseif xhr.status ~= 200 then
       return nil, "HTTP GET " .. xhr.statusText .. ": " .. url
     end
-    return load (xhr.responseText, url)
+    return load (xhr.responseText, url, "t")
   end
   package.searchers [#package.searchers] = nil
   package.searchers [#package.searchers] = nil
@@ -70,20 +70,17 @@
       return "\n    " .. err
     end
   end)
+  print "here"
   local Adapter = require "ardoises.js"
-  xpcall (function ()
-    local co = coroutine.create (function ()
-      print "> running"
-      require "rapidjson"
-      print "< running"
-    end)
-    assert (coroutine.resume (co))
-  end, function (err)
-    print ("error:", err)
-    print (debug.traceback ())
-  end)
+  Adapter {
+    repository = "<%- repository.full_name %>",
+    token      = "<%- user.token %>",
+  }
 </script>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fetch/2.0.2/fetch.min.js"
+        type="text/javascript">
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.1.1/jquery.min.js"
         type="text/javascript">
 </script>
