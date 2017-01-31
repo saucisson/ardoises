@@ -182,8 +182,6 @@ function Editor.pull (editor, branch)
   repository.path = os.tmpname ()
   if not os.execute (Et.render ([[
     rm -rf "<%- directory %>" && \
-    git config --global user.name  "Ardoises" && \
-    git config --global user.email "editor@ardoises.ovh" && \
     git clone --quiet \
               --depth=1 \
               --single-branch \
@@ -336,13 +334,13 @@ function Editor.require (editor, x)
   }
   layer [Layer.key.refines] = { remote }
   Layer.write_to (layer, false) -- read-only
-  repository.modules [module] = {
+  repository.modules [req.module] = {
     layer  = layer,
     remote = remote,
     ref    = ref,
     code   = code,
   }
-  return repository.modules [module]
+  return repository.modules [req.module]
 end
 
 Editor.handlers = {}

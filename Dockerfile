@@ -21,5 +21,7 @@ RUN   apk add --no-cache --virtual .build-deps \
   &&  luarocks install  rockspec/lua-resty-qless-develop-0.rockspec \
   &&  luarocks install  rockspec/lua-websockets-develop-0.rockspec \
   &&  luarocks make     rockspec/ardoises-master-1.rockspec \
+  &&  git config --system user.name  "Ardoises" \
+  &&  git config --system user.email "editor@ardoises.ovh" \
   &&  rm -rf            /src/ardoises \
-  &&  apk del .build-deps
+  &&  apk del           .build-deps
