@@ -182,6 +182,8 @@ function Editor.pull (editor, branch)
   repository.path = os.tmpname ()
   if not os.execute (Et.render ([[
     rm -rf "<%- directory %>" && \
+    git config --global user.name  "Ardoises" && \
+    git config --global user.email "editor@ardoises.ovh" && \
     git clone --quiet \
               --depth=1 \
               --single-branch \
@@ -431,7 +433,7 @@ function Editor.handlers.list (editor)
   local repository = editor.repositories [editor.branch.full_name]
   for module, x in pairs (repository.modules) do
     if x ~= false then
-      result [module] = module .. "@" .. repository.full_name
+      result [module] = module .. "@" .. editor.branch.full_name
     end
   end
   return result
@@ -460,7 +462,9 @@ function Editor.handlers.create (editor, message)
   local filename   = repository.path .. "/src/" .. table.concat (parts, "/") .. ".lua"
   parts [#parts]   = nil
   local directory  = repository.path .. "/src/" .. table.concat (parts, "/")
-  if not os.execute (Et.render ([[ mkdir -p "<%- directory %>" ]], {
+  if not os.execute (Et.render ([[
+    mkdir -p "<%- directory %>"
+  ]], {
     directory = directory,
   })) then
     return nil, "directory creation failure"
@@ -472,7 +476,7 @@ function Editor.handlers.create (editor, message)
   file:write (([[
     return function (Layer, layer, ref)
     end
-  ]]):gsub ("    ", ""))
+  ]]):gsub ("    ", "") .. "\n")
   file:close ()
   if not os.execute (Et.render ([[
     cd <%- path %> && \
@@ -651,7 +655,7 @@ function Editor.handlers.patch (editor, message)
     module.code    = Layer.dump (module.remote)
     local filename = "src/" .. table.concat (parts, "/") .. ".lua"
     local file     = io.open (repository.path .. "/" .. filename, "w")
-    file:write (module.code)
+    file:write (module.code .. "\n")
     file:close ()
     assert (os.execute (Et.render ([[
       cd <%- path %> && \

@@ -38,6 +38,7 @@ Patterns.require =
     Patterns.module * Lpeg.P"@" * Patterns.branch
   ) / function (t)
     t [2].module = t [1]
+    t [2].name   = t [1] .. "@" .. t [2].full_name
     return t [2]
   end
 Patterns.authorization =

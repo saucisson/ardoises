@@ -287,7 +287,7 @@ function Editor.require (editor, module)
   local request  = {
     id     = #editor.requests+1,
     type   = "require",
-    module = module.full_name,
+    module = module.name,
   }
   editor.requests  [request.id] = request
   editor.callbacks [request.id] = function ()
@@ -299,7 +299,7 @@ function Editor.require (editor, module)
     return nil, request.errors
   end
   local code = request.answer.code
-  local loaded, err_loaded = _G.load (code, module.full_name, "t")
+  local loaded, err_loaded = _G.load (code, module.name, "t")
   if not loaded then
     return nil, "invalid layer: " .. err_loaded
   end
@@ -308,7 +308,7 @@ function Editor.require (editor, module)
     return nil, "invalid layer: " .. chunk
   end
   local remote, ref = Layer.new {
-    name = module.full_name,
+    name = module.name,
   }
   local oldcurrent = editor.current
   editor.current   = Et.render ("<%- owner %>/<%- repository %>:<%- branch %>", module)
@@ -322,14 +322,14 @@ function Editor.require (editor, module)
   }
   layer [Layer.key.refines] = { remote }
   Layer.write_to (layer, false) -- read-only
-  editor.modules [module.full_name] = {
-    name   = module.full_name,
+  editor.modules [module.name] = {
+    name   = module.name,
     layer  = layer,
     remote = remote,
     ref    = ref,
     code   = code,
   }
-  return editor.modules [module.full_name]
+  return editor.modules [module.name]
 end
 
 function Editor.create (editor, name)
@@ -337,22 +337,23 @@ function Editor.create (editor, name)
   if Patterns.module:match (name) then
     name = name .. "@" .. assert (editor.current)
   end
-  if not Patterns.require:match (name) then
+  local module = Patterns.require:match (name)
+  if not module then
     return nil, "invalid module"
   end
-  if editor.modules [name] then
+  if editor.modules [module.name] then
     return nil, "module exists already"
   end
   local remote, ref = Layer.new {
-    name = name,
+    name = module.name,
   }
   local layer = Layer.new {
     temporary = true,
   }
   layer [Layer.key.refines] = { remote }
   Layer.write_to (layer, false) -- read-only
-  editor.modules [name] = {
-    name   = name,
+  editor.modules [module.name] = {
+    name   = module.name,
     layer  = layer,
     remote = remote,
     ref    = ref,
@@ -361,16 +362,16 @@ function Editor.create (editor, name)
   local request = {
     id     = #editor.requests+1,
     type   = "create",
-    module = name,
+    module = module.name,
   }
   editor.requests  [request.id] = request
   editor.callbacks [request.id] = function ()
     if not request.success then
-      editor.modules [name] = nil
+      editor.modules [module.name] = nil
     end
   end
   assert (editor.websocket:send (Json.encode (request)))
-  return name
+  return module.name
 end
 
 function Editor.delete (editor, name)
@@ -378,23 +379,24 @@ function Editor.delete (editor, name)
   if Patterns.module:match (name) then
     name = name .. "@" .. assert (editor.current)
   end
-  if not Patterns.require:match (name) then
+  local module = Patterns.require:match (name)
+  if not module then
     return nil, "invalid module"
   end
-  if not editor.modules [name] then
+  if not editor.modules [module.name] then
     return nil, "module does not exist"
   end
-  local back = editor.modules [name]
-  editor.modules [name] = nil
+  local back = editor.modules [module.name]
+  editor.modules [module.name] = nil
   local request = {
     id     = #editor.requests+1,
     type   = "delete",
-    module = name,
+    module = module.name,
   }
   editor.requests  [request.id] = request
   editor.callbacks [request.id] = function ()
     if not request.success then
-      editor.modules [name] = back
+      editor.modules [module.name] = back
     end
   end
   assert (editor.websocket:send (Json.encode (request)))
