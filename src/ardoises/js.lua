@@ -5,6 +5,10 @@ function _G.print (...)
   Adapter.window.console:log (...)
 end
 
+package.preload ["jit"] = function ()
+  return false
+end
+
 package.preload ["lpeg"] = function ()
   return require "lulpeg"
 end

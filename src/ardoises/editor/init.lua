@@ -453,7 +453,7 @@ function Editor.handlers.create (editor, message)
   if repository.modules [req.module] then
     return nil, "existing module"
   end
-  local parts  = {}
+  local parts = {}
   for part in req.module:gmatch "[^%.]+" do
     parts [#parts+1] = part
   end

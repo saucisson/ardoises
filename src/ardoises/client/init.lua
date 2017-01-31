@@ -221,7 +221,11 @@ function Ardoise.edit (ardoise)
     requests  = {},
     callbacks = {},
     answers   = {},
-    current   = nil,
+    current   = Et.render ("<%- owner %>/<%- repository %>:<%- branch %>", {
+      owner      = ardoise.owner.login,
+      repository = ardoise.name,
+      branch     = ardoise.branch,
+    }),
     observers = {},
   }, Editor)
   editor.Layer.require = function (name)
@@ -253,13 +257,16 @@ end
 
 function Editor.list (editor)
   assert (getmetatable (editor) == Editor)
+  local co       = coroutine.running ()
   local request  = {
     id   = #editor.requests+1,
     type = "list",
   }
   editor.requests  [request.id] = request
-  editor.callbacks [request.id] = coroutine.running ()
-  assert (editor.client.websocket:send (Json.encode (request)))
+  editor.callbacks [request.id] = function ()
+    Copas.wakeup (co)
+  end
+  assert (editor.websocket:send (Json.encode (request)))
   Copas.sleep (-math.huge)
   assert (request.answer)
   local coroutine = Coromake ()
@@ -276,13 +283,16 @@ function Editor.require (editor, module)
   if not module then
     return nil, "invalid module"
   end
+  local co       = coroutine.running ()
   local request  = {
     id     = #editor.requests+1,
     type   = "require",
     module = module.full_name,
   }
   editor.requests  [request.id] = request
-  editor.callbacks [request.id] = coroutine.running ()
+  editor.callbacks [request.id] = function ()
+    Copas.wakeup (co)
+  end
   assert (editor.websocket:send (Json.encode (request)))
   Copas.sleep (-math.huge)
   if not request.success then
@@ -320,6 +330,75 @@ function Editor.require (editor, module)
     code   = code,
   }
   return editor.modules [module.full_name]
+end
+
+function Editor.create (editor, name)
+  assert (getmetatable (editor) == Editor)
+  if Patterns.module:match (name) then
+    name = name .. "@" .. assert (editor.current)
+  end
+  if not Patterns.require:match (name) then
+    return nil, "invalid module"
+  end
+  if editor.modules [name] then
+    return nil, "module exists already"
+  end
+  local remote, ref = Layer.new {
+    name = name,
+  }
+  local layer = Layer.new {
+    temporary = true,
+  }
+  layer [Layer.key.refines] = { remote }
+  Layer.write_to (layer, false) -- read-only
+  editor.modules [name] = {
+    name   = name,
+    layer  = layer,
+    remote = remote,
+    ref    = ref,
+    code   = [[ return function () end ]],
+  }
+  local request = {
+    id     = #editor.requests+1,
+    type   = "create",
+    module = name,
+  }
+  editor.requests  [request.id] = request
+  editor.callbacks [request.id] = function ()
+    if not request.success then
+      editor.modules [name] = nil
+    end
+  end
+  assert (editor.websocket:send (Json.encode (request)))
+  return name
+end
+
+function Editor.delete (editor, name)
+  assert (getmetatable (editor) == Editor)
+  if Patterns.module:match (name) then
+    name = name .. "@" .. assert (editor.current)
+  end
+  if not Patterns.require:match (name) then
+    return nil, "invalid module"
+  end
+  if not editor.modules [name] then
+    return nil, "module does not exist"
+  end
+  local back = editor.modules [name]
+  editor.modules [name] = nil
+  local request = {
+    id     = #editor.requests+1,
+    type   = "delete",
+    module = name,
+  }
+  editor.requests  [request.id] = request
+  editor.callbacks [request.id] = function ()
+    if not request.success then
+      editor.modules [name] = back
+    end
+  end
+  assert (editor.websocket:send (Json.encode (request)))
+  return true
 end
 
 function Editor.patch (editor, what)
@@ -388,34 +467,34 @@ function Editor.patch (editor, what)
     module.current = nil
   end
   editor.requests  [request.id] = request
-  editor.callbacks [request.id] = coroutine.running ()
-  assert (editor.client.websocket:send (Json.encode (request)))
-  Copas.sleep (-math.huge)
-  for module, layer in pairs (modules) do
-    Layer.write_to (module.layer, nil)
-    local refines = module.layer [Layer.key.refines]
-    for i, l in ipairs (refines) do
-      if layer == l then
-        for j = i+1, #refines do
-          refines [j-1] = refines [j]
+  editor.callbacks [request.id] = function ()
+    for module, layer in pairs (modules) do
+      Layer.write_to (module.layer, nil)
+      local refines = module.layer [Layer.key.refines]
+      for i, l in ipairs (refines) do
+        if layer == l then
+          for j = i+1, #refines do
+            refines [j-1] = refines [j]
+          end
+          refines [#refines] = nil
         end
-        refines [#refines] = nil
+      end
+      Layer.write_to (module.layer, false)
+    end
+    if not request.success then
+      return nil, request.error
+    end
+    for module, layer in pairs (modules) do
+      if type (what [module.name] == "string") then
+        Layer.merge (layer, module.remote)
+      elseif type (what [module.name] == "function") then
+        what [module.name] (editor.Layer, module.remote, module.ref)
+      else
+        assert (false)
       end
     end
-    Layer.write_to (module.layer, false)
   end
-  if not request.success then
-    return nil, request.error
-  end
-  for module, layer in pairs (modules) do
-    if type (what [module.name] == "string") then
-      Layer.merge (layer, module.remote)
-    elseif type (what [module.name] == "function") then
-      what [module.name] (editor.Layer, module.remote, module.ref)
-    else
-      assert (false)
-    end
-  end
+  assert (editor.websocket:send (Json.encode (request)))
   return true
 end
 
@@ -434,7 +513,7 @@ function Editor.receive (editor)
     request.error   = message.error
     editor.requests  [message.id] = nil
     editor.callbacks [message.id] = nil
-    Copas.wakeup (callback)
+    callback ()
   elseif message.type == "create" then
     for observer in pairs (editor.observer) do
       observer (message)

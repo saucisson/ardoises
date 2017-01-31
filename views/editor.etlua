@@ -70,7 +70,6 @@
       return "\n    " .. err
     end
   end)
-  print "here"
   local Adapter = require "ardoises.js"
   Adapter {
     repository = "<%- repository.full_name %>",
