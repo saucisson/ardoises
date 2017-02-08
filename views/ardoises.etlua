@@ -29,6 +29,12 @@
     <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css"
           rel="stylesheet"
           type="text/css" />
+    <link src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.23.0/codemirror.min.css"
+          ref="stylesheet"
+          type="text/css" />
+    <link src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.23.0/theme/monokai.min.css"
+          ref="stylesheet"
+          type="text/css" />
     <link href="/ardoises.css"
           rel="stylesheet"
           type="text/css" />
@@ -42,6 +48,12 @@
             type="text/javascript">
     </script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
+            type="text/javascript">
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.23.0/codemirror.min.js"
+            type="text/javascript">
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.23.0/mode/lua/lua.min.js"
             type="text/javascript">
     </script>
 
