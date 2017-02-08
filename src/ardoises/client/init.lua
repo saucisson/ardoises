@@ -283,6 +283,9 @@ function Editor.require (editor, module)
   if not module then
     return nil, "invalid module"
   end
+  if editor.modules [module.name] then
+    return editor.modules [module.name]
+  end
   local co       = coroutine.running ()
   local request  = {
     id     = #editor.requests+1,
