@@ -226,9 +226,12 @@ end
 function Mt.__call (_, parameters)
   xpcall (function ()
     local Copas    = require "copas"
+    local Et       = require "etlua"
     local Jsonhttp = require "ardoises.jsonhttp"
     Jsonhttp.copas = Jsonhttp.js
     local Client   = require "ardoises.client"
+    local Editor   = Adapter.document:getElementById "editor"
+    local Layers   = Adapter.document:getElementById "layers"
     Copas.addthread (function ()
       local client = Client {
         server = Adapter.origin,
@@ -236,6 +239,28 @@ function Mt.__call (_, parameters)
       }
       local ardoise = client:ardoise (parameters.repository)
       local editor  = ardoise:edit ()
+      local layers  = {}
+      for name, module in editor:list () do
+        layers [name] = editor:require (module)
+      end
+      Editor.innerHTML = ""
+      Layers.innerHTML = Et.render ([[
+        <ul class="list-group">
+          <% for layer in pairs (layers) do %>
+          <li class="list-group-item"><%= layer %></li>
+          <% end %>
+        </ul>
+      ]], {
+        layers = layers,
+      })
+      -- print ("create")
+      -- print (editor:create "mymodule")
+      -- print "list"
+      -- for name, module in editor:list () do
+      --   print (name, module, editor:require (module) ~= nil)
+      -- end
+      -- print ("delete")
+      -- print (editor:delete "mymodule")
       editor:close ()
     end)
     Copas.loop ()

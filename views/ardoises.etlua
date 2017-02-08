@@ -29,12 +29,6 @@
     <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css"
           rel="stylesheet"
           type="text/css" />
-    <link src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.23.0/codemirror.min.css"
-          ref="stylesheet"
-          type="text/css" />
-    <link src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.23.0/theme/monokai.min.css"
-          ref="stylesheet"
-          type="text/css" />
     <link href="/ardoises.css"
           rel="stylesheet"
           type="text/css" />
@@ -42,18 +36,78 @@
   </head>
   <body>
 
+    <div class="navbar navbar-default navbar-fixed-top">
+      <div class="container">
+        <div class="row">
+          <div class="col-sm-4">
+            <ul class="lead nav navbar-nav navbar-left">
+              <li class="">
+                <a href="/"><i class="fa fa-inverse fa-home" aria-hidden="true"></i></a>
+              </li>
+              <% if session and session.user then %>
+              <li class="">
+                <a href="/logout"><i class="fa fa-inverse fa-sign-out" aria-hidden="true"></i></a>
+              </li>
+              <% else %>
+              <li class="">
+                <a href="/login"><i class="fa fa-inverse fa-sign-in" aria-hidden="true"></i></a>
+              </li>
+              <% end %>
+            </ul>
+          </div>
+          <div class="col-sm-4">
+            <% if session and session.user then %>
+            <form class="lead nav navbar-nav navbar-left" action="/" method="get">
+              <div class="input-group">
+                <span class="input-group-addon">
+                  <i class="fa fa-search"></i>
+                </span>
+                <input class="form-control" name="search" type="text" value="<%- search or '' %>"/>
+                <span class="input-group-btn">
+                  <button class="btn btn-default" type="submit">
+                    <i class="fa fa-check"></i>
+                  </button>
+                </span>
+              </div>
+            </form>
+            <% end %>
+          </div>
+          <div class="col-sm-4">
+            <ul class="lead nav navbar-nav navbar-right">
+              <li class="">
+                <a href="https://twitter.com/ArdoiseModeling"><i class="fa fa-inverse fa-twitter"></i></a>
+              </li>
+              <li class="">
+                <a href="http://stackoverflow.com/questions/tagged/ardoises"><i class="fa fa-inverse fa-stack-overflow"></i></a>
+              </li>
+              <li class="">
+                <a href="https://gitter.im/ardoises/Lobby"><i class="fa fa-inverse fa-comments"></i></a>
+              </li>
+              <li class="">
+                <a href="https://github.com/ardoises"><i class="fa fa-inverse fa-github"></i></a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <% content_for ("inner") %>
+
+    <nav class="navbar navbar-default navbar-fixed-bottom">
+      <div class="container">
+        <div class="row">
+          <div class="col-sm-6">
+            <p>Legal info</p>
+          </div>
+        </div>
+      </div>
+    </nav>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.1.1/jquery.min.js"
             type="text/javascript">
     </script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
-            type="text/javascript">
-    </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.23.0/codemirror.min.js"
-            type="text/javascript">
-    </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.23.0/mode/lua/lua.min.js"
             type="text/javascript">
     </script>
 

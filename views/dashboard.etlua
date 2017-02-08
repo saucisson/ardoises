@@ -1,41 +1,5 @@
-<nav class="navbar navbar-default navbar-fixed-top">
-  <div class="container-fluid">
-    <!-- Brand and toggle get grouped for better mobile display -->
-    <div class="navbar-header">
-      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-navbar-collapse-1">
-        <i class="fa fa-inverse fa-bars"></i>
-      </button>
-      <a href="/">
-        <button type="button" class="btn btn-default" aria-label="Home">
-          <i class="fa fa-inverse fa-home" aria-hidden="true"></i>
-        </button>
-      </a>
-    </div>
-    <!-- Collect the nav links, forms, and other content for toggling -->
-    <div class="collapse navbar-collapse"
-         id="bs-navbar-collapse-1">
-      <ul class="nav navbar-nav navbar-right">
-        <li>
-          <a href="/logout">
-            <button type="button" class="btn btn-default" aria-label="Logout">
-              <i class="fa fa-inverse fa-sign-out" aria-hidden="true"></i>
-            </button>
-          </a>
-        </li>
-      </ul>
-    </div>
-  </div>
-</nav>
-
-<section class="bg-dark whole"
-         id="dashboard">
+<section id="dashboard">
   <div class="container">
-    <form action="/" method="get">
-      <div class="input-group margin-bottom-sm">
-        <span class="input-group-addon"><i class="fa fa-search fa-inverse fa-fw"></i></span>
-        <input class="form-control" name="search" type="text" placeholder="<%- search %>" />
-      </div>
-    </div>
     <div class="list-group">
     <% for _, repository in ipairs (repositories) do %>
       <a href="/editors/<%- repository.full_name %>"
@@ -45,28 +9,29 @@
           <h4 class="list-group-item-heading"><%= repository.full_name %></h4>
           <p class="list-group-item-text"><%= repository.description %></p>
         </span>
-        <% if repository.user_permissions.push then %>
-        <span class="fa-stack fa-lg">
-          <i class="fa fa-pencil fa-flip-horizontal fa-inverse fa-stack-1x"></i>
-        </span>
-        <% else %>
-        <span class="fa-stack fa-lg">
-          <i class="fa fa-pencil fa-flip-horizontal fa-inverse fa-stack-1x"></i>
-          <i class="fa fa-ban fa-stack-2x text-danger"></i>
-        </span>
-        <% end %>
-        <% if repository.permissions.push then %>
-        <span class="fa-stack fa-lg">
-          <i class="fa fa-pencil fa-flip-horizontal fa-inverse fa-stack-1x"></i>
-        </span>
-        <% else %>
-        <span class="fa-stack fa-lg">
-          <i class="fa fa-pencil fa-flip-horizontal fa-inverse fa-stack-1x"></i>
-          <i class="fa fa-ban fa-stack-2x text-danger"></i>
-        </span>
-        <% end %>
-        <span class="badge badge-default badge-pill">
-          <%= repository.stargazers_count %><i class="fa fa-inverse fa-star" aria-hidden="true"></i>
+        <span class="pull-right">
+          <img class="circle" src="<%- session.user.avatar_url %>"/>
+          <% if repository.user_permissions.push then %>
+          <span class="fa-stack fa-lg">
+            <i class="fa fa-pencil fa-flip-horizontal fa-stack-1x"></i>
+          </span>
+          <% else %>
+          <span class="fa-stack fa-lg">
+            <i class="fa fa-pencil fa-flip-horizontal fa-stack-1x"></i>
+            <i class="fa fa-ban fa-stack-2x text-danger"></i>
+          </span>
+          <% end %>
+          <img class="circle" height="50px" src="/avatar.png"/>
+          <% if repository.permissions.push then %>
+          <span class="fa-stack fa-lg">
+            <i class="fa fa-pencil fa-flip-horizontal fa-stack-1x"></i>
+          </span>
+          <% else %>
+          <span class="fa-stack fa-lg">
+            <i class="fa fa-pencil fa-flip-horizontal fa-stack-1x"></i>
+            <i class="fa fa-ban fa-stack-2x text-danger"></i>
+          </span>
+          <% end %>
         </span>
       </a>
     <% end %>

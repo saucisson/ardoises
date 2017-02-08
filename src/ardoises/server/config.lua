@@ -36,7 +36,7 @@ local common = {
     api_key  = assert (os.getenv "DOCKER_SECRET"),
   },
   clean = {
-    delay = 5 * 60,
+    delay = 10,
   },
   jsonhttp = {
     delay = 24 * 50 * 60,

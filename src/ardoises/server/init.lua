@@ -137,7 +137,7 @@ app:match ("/", function (self)
         json   = result,
       }
     else
-      self.search       = self.params.search or "search"
+      self.search       = self.params.search
       self.repositories = result
       return {
         status = 200,
@@ -227,7 +227,7 @@ end)
 
 app:match ("/editors/", "/editors/:owner/:repository(/:branch)", function (self)
   if not authenticate (self) then
-    return { redirect_to = "/overview.html" }
+    return { redirect_to = "/" }
   end
   local repository, status
   for _, token in ipairs { self.session.user.token, Config.application.token } do
