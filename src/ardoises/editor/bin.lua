@@ -6,6 +6,12 @@ _G.print = function (...)
   io.stdout:flush ()
 end
 
+local oldexecute = os.execute
+_G.os.execute = function (...)
+  print (...)
+  return oldexecute (...)
+end
+
 local Arguments = require "argparse"
 local Copas     = require "copas"
 local Editor    = require "ardoises.editor"
