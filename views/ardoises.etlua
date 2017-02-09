@@ -26,6 +26,9 @@
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
           rel="stylesheet"
           type="text/css" />
+    <link href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/cyborg/bootstrap.min.css"
+          rel="stylesheet"
+          type="text/css" />
     <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css"
           rel="stylesheet"
           type="text/css" />
@@ -36,7 +39,7 @@
   </head>
   <body>
 
-    <div class="navbar navbar-default navbar-fixed-top">
+    <div class="navbar navbar-fixed-top">
       <div class="container">
         <div class="row">
           <div class="col-sm-4">
@@ -94,7 +97,7 @@
 
     <% content_for ("inner") %>
 
-    <nav class="navbar navbar-default navbar-fixed-bottom">
+    <nav class="navbar navbar-fixed-bottom">
       <div class="container">
         <div class="row">
           <div class="col-sm-6">

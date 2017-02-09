@@ -239,28 +239,90 @@ function Mt.__call (_, parameters)
       }
       local ardoise = client:ardoise (parameters.repository)
       local editor  = ardoise:edit ()
-      local layers  = {}
-      for name, module in editor:list () do
-        layers [name] = editor:require (module)
+      local active  = nil
+      local function render_layer ()
+        if active then
+          local layer = editor:require (active.name)
+        else
+          Editor.innerHTML = [[<h1 class="text-primary"><i class="fully-centered fa fa-beer fa-5x fa-fw"></i></h1>]]
+        end
       end
-      Editor.innerHTML = ""
-      Layers.innerHTML = Et.render ([[
-        <ul class="list-group">
-          <% for layer in pairs (layers) do %>
-          <li class="list-group-item"><%= layer %></li>
-          <% end %>
-        </ul>
-      ]], {
-        layers = layers,
-      })
-      -- print ("create")
-      -- print (editor:create "mymodule")
-      -- print "list"
-      -- for name, module in editor:list () do
-      --   print (name, module, editor:require (module) ~= nil)
-      -- end
-      -- print ("delete")
-      -- print (editor:delete "mymodule")
+      local function render_layers ()
+        Copas.addthread (function ()
+          local layers = {}
+          for name, module in editor:list () do
+            layers [#layers+1] = {
+              id     = #layers+1,
+              name   = name,
+              module = module,
+            }
+          end
+          table.sort (layers, function (l, r) return l.name < r.name end)
+          Layers.innerHTML = Et.render ([[
+              <div class="list-group">
+                <div class="list-group-item row">
+                  <div class="input-group">
+                    <input id="layer-name" type="text" class="form-control" placeholder="Module" />
+                    <span id="layer-create" class="input-group-addon"><i class="fa fa-plus fa-inverse" aria-hidden="true"></i></span>
+                  </div>
+                </div>
+                <% for _, layer in ipairs (layers) do %>
+                  <div class="list-group-item row">
+                      <div class="input-group">
+                        <span id="layer-get-<%- layer.id %>" class="input-xlarge uneditable-input"><%= layer.name %></span>
+                        <span id="layer-delete-<%- layer.id %>" class="input-group-addon"><i class="fa fa-trash fa-inverse" aria-hidden="true"></i></span>
+                      </div>
+                  </div>
+                <% end %>
+              </div>
+          ]], {
+            layers = layers,
+          })
+          do
+            local link = Adapter.document:getElementById ("layer-create")
+            link.onclick = function ()
+              local name = Adapter.document:getElementById ("layer-name").value
+              Copas.addthread (function ()
+                editor:create (name)
+                render_layers ()
+              end)
+              return false
+            end
+          end
+          for _, layer in ipairs (layers) do
+            local link = Adapter.document:getElementById ("layer-get-" .. tostring (layer.id))
+            link.onclick = function ()
+              active = layer
+              render_layer ()
+              return false
+            end
+          end
+          for _, layer in ipairs (layers) do
+            local link = Adapter.document:getElementById ("layer-delete-" .. tostring (layer.id))
+            link.onclick = function ()
+              Copas.addthread (function ()
+                editor:delete (layer.name)
+                render_layers ()
+              end)
+              return false
+            end
+          end
+        end)
+      end
+      render_layers ()
+      render_layer  ()
+      while true do
+        local type, data = editor:wait ()
+        print (type, data)
+        if type == "create"
+        or type == "delete" then
+          render_layers ()
+        elseif type == "update" then
+          -- TODO
+        else
+          break
+        end
+      end
       editor:close ()
     end)
     Copas.loop ()

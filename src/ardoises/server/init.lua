@@ -126,17 +126,21 @@ app:match ("/", function (self)
         }
       end
     end
-    table.sort (result, function (l, r)
-      return l.permission > r.permission -- write > read
-         and l.pushed_at > r.pushed_at
-         and l.full_name < r.full_name -- name
-    end)
     if self.req.headers.accept == "application/json" then
       return {
         status = 200,
         json   = result,
       }
     else
+      table.sort (result, function (l, r)
+        return l.permission > r.permission -- write > read
+      end)
+      table.sort (result, function (l, r)
+        return l.pushed_at > r.pushed_at -- last push
+      end)
+      table.sort (result, function (l, r)
+        return l.full_name < r.full_name -- name
+      end)
       self.search       = self.params.search
       self.repositories = result
       return {

@@ -272,6 +272,7 @@ function Editor.list (editor)
   local coroutine = Coromake ()
   return coroutine.wrap (function ()
     for name, module in pairs (request.answer) do
+      editor.modules [module] = true
       coroutine.yield (name, module)
     end
   end)
@@ -283,7 +284,10 @@ function Editor.require (editor, module)
   if not module then
     return nil, "invalid module"
   end
-  if editor.modules [module.name] then
+  if editor.modules [module.name] == false then
+    return nil, "module not found"
+  elseif editor.modules [module.name]
+     and editor.modules [module.name] ~= true then
     return editor.modules [module.name]
   end
   local co       = coroutine.running ()
@@ -520,11 +524,13 @@ function Editor.receive (editor)
     editor.callbacks [message.id] = nil
     callback ()
   elseif message.type == "create" then
-    for observer in pairs (editor.observer) do
+    editor.modules [message.module] = true
+    for observer in pairs (editor.observers) do
       observer (message)
     end
   elseif message.type == "delete" then
-    for observer in pairs (editor.observer) do
+    editor.modules [message.module] = nil
+    for observer in pairs (editor.observers) do
       observer (message)
     end
   elseif message.type == "patch" then
@@ -545,7 +551,7 @@ function Editor.receive (editor)
         loaded (editor.Layer, module.remote, module.ref)
       end
     end
-    for observer in pairs (editor.observer) do
+    for observer in pairs (editor.observers) do
       observer (message)
     end
   end
@@ -592,6 +598,7 @@ function Editor.wait (editor, t)
   end
   editor.observers [f] = true
   Copas.sleep (-math.huge)
+  editor.observers [f] = nil
   return result.type, result.result
 end
 

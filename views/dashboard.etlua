@@ -2,38 +2,41 @@
   <div class="container">
     <div class="list-group">
     <% for _, repository in ipairs (repositories) do %>
-      <a href="/editors/<%- repository.full_name %>"
-         class="list-group-item justify-content-between"
-         aria-label="Editor for <%- repository.full_name %>">
-        <span>
-          <h4 class="list-group-item-heading"><%= repository.full_name %></h4>
-          <p class="list-group-item-text"><%= repository.description %></p>
-        </span>
-        <span class="pull-right">
-          <img class="circle" src="<%- session.user.avatar_url %>"/>
-          <% if repository.user_permissions.push then %>
-          <span class="fa-stack fa-lg">
-            <i class="fa fa-pencil fa-flip-horizontal fa-stack-1x"></i>
-          </span>
-          <% else %>
-          <span class="fa-stack fa-lg">
-            <i class="fa fa-pencil fa-flip-horizontal fa-stack-1x"></i>
-            <i class="fa fa-ban fa-stack-2x text-danger"></i>
-          </span>
-          <% end %>
-          <img class="circle" height="50px" src="/avatar.png"/>
-          <% if repository.permissions.push then %>
-          <span class="fa-stack fa-lg">
-            <i class="fa fa-pencil fa-flip-horizontal fa-stack-1x"></i>
-          </span>
-          <% else %>
-          <span class="fa-stack fa-lg">
-            <i class="fa fa-pencil fa-flip-horizontal fa-stack-1x"></i>
-            <i class="fa fa-ban fa-stack-2x text-danger"></i>
-          </span>
-          <% end %>
-        </span>
-      </a>
+      <div class="list-group-item row">
+        <a href="/editors/<%- repository.full_name %>"
+          aria-label="Editor for <%- repository.full_name %>">
+          <div class="col-md-8">
+            <h4 class="list-group-item-heading"><%= repository.full_name %></h4>
+            <p class="list-group-item-text"><%= repository.description %></p>
+          </div>
+          <div class="col-md-2">
+            <img class="circle" src="<%- session.user.avatar_url %>"/>
+            <% if repository.user_permissions.push then %>
+            <span class="fa-stack fa-lg">
+              <i class="fa fa-pencil fa-flip-horizontal fa-stack-1x"></i>
+            </span>
+            <% else %>
+            <span class="fa-stack fa-lg">
+              <i class="fa fa-pencil fa-flip-horizontal fa-stack-1x"></i>
+              <i class="fa fa-ban fa-stack-2x text-danger"></i>
+            </span>
+            <% end %>
+          </div>
+          <div class="col-md-2">
+            <img class="circle" height="50px" src="/avatar.png"/>
+            <% if repository.permissions.push then %>
+            <span class="fa-stack fa-lg">
+              <i class="fa fa-pencil fa-flip-horizontal fa-stack-1x"></i>
+            </span>
+            <% else %>
+            <span class="fa-stack fa-lg">
+              <i class="fa fa-pencil fa-flip-horizontal fa-stack-1x"></i>
+              <i class="fa fa-ban fa-stack-2x text-danger"></i>
+            </span>
+            <% end %>
+          </div>
+        </a>
+      </div>
     <% end %>
     </div>
   </div>

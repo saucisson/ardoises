@@ -30,19 +30,18 @@ body {
 }
 
 .navbar {
-  background-color: DimGrey;
-  font-size: 12px;
+  font-size: 10px;
 }
 
 .circle {
-    padding-top: 0px;
-    border-radius: 50%;
+    padding: 0px;
+    border-radius: 20%;
     width: 50px;
     height: 50px;
 }
 
 .fully-centered {
   position: fixed;
-  bottom: 50%;
-  right: 50%;
+  top: 45%;
+  left: 45%;
 }
