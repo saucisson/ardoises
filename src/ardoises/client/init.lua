@@ -211,22 +211,23 @@ function Ardoise.edit (ardoise)
     return nil, "authentication failure"
   end
   local editor = setmetatable ({
-    Layer     = setmetatable ({}, { __index = Layer }),
-    ardoise   = ardoise,
-    client    = client,
-    url       = ardoise.editor_url,
-    websocket = websocket,
-    running   = true,
-    modules   = {},
-    requests  = {},
-    callbacks = {},
-    answers   = {},
-    current   = Et.render ("<%- owner %>/<%- repository %>:<%- branch %>", {
+    Layer       = setmetatable ({}, { __index = Layer }),
+    ardoise     = ardoise,
+    client      = client,
+    url         = ardoise.editor_url,
+    websocket   = websocket,
+    running     = true,
+    modules     = {},
+    requests    = {},
+    callbacks   = {},
+    answers     = {},
+    observers   = {},
+    permissions = res.answer,
+    current     = Et.render ("<%- owner %>/<%- repository %>:<%- branch %>", {
       owner      = ardoise.owner.login,
       repository = ardoise.name,
       branch     = ardoise.branch,
     }),
-    observers = {},
   }, Editor)
   editor.Layer.require = function (name)
     if not Patterns.require:match (name) then
@@ -278,9 +279,12 @@ function Editor.list (editor)
   end)
 end
 
-function Editor.require (editor, module)
+function Editor.require (editor, name)
   assert (getmetatable (editor) == Editor)
-  module = Patterns.require:match (module)
+  if Patterns.module:match (name) then
+    name = name .. "@" .. assert (editor.current)
+  end
+  local module = Patterns.require:match (name)
   if not module then
     return nil, "invalid module"
   end

@@ -45,3 +45,8 @@ body {
   top: 45%;
   left: 45%;
 }
+
+.editor {
+  height: 600px;
+  min-height: 600px;
+}

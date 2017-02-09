@@ -227,13 +227,14 @@ function Mt.__call (_, parameters)
   xpcall (function ()
     local Copas    = require "copas"
     local Et       = require "etlua"
+    local Layer    = require "layeredata"
     local Jsonhttp = require "ardoises.jsonhttp"
     Jsonhttp.copas = Jsonhttp.js
     local Client   = require "ardoises.client"
     local Editor   = Adapter.document:getElementById "editor"
     local Layers   = Adapter.document:getElementById "layers"
     Copas.addthread (function ()
-      local client = Client {
+      local client  = Client {
         server = Adapter.origin,
         token  = parameters.token,
       }
@@ -242,7 +243,25 @@ function Mt.__call (_, parameters)
       local active  = nil
       local function render_layer ()
         if active then
-          local layer = editor:require (active.name)
+          Copas.addthread (function ()
+            local layer      = editor:require (active.name)
+            Editor.innerHTML = Et.render ([[
+              <div class="panel panel-default">
+                <div class="panel-body">
+                  <div class="editor" id="layer-<%- active.id %>">
+                  </div>
+                </div>
+              </div>
+            ]], {
+              active = active,
+            })
+            local sourced = Adapter.window.ace:edit ("layer-" .. tostring (active.id))
+            sourced:setReadOnly (not editor.permissions.write)
+            sourced ["$blockScrolling"] = true
+            sourced:setTheme "ace/theme/monokai"
+            sourced:getSession ():setMode "ace/mode/lua"
+            sourced:setValue (layer.code)
+          end)
         else
           Editor.innerHTML = [[<h1 class="text-primary"><i class="fully-centered fa fa-beer fa-5x fa-fw"></i></h1>]]
         end
