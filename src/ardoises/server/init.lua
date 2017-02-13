@@ -286,6 +286,7 @@ app:match ("/editors/", "/editors/:owner/:repository(/:branch)", function (self)
              }
   until editor and editor.url
   repository.editor_url = editor.url
+  repository.branch     = self.params.branch
   if self.req.headers.accept == "application/json" then
     return {
       status = 200,

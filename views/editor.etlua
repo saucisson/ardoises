@@ -1,7 +1,16 @@
 <section>
   <div class="container-fluid">
     <div class="row">
-      <div id="layers" class="col-md-2">
+      <div class="col-md-2">
+        <div class="list-group">
+          <div class="list-group-item row">
+            <div class="input-group">
+              <span class="input-xlarge uneditable-input"><%= repository.owner.login %>/<%= repository.name %>:<%= repository.branch %></span>
+              <span class="input-group-addon js-gitter-toggle-chat-button"><i class="fa fa-comments fa-inverse" aria-hidden="true"></i></span>
+            </div>
+          </div>
+        </div>
+        <div id="layers"></div>
       </div>
       <div id="editor" class="col-md-10">
         <h1 class="text-primary">
@@ -38,9 +47,22 @@
   end)
   local Adapter = require "ardoises.js"
   Adapter {
-    repository = "<%- repository.full_name %>",
+    repository = {
+      owner     = "<%- repository.owner.login %>",
+      name      = "<%- repository.name %>",
+      branch    = "<%- repository.branch %>",
+      full_name = "<%- repository.full_name %>",
+    },
     token      = "<%- user.token %>",
   }
+</script>
+
+<script>
+  ((window.gitter = {}).chat = {}).options = {
+    room: '<%- repository.owner.login %>/<%- repository.name %>',
+    activationElement: '.js-gitter-toggle-chat-button',
+  };
+  console.log (window.gitter)
 </script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fetch/2.0.2/fetch.min.js"
@@ -56,19 +78,28 @@
         type="text/javascript">
 </script>
 <script src="https://d3js.org/d3.v4.min.js"
-        type="text/javascript">
+        type="text/javascript"
+        async defer>
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.2.6/ace.js"
-        type="text/javascript">
+        type="text/javascript"
+        async defer>
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.2.6/mode-lua.js"
-        type="text/javascript">
+        type="text/javascript"
+        async defer>
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.2.6/theme-monokai.js"
-        type="text/javascript">
+        type="text/javascript"
+        async defer>
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.2.6/worker-lua.js"
-        type="text/javascript">
+        type="text/javascript"
+        async defer>
+</script>
+<script src="https://sidecar.gitter.im/dist/sidecar.v1.js"
+        type="text/javascript"
+        async defer>
 </script>
 
 <script>

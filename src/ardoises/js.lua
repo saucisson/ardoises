@@ -227,7 +227,6 @@ function Mt.__call (_, parameters)
   xpcall (function ()
     local Copas    = require "copas"
     local Et       = require "etlua"
-    local Layer    = require "layeredata"
     local Jsonhttp = require "ardoises.jsonhttp"
     Jsonhttp.copas = Jsonhttp.js
     local Client   = require "ardoises.client"
@@ -238,31 +237,22 @@ function Mt.__call (_, parameters)
         server = Adapter.origin,
         token  = parameters.token,
       }
-      local ardoise = client:ardoise (parameters.repository)
+      local ardoise = client:ardoise (Et.render ("<%- owner %>/<%- name %>:<%- branch %>", parameters.repository))
       local editor  = ardoise:edit ()
       local active  = nil
+      local changed = true
       local function render_layer ()
-        if active then
+        if active and changed then
+          local layer  = editor:require (active.name)
+          local togui = layer.togui or Adapter.default_togui
           Copas.addthread (function ()
-            local layer      = editor:require (active.name)
-            Editor.innerHTML = Et.render ([[
-              <div class="panel panel-default">
-                <div class="panel-body">
-                  <div class="editor" id="layer-<%- active.id %>">
-                  </div>
-                </div>
-              </div>
-            ]], {
-              active = active,
-            })
-            local sourced = Adapter.window.ace:edit ("layer-" .. tostring (active.id))
-            sourced:setReadOnly (not editor.permissions.write)
-            sourced ["$blockScrolling"] = true
-            sourced:setTheme "ace/theme/monokai"
-            sourced:getSession ():setMode "ace/mode/lua"
-            sourced:setValue (layer.code)
+            togui {
+              editor = editor,
+              layer  = layer,
+              target = Editor,
+            }
           end)
-        else
+        elseif not active and changed then
           Editor.innerHTML = [[<h1 class="text-primary"><i class="fully-centered fa fa-beer fa-5x fa-fw"></i></h1>]]
         end
       end
@@ -287,15 +277,16 @@ function Mt.__call (_, parameters)
                 </div>
                 <% for _, layer in ipairs (layers) do %>
                   <div class="list-group-item row">
-                      <div class="input-group">
-                        <span id="layer-get-<%- layer.id %>" class="input-xlarge uneditable-input"><%= layer.name %></span>
-                        <span id="layer-delete-<%- layer.id %>" class="input-group-addon"><i class="fa fa-trash fa-inverse" aria-hidden="true"></i></span>
-                      </div>
+                    <div class="input-group">
+                      <span id="layer-get-<%- layer.id %>" class="input-xlarge uneditable-input"><%= layer.name %></span>
+                      <span id="layer-delete-<%- layer.id %>" class="input-group-addon"><i class="fa fa-trash fa-inverse" aria-hidden="true"></i></span>
+                    </div>
                   </div>
                 <% end %>
               </div>
           ]], {
-            layers = layers,
+            repository = parameters.repository,
+            layers     = layers,
           })
           do
             local link = Adapter.document:getElementById ("layer-create")
@@ -311,8 +302,11 @@ function Mt.__call (_, parameters)
           for _, layer in ipairs (layers) do
             local link = Adapter.document:getElementById ("layer-get-" .. tostring (layer.id))
             link.onclick = function ()
-              active = layer
-              render_layer ()
+              Copas.addthread (function ()
+                active  = layer
+                changed = true
+                render_layer ()
+              end)
               return false
             end
           end
@@ -321,6 +315,11 @@ function Mt.__call (_, parameters)
             link.onclick = function ()
               Copas.addthread (function ()
                 editor:delete (layer.name)
+                if active == layer then
+                  active  = nil
+                  changed = true
+                  render_layer ()
+                end
                 render_layers ()
               end)
               return false
@@ -349,6 +348,30 @@ function Mt.__call (_, parameters)
     print ("error:", err)
     print (debug.traceback ())
   end)
+end
+
+function Adapter.default_togui (parameters)
+  assert (type (parameters) == "table")
+  local Et     = require "etlua"
+  local editor = assert (parameters.editor)
+  local layer  = assert (parameters.layer )
+  local target = assert (parameters.target)
+  target.innerHTML = Et.render ([[
+    <div class="panel panel-default">
+      <div class="panel-body">
+        <div class="editor" id="layer-<%- active.id %>">
+        </div>
+      </div>
+    </div>
+  ]], {
+    active = layer,
+  })
+  local sourced = Adapter.window.ace:edit ("layer-" .. tostring (layer.id))
+  sourced:setReadOnly (not editor.permissions.write)
+  sourced ["$blockScrolling"] = true
+  sourced:setTheme "ace/theme/monokai"
+  sourced:getSession ():setMode "ace/mode/lua"
+  sourced:setValue (layer.code)
 end
 
 return Adapter
