@@ -243,10 +243,13 @@ function Mt.__call (_, parameters)
       local changed = true
       local function render_layer ()
         if active and changed then
-          local layer  = editor:require (active.name)
-          local togui = layer.togui or Adapter.default_togui
           Copas.addthread (function ()
+            local layer = editor:require (active.name)
+            local togui = layer.togui
+                       or Adapter.d3_togui
+                       or Adapter.default_togui
             togui {
+              name   = active.name,
               editor = editor,
               layer  = layer,
               target = Editor,
@@ -352,26 +355,121 @@ end
 
 function Adapter.default_togui (parameters)
   assert (type (parameters) == "table")
-  local Et     = require "etlua"
   local editor = assert (parameters.editor)
   local layer  = assert (parameters.layer )
   local target = assert (parameters.target)
-  target.innerHTML = Et.render ([[
+  target.innerHTML = [[
     <div class="panel panel-default">
       <div class="panel-body">
-        <div class="editor" id="layer-<%- active.id %>">
+        <div class="editor" id="layer">
         </div>
       </div>
     </div>
-  ]], {
-    active = layer,
-  })
-  local sourced = Adapter.window.ace:edit ("layer-" .. tostring (layer.id))
+  ]]
+  local sourced = Adapter.window.ace:edit "layer"
   sourced:setReadOnly (not editor.permissions.write)
   sourced ["$blockScrolling"] = true
   sourced:setTheme "ace/theme/monokai"
   sourced:getSession ():setMode "ace/mode/lua"
   sourced:setValue (layer.code)
+end
+
+function Adapter.d3_togui (parameters)
+  assert (type (parameters) == "table")
+  local D3     = Adapter.window.d3
+  -- local editor = assert (parameters.editor)
+  local Layer  = require "layeredata"
+  local meta   = Layer.key.meta
+  local layer  = assert (parameters.layer ).layer
+  local target = assert (parameters.target)
+  target.innerHTML = [[
+    <div class="panel panel-default">
+      <div class="panel-body">
+        <canvas width="960" height="500" id="layer">
+        </canvas>
+      </div>
+    </div>
+  ]]
+  local canvas  = Adapter.document:querySelector "#layer" -- canvas
+  local context = canvas:getContext "2d"
+  local width   = canvas.width
+  local height  = canvas.height
+  local hidden  = {}
+  local nodes   = Adapter.js.new (Adapter.window.Array)
+  local links   = Adapter.js.new (Adapter.window.Array)
+  for key, vertex in pairs (layer.vertices) do
+    local data = Adapter.tojs {
+      id = nodes.length,
+      x  = width  / 2,
+      y  = height / 2,
+    }
+    hidden [data] = {
+      id    = nodes.length,
+      key   = key,
+      proxy = vertex,
+    }
+    nodes [nodes.length] = data
+  end
+  for key, edge in pairs (layer.edges) do
+    local data = Adapter.tojs {
+      id = nodes.length,
+      x  = width  / 2,
+      y  = height / 2,
+    }
+    hidden [data] = {
+      id    = nodes.length,
+      key   = key,
+      proxy = edge,
+    }
+    nodes [nodes.length] = data
+    for k, arrow in pairs (edge.arrows) do
+      for i = 0, nodes.length-1 do
+        local node = nodes [i]
+        if arrow.vertex <= hidden [node].proxy then
+          local link = Adapter.js.new (Adapter.window.Object)
+          link.source = data
+          link.target = node
+          hidden [link] = {
+            id    = links.length,
+            key   = k,
+            arrow = arrow,
+          }
+          links [links.length] = link
+        end
+      end
+    end
+  end
+  local simulation = D3:forceSimulation ()
+    :force ("link"  , D3:forceLink ():id (function (_, d) return d.id end))
+    :force ("charge", D3:forceManyBody ())
+    :force ("center", D3:forceCenter (width / 2, height / 2))
+  simulation:nodes (nodes)
+  simulation:force "link":links (links)
+  simulation:on ("tick", function ()
+    context:clearRect (0, 0, width, height)
+    context:beginPath ()
+    links:forEach (function (_, link)
+      context:moveTo (link.source.x, link.source.y);
+      context:lineTo (link.target.x, link.target.y);
+    end)
+    context.strokeStyle = "#aaa"
+    context:stroke()
+    context:beginPath ()
+    nodes:forEach (function (_, node)
+      if layer [meta].vertex_type <= hidden [node].proxy then
+        context:moveTo (node.x + 10, node.y);
+        context:arc (node.x, node.y, 10, 0, 2 * math.pi);
+      elseif layer [meta].edge_type <= hidden [node].proxy then
+        context:moveTo (node.x + 3, node.y);
+        context:arc (node.x, node.y, 3, 0, 2 * math.pi);
+      else
+        assert (false)
+      end
+    end)
+    context:fill ()
+    context.strokeStyle = "#fff"
+    context:stroke ()
+  end)
 end
 
 return Adapter

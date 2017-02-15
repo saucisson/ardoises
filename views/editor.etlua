@@ -62,7 +62,6 @@
     room: '<%- repository.owner.login %>/<%- repository.name %>',
     activationElement: '.js-gitter-toggle-chat-button',
   };
-  console.log (window.gitter)
 </script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fetch/2.0.2/fetch.min.js"
