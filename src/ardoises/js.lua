@@ -385,19 +385,19 @@ end
 
 function Adapter.d3_togui (parameters)
   assert (type (parameters) == "table")
-  local D3     = Adapter.window.d3
+  local D3       = Adapter.window.d3
   -- local editor = assert (parameters.editor)
-  local Copas  = require "copas"
-  local Et     = require "etlua"
-  local Layer  = require "layeredata"
-  local meta   = Layer.key.meta
-  local layer  = assert (parameters.layer ).layer
-  local target = assert (parameters.target)
-  local width     = 960
-  local height    = 500
-  local hidden    = {}
-  local vertices  = Adapter.js.new (Adapter.window.Array)
-  local edges     = Adapter.js.new (Adapter.window.Array)
+  local Copas    = require "copas"
+  local Et       = require "etlua"
+  local Layer    = require "layeredata"
+  local meta     = Layer.key.meta
+  local layer    = assert (parameters.layer ).layer
+  local target   = assert (parameters.target)
+  local width    = 960
+  local height   = 500
+  local hidden   = {}
+  local vertices = Adapter.js.new (Adapter.window.Array)
+  local edges    = Adapter.js.new (Adapter.window.Array)
   for key, vertex in pairs (layer.vertices) do
     local data = Adapter.tojs {
       id = vertices.length,
@@ -473,19 +473,19 @@ function Adapter.d3_togui (parameters)
     vertex.fy = D3.event.y
   end
   local links = g
-    :attr ("class", "links")
+    :attr      ("class", "links")
     :selectAll "line"
-    :data (edges)
-    :enter ()
-    :append "line"
+    :data      (edges)
+    :enter     ()
+    :append    "line"
   local nodes = g
-    :attr ("class", "nodes")
+    :attr      ("class", "nodes")
     :selectAll "circle"
-    :data (vertices)
-    :enter ()
-    :append "circle"
-    :attr ("r", vertex_size)
-    :call (D3:drag ():on ("start", drag_start):on ("drag" , drag_drag))
+    :data      (vertices)
+    :enter     ()
+    :append    "circle"
+    :attr      ("r", vertex_size)
+    :call      (D3:drag ():on ("start", drag_start):on ("drag" , drag_drag))
   local source_x = function (_, d) return d.source.x end
   local source_y = function (_, d) return d.source.y end
   local target_x = function (_, d) return d.target.x end
