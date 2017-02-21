@@ -390,6 +390,7 @@ function Adapter.d3_togui (parameters)
   local Copas    = require "copas"
   local Et       = require "etlua"
   local Layer    = require "layeredata"
+  local Gui      = Layer.require "gui"
   local meta     = Layer.key.meta
   local layer    = assert (parameters.layer ).layer
   local target   = assert (parameters.target)
@@ -433,7 +434,7 @@ function Adapter.d3_togui (parameters)
           hidden [link] = {
             id    = edges.length,
             key   = k,
-            arrow = arrow,
+            proxy = arrow,
           }
           edges [edges.length] = link
         end
@@ -448,21 +449,14 @@ function Adapter.d3_togui (parameters)
     height = height,
   })
   local svg = D3:select "#layer"
-  local g   = svg:append "g"
+  local g   = svg
+    :append "g"
+    :attr   ("class", ".ardoises-gui")
   local simulation = D3
     :forceSimulation ()
     :force ("link"  , D3:forceLink ():id (function (_, d) return d.id end))
     :force ("charge", D3:forceManyBody ())
     :force ("center", D3:forceCenter (width / 2, height / 2))
-  local vertex_size = function (_, vertex)
-    if layer [meta].vertex_type <= hidden [vertex].proxy then
-      return 10
-    elseif layer [meta].edge_type <= hidden [vertex].proxy then
-      return 3
-    else
-      assert (false)
-    end
-  end
   local drag_start = function (_, vertex)
     simulation:alphaTarget (1):restart ()
     vertex.fx = vertex.x
@@ -473,32 +467,41 @@ function Adapter.d3_togui (parameters)
     vertex.fy = D3.event.y
   end
   local links = g
-    :attr      ("class", "links")
-    :selectAll "line"
+    :selectAll ".ardoises-gui"
     :data      (edges)
     :enter     ()
     :append    "line"
   local nodes = g
-    :attr      ("class", "nodes")
-    :selectAll "circle"
-    :data      (vertices)
-    :enter     ()
-    :append    "circle"
-    :attr      ("r", vertex_size)
-    :call      (D3:drag ():on ("start", drag_start):on ("drag" , drag_drag))
+    :selectAll ".ardoises-gui"
+    :data   (vertices)
+    :enter  ()
+    :append (function (_, data)
+       local proxy = hidden [data].proxy
+       local gui   = proxy [meta] [Gui]
+       return gui.create (Adapter, {
+         proxy = hidden [data],
+         data  = data,
+       })
+     end)
+    :call (D3:drag ():on ("start", drag_start):on ("drag" , drag_drag))
   local source_x = function (_, d) return d.source.x end
   local source_y = function (_, d) return d.source.y end
   local target_x = function (_, d) return d.target.x end
   local target_y = function (_, d) return d.target.y end
-  local x        = function (_, d) return d.x        end
-  local y        = function (_, d) return d.y        end
   local tick     = function ()
     links:attr ("x1", source_x)
          :attr ("y1", source_y)
          :attr ("x2", target_x)
          :attr ("y2", target_y)
-    nodes:attr ("cx", x)
-         :attr ("cy", y)
+    nodes:each (function (element, data)
+      local proxy = hidden [data].proxy
+      local gui   = proxy [meta] [Gui]
+      return gui.update (Adapter, {
+        element = element,
+        proxy   = hidden [data],
+        data    = data,
+      })
+    end)
   end
   simulation:nodes (vertices):on ("tick", tick)
   simulation:force "link":links (edges)
