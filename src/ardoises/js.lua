@@ -227,6 +227,7 @@ function Mt.__call (_, parameters)
   xpcall (function ()
     local Copas    = require "copas"
     local Et       = require "etlua"
+    local Layer    = require "layeredata"
     local Jsonhttp = require "ardoises.jsonhttp"
     Jsonhttp.copas = Jsonhttp.js
     local Client   = require "ardoises.client"
@@ -249,14 +250,16 @@ function Mt.__call (_, parameters)
             </h1>
           ]]
           Copas.addthread (function ()
-            local layer = editor:require (active.name)
-            local togui = layer.togui
-                       or Adapter.d3_togui
+            local what = editor:require (active.name)
+            local gui  = Layer.loaded ["gui"]
+            local togui = what.layer [Layer.key.meta]
+                      and what.layer [Layer.key.meta] [gui]
+                      and what.layer [Layer.key.meta] [gui].render
                        or Adapter.default_togui
             togui {
               name   = active.name,
               editor = editor,
-              layer  = layer,
+              what   = what,
               target = Editor,
             }
           end)
@@ -365,7 +368,7 @@ end
 function Adapter.default_togui (parameters)
   assert (type (parameters) == "table")
   local editor = assert (parameters.editor)
-  local layer  = assert (parameters.layer )
+  local what   = assert (parameters.what  )
   local target = assert (parameters.target)
   target.innerHTML = [[
     <div class="panel panel-default">
@@ -380,137 +383,8 @@ function Adapter.default_togui (parameters)
   sourced ["$blockScrolling"] = true
   sourced:setTheme "ace/theme/monokai"
   sourced:getSession ():setMode "ace/mode/lua"
-  sourced:setValue (layer.code)
+  sourced:setValue (what.code)
 end
 
-function Adapter.d3_togui (parameters)
-  assert (type (parameters) == "table")
-  local D3       = Adapter.window.d3
-  -- local editor = assert (parameters.editor)
-  local Copas    = require "copas"
-  local Et       = require "etlua"
-  local Layer    = require "layeredata"
-  local Gui      = Layer.require "gui"
-  local meta     = Layer.key.meta
-  local layer    = assert (parameters.layer ).layer
-  local target   = assert (parameters.target)
-  local width    = 960
-  local height   = 500
-  local hidden   = {}
-  local vertices = Adapter.js.new (Adapter.window.Array)
-  local edges    = Adapter.js.new (Adapter.window.Array)
-  for key, vertex in pairs (layer.vertices) do
-    local data = Adapter.tojs {
-      id = vertices.length,
-      x  = width  / 2,
-      y  = height / 2,
-    }
-    hidden [data] = {
-      id    = vertices.length,
-      key   = key,
-      proxy = vertex,
-    }
-    vertices [vertices.length] = data
-  end
-  for key, edge in pairs (layer.edges) do
-    local data = Adapter.tojs {
-      id = vertices.length,
-      x  = width  / 2,
-      y  = height / 2,
-    }
-    hidden [data] = {
-      id    = vertices.length,
-      key   = key,
-      proxy = edge,
-    }
-    vertices [vertices.length] = data
-    for k, arrow in pairs (edge.arrows) do
-      for i = 0, vertices.length-1 do
-        local node = vertices [i]
-        if arrow.vertex <= hidden [node].proxy then
-          local link = Adapter.js.new (Adapter.window.Object)
-          link.source = data
-          link.target = node
-          hidden [link] = {
-            id    = edges.length,
-            key   = k,
-            proxy = arrow,
-          }
-          edges [edges.length] = link
-        end
-      end
-    end
-  end
-  target.innerHTML = Et.render ([[
-    <svg width="960" height="500" id="layer">
-    </svg>
-  ]], {
-    width  = width,
-    height = height,
-  })
-  local svg = D3:select "#layer"
-  local g   = svg
-    :append "g"
-    :attr   ("class", ".ardoises-gui")
-  local simulation = D3
-    :forceSimulation ()
-    :force ("link"  , D3:forceLink ():id (function (_, d) return d.id end))
-    :force ("charge", D3:forceManyBody ())
-    :force ("center", D3:forceCenter (width / 2, height / 2))
-  local drag_start = function (_, vertex)
-    simulation:alphaTarget (1):restart ()
-    vertex.fx = vertex.x
-    vertex.fy = vertex.y
-  end
-  local drag_drag = function (_, vertex)
-    vertex.fx = D3.event.x
-    vertex.fy = D3.event.y
-  end
-  local links = g
-    :selectAll ".ardoises-gui"
-    :data      (edges)
-    :enter     ()
-    :append    "line"
-  local nodes = g
-    :selectAll ".ardoises-gui"
-    :data   (vertices)
-    :enter  ()
-    :append (function (_, data)
-       local proxy = hidden [data].proxy
-       local gui   = proxy [meta] [Gui]
-       return gui.create (Adapter, {
-         proxy = hidden [data],
-         data  = data,
-       })
-     end)
-    :call (D3:drag ():on ("start", drag_start):on ("drag" , drag_drag))
-  local source_x = function (_, d) return d.source.x end
-  local source_y = function (_, d) return d.source.y end
-  local target_x = function (_, d) return d.target.x end
-  local target_y = function (_, d) return d.target.y end
-  local tick     = function ()
-    links:attr ("x1", source_x)
-         :attr ("y1", source_y)
-         :attr ("x2", target_x)
-         :attr ("y2", target_y)
-    nodes:each (function (element, data)
-      local proxy = hidden [data].proxy
-      local gui   = proxy [meta] [Gui]
-      return gui.update (Adapter, {
-        element = element,
-        proxy   = hidden [data],
-        data    = data,
-      })
-    end)
-  end
-  simulation:nodes (vertices):on ("tick", tick)
-  simulation:force "link":links (edges)
-  svg:call (D3:zoom ():on ("zoom", function ()
-    g:attr ("transform", D3.event.transform)
-  end))
-  while true do
-    Copas.sleep (1)
-  end
-end
 
 return Adapter
