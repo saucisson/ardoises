@@ -43,11 +43,16 @@ local function authenticate (self)
   if status ~= 200 then
     return nil
   end
-  Model.accounts:create {
-    id       = user.id,
-    token    = authorization,
-    contents = Json.encode (user),
-  }
+  pcall (function ()
+    Model.accounts:create {
+      id       = user.id,
+      token    = authorization,
+      contents = Json.encode (user),
+    }
+  end)
+  assert (Model.accounts:find {
+    id = user.id,
+  })
   self.session.user = user
   self.session.user.token = authorization
   return true
@@ -218,11 +223,16 @@ app:match ("/register", function (self)
       contents = Json.encode (user),
     }
   elseif not account then
-    Model.accounts:create {
-      id       = user.id,
-      token    = user.token,
-      contents = Json.encode (user),
-    }
+    pcall (function ()
+      Model.accounts:create {
+        id       = user.id,
+        token    = user.token,
+        contents = Json.encode (user),
+      }
+    end)
+    assert (Model.accounts:find {
+      id = user.id,
+    })
   end
   self.session.user = user
   self.session.user.token = result.access_token
