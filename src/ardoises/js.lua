@@ -256,12 +256,13 @@ function Mt.__call (_, parameters)
                       and what.layer [Layer.key.meta] [gui]
                       and what.layer [Layer.key.meta] [gui].render
                        or Adapter.default_togui
-            togui {
+            active.co = coroutine.create (togui)
+            coroutine.resume (active.co, {
               name   = active.name,
               editor = editor,
               what   = what,
               target = Editor,
-            }
+            })
           end)
         elseif not active and changed then
           Editor.innerHTML = [[
@@ -318,6 +319,9 @@ function Mt.__call (_, parameters)
             local link = Adapter.document:getElementById ("layer-get-" .. tostring (layer.id))
             link.onclick = function ()
               Copas.addthread (function ()
+                if active and active.co then
+                  coroutine.resume (active.co) -- cleanup
+                end
                 active  = layer
                 changed = true
                 render_layer ()
@@ -331,6 +335,9 @@ function Mt.__call (_, parameters)
               Copas.addthread (function ()
                 editor:delete (layer.name)
                 if active == layer then
+                  if active.co then
+                    coroutine.resume (active.co) -- cleanup
+                  end
                   active  = nil
                   changed = true
                   render_layer ()
@@ -379,11 +386,13 @@ function Adapter.default_togui (parameters)
     </div>
   ]]
   local sourced = Adapter.window.ace:edit "layer"
-  sourced:setReadOnly (not editor.permissions.write)
+  sourced:setReadOnly (true)
   sourced ["$blockScrolling"] = true
   sourced:setTheme "ace/theme/monokai"
   sourced:getSession ():setMode "ace/mode/lua"
   sourced:setValue (what.code)
+  coroutine.yield ()
+  target.innerHTML = [[]]
 end
 
 
