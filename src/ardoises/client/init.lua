@@ -422,22 +422,27 @@ function Editor.patch (editor, what)
   local modules = {}
   local function rollback ()
     for _, module in pairs (editor.modules) do
-      if module.current then
-        Layer.write_to (module.layer, nil)
-        local refines = module.layer [Layer.key.refines]
-        refines [Layer.len (refines)] = nil
+      if type (module) == "table" then
+        if module.current then
+          Layer.write_to (module.layer, nil)
+          local refines = module.layer [Layer.key.refines]
+          refines [Layer.len (refines)] = nil
+        end
+        Layer.write_to (module.layer, false)
+        module.current = nil
       end
-      Layer.write_to (module.layer, false)
-      module.current = nil
     end
   end
   for name, code in pairs (what) do
+    if Patterns.module:match (name) then
+      name = name .. "@" .. assert (editor.current)
+    end
     local module = editor.modules [name]
     if not module then
-      return nil, "unknown module"
+      return nil, "unknown module: " .. name
     end
     if type (code) == "string" then
-      local chunk, err_chunk = _G.load (code, module, "t")
+      local chunk, err_chunk = _G.load (code, name, "t")
       if not chunk then
         return nil, "invalid patch: " .. err_chunk
       end
@@ -476,7 +481,10 @@ function Editor.patch (editor, what)
       rollback ()
       return nil, "unable to dump patch: " .. err
     end
-    request.patches [module.name] = dumped
+    request.patches [#request.patches+1] = {
+      module = module.name,
+      code   = dumped,
+    }
     module.current = nil
   end
   editor.requests  [request.id] = request
@@ -538,10 +546,10 @@ function Editor.receive (editor)
       observer (message)
     end
   elseif message.type == "patch" then
-    for name, code in pairs (message.patches) do
-      local module = editor.modules [name]
+    for _, patch in ipairs (message.patches) do
+      local module = editor.modules [patch.module]
       if module then
-        local chunk, err_chunk = _G.load (code, module, "t")
+        local chunk, err_chunk = _G.load (patch.code, module, "t")
         if not chunk then
           return nil, "invalid patch: " .. err_chunk
         end
@@ -606,9 +614,9 @@ function Editor.wait (editor, t)
   return result.type, result.result
 end
 
-function Editor.__call (editor, f)
+function Editor.__call (editor, t)
   assert (getmetatable (editor) == Editor)
-  return editor:patch (f)
+  return editor:patch (t)
 end
 
 function Editor.close (editor)

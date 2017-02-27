@@ -250,8 +250,9 @@ function Mt.__call (_, parameters)
             </h1>
           ]]
           Copas.addthread (function ()
-            local what = editor:require (active.name)
-            local gui  = Layer.loaded ["gui"]
+            local what  = editor:require (active.name)
+            local gui   = what.layer [Layer.key.meta]
+                      and what.layer [Layer.key.meta].gui
             local togui = what.layer [Layer.key.meta]
                       and what.layer [Layer.key.meta] [gui]
                       and what.layer [Layer.key.meta] [gui].render
@@ -262,6 +263,8 @@ function Mt.__call (_, parameters)
               editor = editor,
               what   = what,
               target = Editor,
+              width  = Adapter.window.innerWidth  * 0.8,
+              height = Adapter.window.innerHeight * 0.8,
             })
           end)
         elseif not active and changed then

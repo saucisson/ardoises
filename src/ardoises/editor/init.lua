@@ -664,7 +664,9 @@ function Editor.handlers.patch (editor, message)
     })))
   end
   rollback ()
-  local patches = {}
+  local patches = {
+    [[Update(s) from the Ardoises Editor]],
+  }
   for _, patch in ipairs (message.patches) do
     patches [#patches+1] = Et.render ([[
 ===== <%- module %> =====
