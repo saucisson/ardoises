@@ -4,9 +4,15 @@ services:
     image: postgres
   redis:
     image: redis:3.0.7 # because of bug in qless
+  docker:
+    image: shipyard/docker-proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
   ardoises:
     env_file: .environment
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile-quick
     entrypoint: ardoises-server
     ports:
       - "8080:8080"
@@ -21,6 +27,7 @@ services:
     logging:
       driver: "json-file"
     environment:
+      DOCKER_PORT:        "tcp://docker:2375"
       REDIS_PORT:         "tcp://redis:6379"
       POSTGRES_PORT:      "tcp://postgres:5432"
       POSTGRES_USER:      postgres

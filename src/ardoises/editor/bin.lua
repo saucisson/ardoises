@@ -15,8 +15,6 @@ end
 local Arguments = require "argparse"
 local Copas     = require "copas"
 local Editor    = require "ardoises.editor"
-local Http      = require "ardoises.jsonhttp".default
-local Mime      = require "mime"
 local Patterns  = require "ardoises.patterns"
 
 local parser = Arguments () {
@@ -53,14 +51,3 @@ Copas.addthread (function ()
   editor:start ()
 end)
 Copas.loop ()
-
--- Force deletion of service, as docker cloud seems buggy.
-if os.getenv "DOCKERCLOUD_SERVICE_API_URL" then
-  Http {
-    url     = os.getenv "DOCKERCLOUD_SERVICE_API_URL",
-    method  = "DELETE",
-    headers = {
-      ["Authorization"] = "Basic " .. Mime.b64 (os.getenv "DOCKER_USER" .. ":" .. os.getenv "DOCKER_SECRET"),
-    },
-  }
-end

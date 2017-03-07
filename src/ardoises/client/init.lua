@@ -525,6 +525,7 @@ function Editor.receive (editor)
   if not message then
     return
   end
+  print ("received", message)
   message = Json.decode (message)
   if message.type == "answer" then
     local request  = editor.requests  [message.id]

@@ -1,6 +1,7 @@
 local Config = require "lapis.config"
 local Url    = require "socket.url"
 
+local docker_url   = assert (Url.parse (os.getenv "DOCKER_PORT"  ))
 local postgres_url = assert (Url.parse (os.getenv "POSTGRES_PORT"))
 local redis_url    = assert (Url.parse (os.getenv "REDIS_PORT"   ))
 
@@ -32,8 +33,8 @@ local common = {
     database = 0,
   },
   docker = {
-    username = assert (os.getenv "DOCKER_USER"  ),
-    api_key  = assert (os.getenv "DOCKER_SECRET"),
+    host = assert (docker_url.host),
+    port = assert (docker_url.port),
   },
   clean = {
     delay = 10,
