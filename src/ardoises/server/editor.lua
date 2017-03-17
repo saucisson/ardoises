@@ -1,6 +1,6 @@
 local Config  = require "lapis.config".get ()
 local Et      = require "etlua"
-local Http    = require "ardoises.jsonhttp".resty
+local Http    = require "ardoises.server.jsonhttp".resty
 local Model   = require "ardoises.server.model"
 local gettime = require "socket".gettime
 
@@ -15,9 +15,13 @@ function Start.perform (job)
     return
   end
   pcall (function ()
+    ::container::
     local status, service, info, _
     service, status = Http {
-      url    = "docker:///containers/create",
+      url    = Et.render ("http://<%- host %>:<%- port %>/containers/create", {
+        host = Config.docker.host,
+        port = Config.docker.port,
+      }),
       method = "POST",
       body   = {
         Entrypoint   = "ardoises-editor",
@@ -34,14 +38,31 @@ function Start.perform (job)
         },
       },
     }
+    if status == 404 then
+      _, status = Http {
+        url    = Et.render ("http://<%- host %>:<%- port %>/images/create", {
+          host = Config.docker.host,
+          port = Config.docker.port,
+        }),
+        method = "POST",
+        query  = {
+          fromImage = Config.application.image,
+          tag       = "latest",
+        },
+      }
+      assert (status == 200)
+      goto container
+    end
     assert (status == 201, status)
     editor:update {
       docker = service.Id,
     }
     _, status = Http {
       method = "POST",
-      url    = Et.render ("docker:///containers/<%- id %>/start", {
-        id = service.Id,
+      url    = Et.render ("http://<%- host %>:<%- port %>/containers/<%- id %>/start", {
+        host = Config.docker.host,
+        port = Config.docker.port,
+        id   = service.Id,
       }),
     }
     assert (status == 204, status)
@@ -50,8 +71,10 @@ function Start.perform (job)
       job:heartbeat ()
       info, status = Http {
         method = "GET",
-        url    = Et.render ("docker:///containers/<%- id %>/json", {
-          id = service.Id,
+        url    = Et.render ("http://<%- host %>:<%- port %>/containers/<%- id %>/json", {
+          host = Config.docker.host,
+          port = Config.docker.port,
+          id   = service.Id,
         }),
       }
       assert (status == 200, status)

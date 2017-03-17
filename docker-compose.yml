@@ -1,36 +1,62 @@
 version: "2"
 services:
-  postgres:
-    image: postgres
   redis:
-    image: redis:3.0.7 # because of bug in qless
+    image: redis:alpine
   docker:
     image: shipyard/docker-proxy
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-  ardoises:
+  clean:
     env_file: .environment
     build:
       context: .
-      dockerfile: Dockerfile-quick
-    entrypoint: ardoises-server
-    ports:
-      - "8080:8080"
+      dockerfile: docker/Dockerfile-util-quick
+    entrypoint: ardoises-clean
     links:
-      - postgres
+      - docker
       - redis
-    depends_on:
-      - postgres
-      - redis
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
     logging:
       driver: "json-file"
     environment:
-      DOCKER_PORT:        "tcp://docker:2375"
-      REDIS_PORT:         "tcp://redis:6379"
-      POSTGRES_PORT:      "tcp://postgres:5432"
-      POSTGRES_USER:      postgres
-      POSTGRES_PASSWORD:  ""
-      POSTGRES_DATABASE:  postgres
-      ARDOISES_USER:      ardoises
+      DOCKER_URL: "tcp://docker:2375"
+      REDIS_URL:  "tcp://redis:6379"
+  invitation:
+    env_file: .environment
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-util-quick
+    entrypoint: ardoises-invitation
+    links:
+      - redis
+    logging:
+      driver: "json-file"
+    environment:
+      REDIS_URL:  "tcp://redis:6379"
+  permission:
+    env_file: .environment
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-util-quick
+    entrypoint: ardoises-permission
+    links:
+      - redis
+    logging:
+      driver: "json-file"
+    environment:
+      REDIS_URL:  "tcp://redis:6379"
+  server:
+    env_file: .environment
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-server-quick
+    entrypoint: ardoises-server
+    ports:
+      - "8080:80"
+    links:
+      - docker
+      - redis
+    logging:
+      driver: "json-file"
+    environment:
+      DOCKER_URL: "tcp://docker:2375"
+      REDIS_URL:  "tcp://redis:6379"

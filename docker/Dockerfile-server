@@ -7,24 +7,23 @@ ADD . /src/ardoises
 RUN apk add --no-cache --virtual .build-deps \
         build-base \
         cmake \
+        curl \
+        git \
         make \
         openssl-dev \
         pcre-dev \
         perl \
         python3 \
         readline-dev \
+        unzip \
         zlib-dev \
  && apk add --no-cache --repository http://dl-3.alpinelinux.org/alpine/edge/testing/ \
         dockerize \
  && apk add --no-cache \
-        curl \
-        git \
         libstdc++ \
         openssl \
         pcre \
         readline \
-        unzip \
-        zlib \
  && pip3 install hererocks \
  && hererocks --luajit=2.1 --luarocks=^ --compat=5.2 /usr \
  && luarocks install luasec \
@@ -41,17 +40,13 @@ RUN apk add --no-cache --virtual .build-deps \
  && rm -rf openresty-${RESTY_VERSION}.tar.gz openresty-${RESTY_VERSION} \
  && ln -sf /dev/stdout /usr/local/openresty/nginx/logs/access.log \
  && ln -sf /dev/stderr /usr/local/openresty/nginx/logs/error.log \
- && cd /src/ardoises/ \
- && cp -r data/* / \
- && cp -r views  /views \
- && cp -r static /static \
- && luarocks install rockspec/lulpeg-develop-0.rockspec \
- && luarocks install rockspec/lua-resty-qless-develop-0.rockspec \
- && luarocks install rockspec/lua-websockets-develop-0.rockspec \
- && luarocks make    rockspec/ardoises-master-1.rockspec \
- && git config --system user.name  "Ardoises" \
- && git config --system user.email "editor@ardoises.ovh" \
+ && cd /src/ardoises/  \
+ && luarocks install rockspec/redis-lua-develop-0.rockspec \
+ && luarocks make rockspec/ardoises-server-master-1.rockspec \
+ && mkdir -p /etc/nginx/ \
+ && cp src/ardoises/server/nginx.conf /etc/nginx/nginx.conf \
  && rm -rf /src/ardoises \
- && apk del .build-deps
+ && apk del .build-deps \
+ && true
 
-ENV PATH /usr/local/openresty/bin/:$PATH
+ENV PATH /usr/local/openresty/bin/:/usr/local/openresty/nginx/sbin/:$PATH

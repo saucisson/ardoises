@@ -1,0 +1,8 @@
+FROM ardoises-util
+
+ADD . /src/ardoises
+
+RUN cd /src/ardoises/  \
+ && luarocks make rockspec/ardoises-util-master-1.rockspec \
+ && rm -rf /src/ardoises \
+ && true
