@@ -57,7 +57,6 @@ JsonHttp.resty = wrap (function (request, cache)
   local Config = require "lapis.config".get ()
   local Http   = require "resty.http"
   local Redis  = require "resty.redis"
-  local Url    = require "socket.url"
   local json   = {}
   local redis  = Redis:new ()
   assert (redis:connect (Config.redis.host, Config.redis.port))
@@ -78,19 +77,7 @@ JsonHttp.resty = wrap (function (request, cache)
   if cache ~= "only" then
     local client = Http.new ()
     client:set_timeout (1000) -- milliseconds
-    local url = Url.parse (request.url)
-    if url.scheme == "docker" then
-      client:connect "unix:/var/run/docker.sock"
-      request.path = url.path
-      request.headers ["Host"] = "localhost"
-      result = assert (client:request (request))
-      if result.has_body then
-        result.body = result:read_body ()
-      end
-      client:set_keepalive ()
-    else
-      result = assert (client:request_uri (request.url, request))
-    end
+    result = assert (client:request_uri (request.url, request))
   else
     result = json.answer
   end
@@ -133,31 +120,11 @@ JsonHttp.default = wrap (function (request)
   local Httpn = require "socket.http"
   local Https = require "ssl.https"
   local Ltn12 = require "ltn12"
-  local Unix  = require "socket.unix"
-  local Url   = require "socket.url"
   local result   = {}
   request.sink   = Ltn12.sink.table (result)
   request.source = request.body  and Ltn12.source.string (request.body)
-  local url = Url.parse (request.url)
-  local _, status, headers
-  if url.scheme == "docker" then
-    local t = {
-      scheme = "http",
-      host   = "/var/run/docker.sock",
-      path   = url.path,
-      create = Unix,
-    }
-    for k, v in pairs (request) do
-      t [k] = v
-    end
-    t.headers = t.headers or {}
-    t.headers.Host = "localhost"
-    t.url    = nil
-    _, status, headers = Httpn.request (t)
-  else
-    local http = request.url:match "https://" and Https or Httpn
-    _, status, headers = http.request (request)
-  end
+  local http = request.url:match "https://" and Https or Httpn
+  local _, status, headers = http.request (request)
   return {
     status  = status,
     headers = headers,
