@@ -27,6 +27,7 @@ RUN apk add --no-cache --virtual .build-deps \
  && pip3 install hererocks \
  && hererocks --luajit=2.1 --luarocks=^ --compat=5.2 /usr \
  && luarocks install luasec \
+ && luarocks install compat53 \
  && cd /tmp \
  && curl -fSL https://openresty.org/download/openresty-${RESTY_VERSION}.tar.gz -o openresty-${RESTY_VERSION}.tar.gz \
  && tar xzf openresty-${RESTY_VERSION}.tar.gz \
@@ -45,6 +46,8 @@ RUN apk add --no-cache --virtual .build-deps \
  && luarocks make rockspec/ardoises-server-master-1.rockspec \
  && mkdir -p /etc/nginx/ \
  && cp src/ardoises/server/nginx.conf /etc/nginx/nginx.conf \
+ && mkdir -p /static \
+ && cp -r static/* /static/ \
  && rm -rf /src/ardoises \
  && apk del .build-deps \
  && true

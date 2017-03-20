@@ -4,10 +4,13 @@ _G.print = function (...)
   io.stdout:flush ()
 end
 
+require "compat53"
+
 local Cookie   = require "resty.cookie"
 local Http     = require "ardoises.server.jsonhttp"
 local Json     = require "rapidjson"
 local Jwt      = require "resty.jwt"
+local Lpeg     = require "lpeg"
 local Lustache = require "lustache"
 local Redis    = require "resty.redis"
 local Url      = require "net.url"
@@ -22,12 +25,77 @@ local Config  = {
   },
 }
 
+local Patterns = {}
+
+Lpeg.locale (Patterns)
+
+Patterns.authorization =
+    Lpeg.P"Token:"
+  * Lpeg.S"\r\n\f\t "^1
+  * ((Patterns.alnum + Lpeg.S "-_.")^1 / tostring)
+
 local Server = {}
+
+function Server.template (what, data)
+  local file, err = io.open ("/static/" .. what .. ".template", "r")
+  if not file then
+    print (err)
+    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
+  end
+  local template = assert (file:read "*a")
+  assert (file:close ())
+  ngx.header ["Content-type"] = "text/html"
+  return Lustache:render (template, data)
+end
+
+function Server.authenticate (noexit)
+  local headers = ngx.req.get_headers ()
+  local cookie  = Cookie:new ()
+  local field   = cookie:get "Ardoises-Token"
+  local header  = field
+              and "Token: " .. field
+               or headers ["Authorization"]
+  if not header then
+    return not noexit and ngx.exit (ngx.HTTP_UNAUTHORIZED) or nil
+  end
+  local token = Patterns.authorization:match (header)
+  if not token then
+    return not noexit and ngx.exit (ngx.HTTP_UNAUTHORIZED) or nil
+  end
+  token = Jwt:verify (Config.application.secret, token)
+  if not token then
+    return not noexit and ngx.exit (ngx.HTTP_UNAUTHORIZED) or nil
+  end
+  local redis = Redis:new ()
+  if not redis:connect (Config.redis.host, Config.redis.port) then
+    return not noexit and ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR) or nil
+  end
+  local user = redis:get (Lustache:render (Config.pattern, {
+    what = token.payload.login,
+  }))
+  redis:set_keepalive ()
+  if not user then
+    return not noexit and ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR) or nil
+  end
+  user = Json.decode (user)
+  if not user then
+    return not noexit and ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR) or nil
+  end
+  return user
+end
+
+function Server.root ()
+  local user = Server.authenticate (true)
+  ngx.say (Server.template ("index", {
+    user = user,
+  }))
+  return ngx.exit (ngx.HTTP_OK)
+end
 
 function Server.login ()
   local url           = Url.parse "https://github.com/login/oauth/authorize"
   url.query.client_id = Config.application.id
-  url.query.scope     = "user:email"
+  url.query.scope     = ""
   url.query.state     = Jwt:sign (Config.application.secret, {
     header  = {
       typ = "JWT",
@@ -50,16 +118,16 @@ function Server.logout ()
     secure   = false,
     samesite = "Strict",
   }
-  return ngx.exit (204)
+  return ngx.exit (ngx.HTTP_NO_CONTENT)
 end
 
 function Server.register ()
-  local query = ngx.req.get_uri_args()
+  local query = ngx.req.get_uri_args ()
   local token = Jwt:verify (Config.application.secret, query.state)
   if not token
   or not token.payload
   or not token.payload.csrf then
-    return ngx.exit (403)
+    return ngx.exit (ngx.HTTP_UNAUTHORIZED)
   end
   local redis = Redis:new ()
   assert (redis:connect (Config.redis.host, Config.redis.port))
@@ -86,9 +154,9 @@ function Server.register ()
     },
   }
   redis:del "ardoises:lock:register"
-  if status ~= 200
+  if status ~= ngx.HTTP_OK
   or not result.access_token then
-    return ngx.exit (500)
+    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
   end
   user, status = Http {
     url     = "https://api.github.com/user",
@@ -99,10 +167,10 @@ function Server.register ()
       ["User-Agent"   ] = "Ardoises",
     },
   }
-  if status ~= 200 then
-    return ngx.exit (500)
+  if status ~= ngx.HTTP_OK then
+    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
   end
-  local key  = Lustache:render (Config.pattern, {
+  local key = Lustache:render (Config.pattern, {
     what = user.login
   })
   repeat
@@ -135,7 +203,32 @@ function Server.register ()
       },
     }),
   }
-  return ngx.exit (204)
+  return ngx.redirect "/"
+end
+
+function Server.user ()
+  local _     = Server.authenticate ()
+  local query = ngx.req.get_uri_args ()
+  local redis = Redis:new ()
+  assert (redis:connect (Config.redis.host, Config.redis.port))
+  local result = redis:get (Lustache:render (Config.pattern, {
+    what = query.user,
+  }))
+  if result == ngx.null then
+    return ngx.exit (ngx.HTTP_NOT_FOUND)
+  end
+  result = Json.decode (result)
+  if not result then
+    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
+  end
+  return {
+    login      = result.login,
+    name       = result.name,
+    company    = result.company,
+    location   = result.location,
+    bio        = result.bio,
+    avatar_url = result.avatar_url,
+  }
 end
 
 return Server

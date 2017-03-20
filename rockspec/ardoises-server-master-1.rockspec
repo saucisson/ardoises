@@ -16,6 +16,7 @@ description = {
 dependencies = {
   "lua >= 5.1",
   "argparse",
+  "lpeg",
   "luaposix",
   "luasec",
   "luasocket",

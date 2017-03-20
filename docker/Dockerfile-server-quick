@@ -6,5 +6,7 @@ RUN cd /src/ardoises/  \
  && luarocks make rockspec/ardoises-server-master-1.rockspec \
  && mkdir -p /etc/nginx/ \
  && cp src/ardoises/server/nginx.conf /etc/nginx/nginx.conf \
+ && mkdir -p /static \
+ && cp -r static/* /static/ \
  && rm -rf /src/ardoises \
  && true
