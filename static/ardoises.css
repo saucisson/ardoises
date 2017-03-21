@@ -15,7 +15,7 @@ body {
   background-size: cover;
   background-position: center;
   background-color: DimGrey;
-  background-image: url(/ardoises.jpg);
+  background-image: url(/static/ardoises.jpg);
   padding-top: 70px;
   padding-bottom: 70px;
 }
@@ -30,7 +30,11 @@ body {
 }
 
 .navbar {
+  color: DarkOrange;
+  font-family: 'La Belle Aurore';
   font-size: 10px;
+  font-style: normal;
+  font-variant: normal;
 }
 
 .circle {

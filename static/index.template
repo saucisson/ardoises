@@ -32,10 +32,16 @@
     <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css"
           rel="stylesheet"
           type="text/css" />
-    <link href="/ardoises.css"
+    <link href="/static/ardoises.css"
           rel="stylesheet"
           type="text/css" />
     <title>Ardoises</title>
+    <script type="text/javascript"
+            lang="javascript">
+      var ardoises = {
+        token: "{{{user.token}}}"
+      };
+    </script>
   </head>
   <body>
 
@@ -48,12 +54,18 @@
                 <a href="/"><i class="fa fa-inverse fa-home" aria-hidden="true"></i></a>
               </li>
               {{#user}}
-              <li class="">
+              <li>
+                <a href="{{user.html_url}}">
+                  <img src="{{{user.avatar_url}}}" height="24px" width="24px"></img>
+                  <span class="navbar-avatar">{{user.name}}</span>
+                </a>
+              </li>
+              <li>
                 <a href="/logout"><i class="fa fa-inverse fa-sign-out" aria-hidden="true"></i></a>
               </li>
               {{/user}}
               {{^user}}
-              <li class="">
+              <li>
                 <a href="/login"><i class="fa fa-inverse fa-sign-in" aria-hidden="true"></i></a>
               </li>
               {{/user}}
@@ -66,7 +78,7 @@
                 <span class="input-group-addon">
                   <i class="fa fa-search"></i>
                 </span>
-                <input class="form-control" name="search" type="text" value="<%- search or '' %>"/>
+                <input class="form-control" name="search" type="text" value="{{{search}}}"/>
                 <span class="input-group-btn">
                   <button class="btn btn-default" type="submit">
                     <i class="fa fa-check"></i>
@@ -95,10 +107,6 @@
         </div>
       </div>
     </div>
-
-    {{#user}}
-    {{user.login}}
-    {{/user}}
 
     <nav class="navbar navbar-fixed-bottom">
       <div class="container">

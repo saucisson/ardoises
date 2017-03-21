@@ -111,11 +111,11 @@ function Server.logout ()
     key      = "Ardoises-Token",
     value    = "deleted",
     expires  = "Thu, 01 Jan 1970 00:00:00 GMT",
-    httponly = false,
+    httponly = true,
     secure   = false,
     samesite = "Strict",
   }
-  return ngx.exit (ngx.HTTP_NO_CONTENT)
+  return ngx.redirect "/"
 end
 
 function Server.register ()
@@ -173,7 +173,7 @@ function Server.register ()
   local cookie = Cookie:new ()
   cookie:set {
     expires  = nil,
-    httponly = false,
+    httponly = true,
     secure   = false,
     samesite = "Strict",
     key      = "Ardoises-Token",
