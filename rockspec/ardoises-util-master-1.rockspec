@@ -28,15 +28,15 @@ dependencies = {
 build = {
   type    = "builtin",
   modules = {
-    ["ardoises.jsonhttp"       ] = "src/ardoises/jsonhttp.lua",
-    ["ardoises.patterns"       ] = "src/ardoises/patterns.lua",
-    ["ardoises.util.jsonhttp"  ] = "src/ardoises/util/jsonhttp.lua",
+    ["ardoises.jsonhttp"     ] = "src/ardoises/jsonhttp.lua",
+    ["ardoises.patterns"     ] = "src/ardoises/patterns.lua",
+    ["ardoises.util.jsonhttp"] = "src/ardoises/util/jsonhttp.lua",
+    ["ardoises.server.config"] = "src/ardoises/server/config.lua",
   },
   install = {
     bin = {
       ["ardoises-clean"     ] = "src/ardoises/util/clean.lua",
       ["ardoises-invitation"] = "src/ardoises/util/invitation.lua",
-      ["ardoises-permission"] = "src/ardoises/util/permission.lua",
     },
   },
 }

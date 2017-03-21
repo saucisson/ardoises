@@ -7,12 +7,12 @@ _G.print = function (...)
 end
 
 local Arguments = require "argparse"
+local Config    = require "ardoises.server.config"
 local Gettime   = require "socket".gettime
 local Http      = require "ardoises.util.jsonhttp"
 local Json      = require "rapidjson"
 local Lustache  = require "lustache"
 local Redis     = require "redis"
-local Url       = require "net.url"
 
 local parser = Arguments () {
   name        = "ardoises-clean",
@@ -23,15 +23,6 @@ parser:option "--delay" {
   default     = "60",
   convert     = tonumber,
 }
-parser:option "--redis" {
-  description = "Redis URL",
-  default     = os.getenv "REDIS_URL",
-  convert     = function (x)
-    local url = assert (Url.parse (x)):normalize ()
-    assert (url.host)
-    return url
-  end,
-}
 local arguments = parser:parse ()
 
 print "Waiting for services to run..."
@@ -39,13 +30,12 @@ os.execute (Lustache:render ([[
   dockerize -wait "{{{redis}}}" \
             -wait "{{{docker}}}"
 ]], {
-  redis  = os.getenv "REDIS_URL",
-  docker = os.getenv "DOCKER_URL",
+  redis  = Config.redis.url,
+  docker = Config.docker.url,
 }))
 
-local pattern   = "ardoises:info:{{{what}}}"
-local redis     = assert (Redis.connect (arguments.redis.host, arguments.redis.port))
-local cursor    = "0"
+local redis  = assert (Redis.connect (Config.redis.host, Config.redis.port))
+local cursor = "0"
 local keys
 
 while true do
@@ -53,7 +43,10 @@ while true do
   local start = Gettime ()
   xpcall (function ()
     cursor, keys = unpack (redis:scan (cursor, {
-        match = Lustache:render (pattern, { what = "*" }),
+        match = Config.patterns.repository {
+          name  = "*",
+          owner = { login = "*" },
+        },
         count = 10,
     }))
     for _, key in ipairs (keys) do

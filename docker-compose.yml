@@ -15,11 +15,6 @@ services:
     links:
       - docker
       - redis
-    logging:
-      driver: "json-file"
-    environment:
-      DOCKER_URL: "tcp://docker:2375"
-      REDIS_URL:  "tcp://redis:6379"
   invitation:
     env_file: .environment
     build:
@@ -27,24 +22,9 @@ services:
       dockerfile: docker/Dockerfile-util-quick
     entrypoint: ardoises-invitation
     links:
+      - docker
       - redis
-    logging:
-      driver: "json-file"
-    environment:
-      REDIS_URL:  "tcp://redis:6379"
-  permission:
-    env_file: .environment
-    build:
-      context: .
-      dockerfile: docker/Dockerfile-util-quick
-    entrypoint: ardoises-permission
-    links:
-      - redis
-    logging:
-      driver: "json-file"
-    environment:
-      REDIS_URL:  "tcp://redis:6379"
-  server:
+  ardoises:
     env_file: .environment
     build:
       context: .
@@ -55,8 +35,3 @@ services:
     links:
       - docker
       - redis
-    logging:
-      driver: "json-file"
-    environment:
-      DOCKER_URL: "tcp://docker:2375"
-      REDIS_URL:  "tcp://redis:6379"

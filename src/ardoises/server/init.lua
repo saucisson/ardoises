@@ -4,26 +4,16 @@ _G.print = function (...)
   io.stdout:flush ()
 end
 
-require "compat53"
-
+local Config   = require "ardoises.server.config"
 local Cookie   = require "resty.cookie"
 local Http     = require "ardoises.server.jsonhttp"
+local Hmac     = require "openssl.hmac"
 local Json     = require "rapidjson"
 local Jwt      = require "resty.jwt"
 local Lpeg     = require "lpeg"
 local Lustache = require "lustache"
 local Redis    = require "resty.redis"
 local Url      = require "net.url"
-
-local Config  = {
-  pattern = "ardoises:info:{{{what}}}",
-  docker = assert (Url.parse (os.getenv "DOCKER_URL")),
-  redis  = assert (Url.parse (os.getenv "REDIS_URL")),
-  application = {
-    id     = assert (os.getenv "APPLICATION_ID"),
-    secret = assert (os.getenv "APPLICATION_SECRET"),
-  },
-}
 
 local Patterns = {}
 
@@ -33,6 +23,15 @@ Patterns.authorization =
     Lpeg.P"Token:"
   * Lpeg.S"\r\n\f\t "^1
   * ((Patterns.alnum + Lpeg.S "-_.")^1 / tostring)
+
+-- http://25thandclement.com/~william/projects/luaossl.pdf
+local function tohex (b)
+  local x = ""
+  for i = 1, #b do
+    x = x .. string.format ("%.2x", string.byte (b, i))
+  end
+  return x
+end
 
 local Server = {}
 
@@ -44,7 +43,7 @@ function Server.template (what, data)
   end
   local template = assert (file:read "*a")
   assert (file:close ())
-  ngx.header ["Content-type"] = "text/html"
+  _G.ngx.header ["Content-type"] = "text/html"
   return Lustache:render (template, data)
 end
 
@@ -70,9 +69,7 @@ function Server.authenticate (noexit)
   if not redis:connect (Config.redis.host, Config.redis.port) then
     return not noexit and ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR) or nil
   end
-  local user = redis:get (Lustache:render (Config.pattern, {
-    what = token.payload.login,
-  }))
+  local user = redis:get (Config.patterns.user (token.payload))
   redis:set_keepalive ()
   if not user then
     return not noexit and ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR) or nil
@@ -95,7 +92,7 @@ end
 function Server.login ()
   local url           = Url.parse "https://github.com/login/oauth/authorize"
   url.query.client_id = Config.application.id
-  url.query.scope     = ""
+  url.query.scope     = "user:email write:repo_hook"
   url.query.state     = Jwt:sign (Config.application.secret, {
     header  = {
       typ = "JWT",
@@ -170,22 +167,9 @@ function Server.register ()
   if status ~= ngx.HTTP_OK then
     return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
   end
-  local key = Lustache:render (Config.pattern, {
-    what = user.login
-  })
-  repeat
-    redis:watch (key)
-    local value = redis:get (key)
-    local info  = value ~= ngx.null
-              and Json.decode (value)
-               or {}
-    for k, v in pairs (user) do
-      info [k] = v
-    end
-    redis:multi ()
-    redis:set (key, Json.encode (info))
-    local success = redis:exec ()
-  until success
+  local key = Config.patterns.user (user)
+  user.token = result.access_token
+  redis:set (key, Json.encode (user))
   local cookie = Cookie:new ()
   cookie:set {
     expires  = nil,
@@ -211,9 +195,7 @@ function Server.user ()
   local query = ngx.req.get_uri_args ()
   local redis = Redis:new ()
   assert (redis:connect (Config.redis.host, Config.redis.port))
-  local result = redis:get (Lustache:render (Config.pattern, {
-    what = query.user,
-  }))
+  local result = redis:get (Config.patterns.user (query))
   if result == ngx.null then
     return ngx.exit (ngx.HTTP_NOT_FOUND)
   end
@@ -229,6 +211,74 @@ function Server.user ()
     bio        = result.bio,
     avatar_url = result.avatar_url,
   }
+end
+
+function Server.repositories ()
+end
+
+function Server.editor ()
+end
+
+function Server.execution ()
+end
+
+function Server.webhook ()
+  ngx.req.read_body ()
+  local data    = ngx.req.get_body_data ()
+  local headers = ngx.req.get_headers ()
+  local hmac    = Hmac.new (Config.application.secret)
+  if not data then
+    return ngx.exit (ngx.HTTP_BAD_REQUEST)
+  end
+  if "sha1=" .. tohex (hmac:final (data)) ~= headers ["X-Hub-Signature"] then
+    return ngx.exit (ngx.HTTP_BAD_REQUEST)
+  end
+  data = Json.decode (data)
+  if not data then
+    return ngx.exit (ngx.HTTP_BAD_REQUEST)
+  end
+  local repository = data.repository
+  if not repository then
+    return ngx.exit (ngx.HTTP_OK)
+  end
+  local redis = Redis:new ()
+  assert (redis:connect (Config.redis.host, Config.redis.port))
+  local collaborators, status = Http {
+    url     = repository.collaborators_url:gsub ("{/collaborator}", ""),
+    method  = "GET",
+    headers = {
+      ["Accept"       ] = "application/vnd.github.korra-preview+json",
+      ["Authorization"] = "token " .. Config.application.token,
+      ["User-Agent"   ] = "Ardoises",
+    },
+  }
+  if status >= 400 and status < 500 then
+    local cursor     = "0"
+    repository.login = "*"
+    repeat
+      local res = redis:scan (cursor, {
+        match = Config.patterns.collaborator (repository, { login = "*" }),
+        count = 10,
+      })
+      if res ~= ngx.null and res then
+        cursor = res [1]
+        local keys = res [2]
+        for _, key in ipairs (keys) do
+          redis:del (key)
+        end
+      end
+    until cursor == "0"
+  elseif status == 200 then
+    for _, collaborator in ipairs (collaborators) do
+      local key = Config.patterns.collaborator (repository, collaborator)
+      redis:set (key, Json.encode (collaborator))
+    end
+  else
+    redis:set_keepalive ()
+    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
+  end
+  redis:set_keepalive ()
+  return ngx.exit (ngx.HTTP_OK)
 end
 
 return Server

@@ -1,3 +1,4 @@
+local Config   = require "ardoises.server.config"
 local Http     = require "ardoises.jsonhttp"
 local Json     = require "rapidjson"
 local Httpn    = require "socket.http"
@@ -5,13 +6,9 @@ local Https    = require "ssl.https"
 local Ltn12    = require "ltn12"
 local Lustache = require "lustache"
 local Redis    = require "redis"
-local Url      = require "net.url"
 
 local prefix = "ardoises:cache:"
 local delay  = 1 * 24 * 60 * 60 -- 1 day
-local Config = {
-  redis = assert (Url.parse (os.getenv "REDIS_URL"))
-}
 
 return Http (function (request, cache)
   assert (type (request) == "table")

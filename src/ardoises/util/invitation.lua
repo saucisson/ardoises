@@ -7,9 +7,12 @@ _G.print = function (...)
 end
 
 local Arguments = require "argparse"
+local Config    = require "ardoises.server.config"
 local Gettime   = require "socket".gettime
 local Http      = require "ardoises.util.jsonhttp"
+local Json      = require "rapidjson"
 local Lustache  = require "lustache"
+local Redis     = require "redis"
 
 local parser = Arguments () {
   name        = "ardoises-clean",
@@ -20,11 +23,17 @@ parser:option "--delay" {
   default     = "60",
   convert     = tonumber,
 }
-parser:option "--token" {
-  description = "GitHub Token",
-  default     = os.getenv "ARDOISES_TOKEN",
-}
 local arguments = parser:parse ()
+
+print "Waiting for services to run..."
+os.execute (Lustache:render ([[
+  dockerize -wait "{{{redis}}}" \
+            -wait "{{{docker}}}"
+]], {
+  redis  = Config.redis.url,
+  docker = Config.docker.url,
+}))
+local redis  = assert (Redis.connect (Config.redis.host, Config.redis.port))
 
 while true do
   print "Answering to invitations..."
@@ -35,7 +44,7 @@ while true do
       method  = "GET",
       headers = {
         ["Accept"       ] = "application/vnd.github.swamp-thing-preview+json",
-        ["Authorization"] = "token " .. arguments.token,
+        ["Authorization"] = "token " .. Config.application.token,
         ["User-Agent"   ] = "Ardoises",
       },
     }
@@ -46,15 +55,41 @@ while true do
       print (Lustache:render ("  ...accepting invitation for {{{repository}}}.", {
         repository = invitation.repository.full_name,
       }))
-      Http {
+      _, status = Http {
         url     = Lustache:render ("https://api.github.com/user/repository_invitations/{{{id}}}", invitation),
         method  = "PATCH",
         headers = {
           ["Accept"       ] = "application/vnd.github.swamp-thing-preview+json",
-          ["Authorization"] = "token " .. arguments.token,
+          ["Authorization"] = "token " .. Config.application.token,
           ["User-Agent"   ] = "Ardoises",
         },
       }
+      assert (status == 204, status)
+      local user = redis:get (Config.patterns.user (invitation.repository.owner))
+      assert (user)
+      user = Json.decode (user)
+      assert (user)
+      _, status = Http {
+        url     = invitation.repository.hooks_url,
+        method  = "POST",
+        headers = {
+          ["Accept"       ] = "application/vnd.github.v3+json",
+          ["Authorization"] = "token " .. user.token,
+          ["User-Agent"   ] = "Ardoises",
+        },
+        body    = {
+          name   = "web",
+          config = {
+            url          = Config.ardoises.url .. "/webhook",
+            content_type = "json",
+            secret       = Config.application.secret,
+            insecure_ssl = "1",
+          },
+          events = { "*" },
+          active = true,
+        },
+      }
+      assert (status == 201, status)
     end
   end, function (err)
     print (err, debug.traceback ())

@@ -17,6 +17,7 @@ dependencies = {
   "lua >= 5.1",
   "argparse",
   "lpeg",
+  "luaossl",
   "luaposix",
   "luasec",
   "luasocket",
@@ -35,6 +36,7 @@ build = {
     ["ardoises.jsonhttp"       ] = "src/ardoises/jsonhttp.lua",
     ["ardoises.util.jsonhttp"  ] = "src/ardoises/util/jsonhttp.lua",
     ["ardoises.server"         ] = "src/ardoises/server/init.lua",
+    ["ardoises.server.config"  ] = "src/ardoises/server/config.lua",
     ["ardoises.server.jsonhttp"] = "src/ardoises/server/jsonhttp.lua",
   },
   install = {
