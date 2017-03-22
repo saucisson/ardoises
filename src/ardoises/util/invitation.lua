@@ -89,7 +89,7 @@ while true do
           active = true,
         },
       }
-      assert (status == 201, status)
+      assert (status == 201 or status == 422, status)
     end
   end, function (err)
     print (err, debug.traceback ())

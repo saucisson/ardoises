@@ -92,7 +92,7 @@ end
 function Server.login ()
   local url           = Url.parse "https://github.com/login/oauth/authorize"
   url.query.client_id = Config.application.id
-  url.query.scope     = "user:email write:repo_hook"
+  url.query.scope     = "user:email admin:repo_hook"
   url.query.state     = Jwt:sign (Config.application.secret, {
     header  = {
       typ = "JWT",
@@ -203,17 +203,19 @@ function Server.user ()
   if not result then
     return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
   end
-  return {
+  ngx.say (Json.encode {
     login      = result.login,
     name       = result.name,
     company    = result.company,
     location   = result.location,
     bio        = result.bio,
     avatar_url = result.avatar_url,
-  }
+  })
+  return ngx.exit (ngx.HTTP_OK)
 end
 
 function Server.repositories ()
+
 end
 
 function Server.editor ()
@@ -253,19 +255,55 @@ function Server.webhook ()
     },
   }
   if status >= 400 and status < 500 then
-    local cursor     = "0"
-    repository.login = "*"
-    repeat
-      local res = redis:scan (cursor, {
-        match = Config.patterns.collaborator (repository, { login = "*" }),
-        count = 10,
-      })
-      if res ~= ngx.null and res then
-        cursor = res [1]
-        local keys = res [2]
-        for _, key in ipairs (keys) do
-          redis:del (key)
+    -- delete webhook:
+    (function ()
+      local user = redis:get (Config.patterns.user (repository.owner))
+      if user == ngx.null or not user then
+        return
+      end
+      user = Json.decode (user)
+      if not user then
+        return
+      end
+      local webhooks, wh_status = Http {
+        url     = repository.hooks_url,
+        method  = "GET",
+        headers = {
+          ["Accept"       ] = "application/vnd.github.v3+json",
+          ["Authorization"] = "token " .. user.token,
+          ["User-Agent"   ] = "Ardoises",
+        },
+      }
+      if wh_status ~= 200 then
+        return
+      end
+      for _, hook in ipairs (webhooks) do
+        if hook.config.url:find (Config.ardoises.url, 1, true) then
+          Http {
+            url     = hook.url,
+            method  = "DELETE",
+            headers = {
+              ["Accept"       ] = "application/vnd.github.v3+json",
+              ["Authorization"] = "token " .. user.token,
+              ["User-Agent"   ] = "Ardoises",
+            },
+          }
         end
+      end
+    end) ()
+    -- delete collaborators in database:
+    local cursor     = 0
+    repeat
+      local res = redis:scan (cursor,
+        "match", Config.patterns.collaborator (repository, { login = "*" }),
+        "count", 100)
+      if res == ngx.null or not res then
+        break
+      end
+      cursor = res [1]
+      local keys = res [2]
+      for _, key in ipairs (keys) do
+        redis:del (key)
       end
     until cursor == "0"
   elseif status == 200 then

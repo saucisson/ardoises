@@ -28,7 +28,7 @@ Setenv ("ARDOISES_IMAGE", info.Config.Image)
 
 -- FIXME:  nginx resolver does not seem to work within docker-compose,
 -- so we convert all service hostnames to IPs before launching the server.
-for _, address in ipairs { "ARDOISES_URL", "DOCKER_URL", "REDIS_URL" } do
+for _, address in ipairs { "DOCKER_URL", "REDIS_URL" } do
   local parsed = assert (Url.parse (os.getenv (address)))
   parsed.host  = assert (Socket.dns.toip (parsed.host))
   Setenv (address, Url.build (parsed))

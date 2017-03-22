@@ -47,7 +47,7 @@ while true do
           name  = "*",
           owner = { login = "*" },
         },
-        count = 10,
+        count = 100,
     }))
     for _, key in ipairs (keys) do
       redis:watch (key)
