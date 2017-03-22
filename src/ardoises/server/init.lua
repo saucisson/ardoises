@@ -71,7 +71,7 @@ function Server.authenticate (noexit)
   end
   local user = redis:get (Config.patterns.user (token.payload))
   redis:set_keepalive ()
-  if not user then
+  if user == ngx.null or not user then
     return not noexit and ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR) or nil
   end
   user = Json.decode (user)
@@ -196,7 +196,7 @@ function Server.user ()
   local redis = Redis:new ()
   assert (redis:connect (Config.redis.host, Config.redis.port))
   local result = redis:get (Config.patterns.user (query))
-  if result == ngx.null then
+  if result == ngx.null or not result then
     return ngx.exit (ngx.HTTP_NOT_FOUND)
   end
   result = Json.decode (result)

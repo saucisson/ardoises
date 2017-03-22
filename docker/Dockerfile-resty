@@ -20,10 +20,15 @@ RUN apk add --no-cache --virtual .build-deps \
  && apk add --no-cache --repository http://dl-3.alpinelinux.org/alpine/edge/testing/ \
         dockerize \
  && apk add --no-cache \
+        bash \
+        curl \
+        diffutils \
+        grep \
         libstdc++ \
         openssl \
         pcre \
         readline \
+        sed \
  && pip3 install hererocks \
  && hererocks --luajit=2.1 --luarocks=^ --compat=5.2 /usr \
  && luarocks install luasec \
@@ -40,15 +45,37 @@ RUN apk add --no-cache --virtual .build-deps \
  && rm -rf openresty-${RESTY_VERSION}.tar.gz openresty-${RESTY_VERSION} \
  && ln -sf /dev/stdout /usr/local/openresty/nginx/logs/access.log \
  && ln -sf /dev/stderr /usr/local/openresty/nginx/logs/error.log \
+ && addgroup -g 82 -S www-data \
+ && adduser  -u 82 -D -S -G www-data www-data \
  && cd /src/ardoises/  \
+ && luarocks install rockspec/lua-websockets-develop-0.rockspec \
+ && luarocks install rockspec/lulpeg-develop-0.rockspec \
  && luarocks install rockspec/redis-lua-develop-0.rockspec \
- && luarocks make rockspec/ardoises-server-master-1.rockspec \
- && mkdir -p /etc/nginx/ \
+ && luarocks make    rockspec/ardoises-master-1.rockspec \
+ && mkdir -p /etc/nginx/ssl \
  && cp src/ardoises/server/nginx.conf /etc/nginx/nginx.conf \
- && mkdir -p /static \
- && cp -r static/* /static/ \
+ && cat cert.info | openssl req \
+      -x509 \
+      -nodes \
+      -days 365 \
+      -newkey rsa:2048 \
+      -keyout /etc/nginx/ssl/nginx.key \
+      -out    /etc/nginx/ssl/nginx.crt \
  && rm -rf /src/ardoises \
  && apk del .build-deps \
+ && rm -rf /tmp/* \
  && true
 
+# && mkdir -p /static
+# && cp -r static/* /static/
+# && cd /tmp \
+# && git clone https://github.com/saucisson/lua-resty-shell.git \
+# && cd lua-resty-shell \
+# && luarocks make lua-resty-shell-scm-1.rockspec \
+# && cd /tmp \
+# && git clone https://github.com/saucisson/lua-resty-auto-ssl.git \
+# && cd lua-resty-auto-ssl \
+# && luarocks make lua-resty-auto-ssl-develop-0.rockspec \
+
 ENV PATH /usr/local/openresty/bin/:/usr/local/openresty/nginx/sbin/:$PATH
+VOLUME ["/static"]

@@ -1,4 +1,4 @@
-package = "ardoises-server"
+package = "ardoises"
 version = "master-1"
 source  = {
   url    = "git+https://github.com/ardoises/ardoises.git",
@@ -16,7 +16,11 @@ description = {
 dependencies = {
   "lua >= 5.1",
   "argparse",
+  "copas",
+  "coronest",
+  "etlua",
   "lpeg",
+  "layeredata",
   "luaossl",
   "luaposix",
   "luasec",
@@ -24,6 +28,7 @@ dependencies = {
   "lua-resty-cookie",
   "lua-resty-http",
   "lua-resty-jwt",
+  "lua-websockets",
   "lustache",
   "net-url",
   "rapidjson",
@@ -33,7 +38,13 @@ dependencies = {
 build = {
   type    = "builtin",
   modules = {
+    ["ardoises.js"             ] = "src/ardoises/js.lua",
     ["ardoises.jsonhttp"       ] = "src/ardoises/jsonhttp.lua",
+    ["ardoises.patterns"       ] = "src/ardoises/patterns.lua",
+    ["ardoises.client"         ] = "src/ardoises/client/init.lua",
+    ["ardoises.client.jsonhttp"] = "src/ardoises/client/jsonhttp.lua",
+    ["ardoises.editor"         ] = "src/ardoises/editor/init.lua",
+    ["ardoises.editor.jsonhttp"] = "src/ardoises/editor/jsonhttp.lua",
     ["ardoises.util.jsonhttp"  ] = "src/ardoises/util/jsonhttp.lua",
     ["ardoises.server"         ] = "src/ardoises/server/init.lua",
     ["ardoises.server.config"  ] = "src/ardoises/server/config.lua",
@@ -41,7 +52,9 @@ build = {
   },
   install = {
     bin = {
-      ["ardoises-server"] = "src/ardoises/server/bin.lua",
-    },
+      ["ardoises-editor"    ] = "src/ardoises/editor/bin.lua",
+      ["ardoises-server"    ] = "src/ardoises/server/bin.lua",
+      ["ardoises-clean"     ] = "src/ardoises/util/clean.lua",
+      ["ardoises-invitation"] = "src/ardoises/util/invitation.lua",    },
   },
 }

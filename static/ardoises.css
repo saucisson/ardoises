@@ -31,8 +31,13 @@ body {
 
 .navbar {
   color: DarkOrange;
-  font-family: 'La Belle Aurore';
-  font-size: 10px;
+  font-size: 12px;
+  font-style: normal;
+  font-variant: normal;
+}
+.navbar-username {
+  color: DarkOrange;
+  font-size: 14px;
   font-style: normal;
   font-variant: normal;
 }

@@ -24,8 +24,10 @@ RUN apk add --no-cache --virtual .build-deps \
  && hererocks --luajit=2.1 --luarocks=^ --compat=5.2 /usr \
  && luarocks install luasec \
  && cd /src/ardoises/  \
+ && luarocks install rockspec/lua-websockets-develop-0.rockspec \
+ && luarocks install rockspec/lulpeg-develop-0.rockspec \
  && luarocks install rockspec/redis-lua-develop-0.rockspec \
- && luarocks make rockspec/ardoises-util-master-1.rockspec \
+ && luarocks make    rockspec/ardoises-master-1.rockspec \
  && rm -rf /src/ardoises \
  && apk del .build-deps \
  && true

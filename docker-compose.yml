@@ -10,7 +10,7 @@ services:
     env_file: .environment
     build:
       context: .
-      dockerfile: docker/Dockerfile-util-quick
+      dockerfile: docker/Dockerfile-noresty-quick
     entrypoint: ardoises-clean
     links:
       - docker
@@ -19,7 +19,7 @@ services:
     env_file: .environment
     build:
       context: .
-      dockerfile: docker/Dockerfile-util-quick
+      dockerfile: docker/Dockerfile-noresty-quick
     entrypoint: ardoises-invitation
     links:
       - docker
@@ -28,10 +28,13 @@ services:
     env_file: .environment
     build:
       context: .
-      dockerfile: docker/Dockerfile-server-quick
+      dockerfile: docker/Dockerfile-resty-quick
     entrypoint: ardoises-server
     ports:
       - "8080:80"
+      - "8081:443"
     links:
       - docker
       - redis
+    volumes:
+      - ./static:/static
