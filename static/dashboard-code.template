@@ -5,42 +5,84 @@ dashboard.innerHTML = [[
   </h1>
 ]]
 
+local Copas  = require "copas"
 local Client = require "ardoises.client"
 local Et     = require "etlua"
 local client = Client {
   server = "http://localhost:8080",
   token  = "{{user.token}}",
 }
-local data = client:repositories ()
-dashboard.innerHTML = Et.render ([[
+local data   = client:repositories ()
+
+dashboard.innerHTML = [[
   <div class="container">
-    <div class="list-group">
-    <% for _, t in ipairs (data) do %>
-      <div class="list-group-item row">
-        <a href="/editors/<%- t.repository.owner.login %>/<%- t.repository.name %>/<%- t.branch %>"
-          aria-label="Editor for <%- t.repository.owner.login %>/<%- t.repository.name %>:<%- t.branch %>">
-          <div class="col-md-10">
-            <h4 class="list-group-item-heading"><%= t.repository.full_name %></h4>
-            <p class="list-group-item-text"><%= t.repository.description or ""%></p>
-          </div>
-          <div class="col-md-2">
-            <img class="circle" src="<%- t.collaborator.avatar_url %>"/>
-            <% if t.collaborator.permissions.push then %>
-            <span class="fa-stack fa-lg">
-              <i class="fa fa-pencil fa-flip-horizontal fa-stack-1x"></i>
+    <div class="row">
+      <div class="col-md-4">
+        <form action="/" method="get">
+          <div class="input-group">
+            <span class="input-group-addon">
+              <i class="fa fa-search"></i>
             </span>
-            <% else %>
-            <span class="fa-stack fa-lg">
-              <i class="fa fa-pencil fa-flip-horizontal fa-stack-1x"></i>
-              <i class="fa fa-ban fa-stack-2x text-danger"></i>
-            </span>
-            <% end %>
+            <input id="search"
+                   class="form-control"
+                   autofocus
+                   type="text"/>
           </div>
-        </a>
+        </form>
       </div>
-    <% end %>
+      <div class="col-md-8">
+      </div>
     </div>
   </div>
-]], {
-  data = data,
-})
+  <section id="repositories">
+  </section>
+]]
+
+local input        = _G.js.global.document:getElementById "search"
+local repositories = _G.js.global.document:getElementById "repositories"
+
+while true do
+  local searched = input.value
+  local filtered = {}
+  for _, t in ipairs (data) do
+    if t.repository.full_name:match (input.value)
+    or (t.repository.description or ""):match (input.value) then
+      filtered [#filtered+1] = t
+    end
+  end
+  repositories.innerHTML = Et.render ([[
+    <div class="container">
+      <div class="list-group">
+      <% for _, t in ipairs (data) do %>
+        <div class="list-group-item row">
+          <a href="/editors/<%- t.repository.owner.login %>/<%- t.repository.name %>/<%- t.branch %>"
+            aria-label="Editor for <%- t.repository.owner.login %>/<%- t.repository.name %>:<%- t.branch %>">
+            <div class="col-md-10">
+              <h4 class="list-group-item-heading"><%= t.repository.full_name %></h4>
+              <p class="list-group-item-text"><%= t.repository.description or ""%></p>
+            </div>
+            <div class="col-md-2">
+              <img class="circle" src="<%- t.collaborator.avatar_url %>"/>
+              <% if t.collaborator.permissions.push then %>
+              <span class="fa-stack fa-lg">
+                <i class="fa fa-pencil fa-flip-horizontal fa-stack-1x"></i>
+              </span>
+              <% else %>
+              <span class="fa-stack fa-lg">
+                <i class="fa fa-pencil fa-flip-horizontal fa-stack-1x"></i>
+                <i class="fa fa-ban fa-stack-2x text-danger"></i>
+              </span>
+              <% end %>
+            </div>
+          </a>
+        </div>
+      <% end %>
+      </div>
+    </div>
+  ]], {
+    data = filtered,
+  })
+  repeat
+    Copas.sleep (1)
+  until searched ~= input.value
+end

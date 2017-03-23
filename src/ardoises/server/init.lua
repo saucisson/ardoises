@@ -98,9 +98,29 @@ end
 
 function Server.root ()
   local user = Server.authenticate (true)
+  if user then
+    return ngx.redirect "/dashboard"
+  else
+    return ngx.redirect "/overview"
+  end
+end
+
+function Server.dashboard ()
+  local user = Server.authenticate ()
   _G.ngx.header ["Content-type"] = "text/html"
   ngx.say (Server.template ("index", {
-    user = user,
+    user    = user,
+    content = "{{{dashboard}}}"
+  }))
+  return ngx.exit (ngx.HTTP_OK)
+end
+
+function Server.overview ()
+  local user = Server.authenticate (true)
+  _G.ngx.header ["Content-type"] = "text/html"
+  ngx.say (Server.template ("index", {
+    user    = user,
+    content = "{{{overview}}}"
   }))
   return ngx.exit (ngx.HTTP_OK)
 end

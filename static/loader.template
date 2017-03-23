@@ -267,7 +267,9 @@ function _G.require (name)
   for _, searcher in ipairs (package.searchers) do
     local loader, value = searcher (name)
     if type (loader) == "function" then
-      return loader (value)
+      local loaded = loader (value)
+      package.loaded [name] = loaded
+      return loaded
     elseif type (loader) == "string" then
       reasons [#reasons+1] = loader
     end
@@ -277,7 +279,6 @@ end
 
 -- Taken from lua.vm.js:
 local function load_lua_over_http (url)
-  print ("require", url)
   local running = {
     copas = Copas and Copas.running,
     co    = coroutine.running (),

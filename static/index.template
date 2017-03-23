@@ -45,9 +45,12 @@
           <div class="col-sm-4">
             <ul class="lead nav navbar-nav navbar-left">
               <li class="">
-                <a href="/"><i class="fa fa-inverse fa-home" aria-hidden="true"></i></a>
+                <a href="/overview"><i class="fa fa-inverse fa-home" aria-hidden="true"></i></a>
               </li>
               {{#user}}
+              <li class="">
+                <a href="/dashboard"><i class="fa fa-inverse fa-list" aria-hidden="true"></i></a>
+              </li>
               <li>
                 <a href="{{user.html_url}}">
                   <img src="{{{user.avatar_url}}}" height="20px" width="20px"></img>
@@ -66,21 +69,6 @@
             </ul>
           </div>
           <div class="col-sm-4">
-            {{#user}}
-            <form class="lead nav navbar-nav navbar-left" action="/" method="get">
-              <div class="input-group">
-                <span class="input-group-addon">
-                  <i class="fa fa-search"></i>
-                </span>
-                <input class="form-control" name="search" type="text" value="{{{search}}}"/>
-                <span class="input-group-btn">
-                  <button class="btn btn-default" type="submit">
-                    <i class="fa fa-check"></i>
-                  </button>
-                </span>
-              </div>
-            </form>
-            {{/user}}
           </div>
           <div class="col-sm-4">
             <ul class="lead nav navbar-nav navbar-right">
@@ -102,12 +90,7 @@
       </div>
     </div>
 
-    {{#user}}
-    {{{dashboard}}}
-    {{/user}}
-    {{^user}}
-    {{{overview}}}
-    {{/user}}
+    {{{content}}}
 
     <nav class="navbar navbar-fixed-bottom">
       <div class="container">
