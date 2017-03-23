@@ -3,6 +3,9 @@ local Url      = require "net.url"
 
 local result = {
   patterns = {
+    lock         = function (what)
+      return Lustache:render ("ardoises:lock:{{{what}}}", { what = what })
+    end,
     user         = function (user)
       return Lustache:render ("ardoises:user:{{{login}}}", user)
     end,

@@ -20,7 +20,7 @@ local Patterns = {}
 Lpeg.locale (Patterns)
 
 Patterns.authorization =
-    Lpeg.P"token:"
+    Lpeg.P"token"
   * Lpeg.S"\r\n\f\t "^1
   * ((Patterns.alnum + Lpeg.S "-_.")^1 / tostring)
 
@@ -67,7 +67,7 @@ function Server.authenticate (noexit)
   local cookie  = Cookie:new ()
   local field   = cookie:get "Ardoises-Token"
   local header  = field
-              and "token: " .. field
+              and "token " .. field
                or headers ["Authorization"]
   if not header then
     return not noexit and ngx.exit (ngx.HTTP_UNAUTHORIZED) or nil
@@ -166,7 +166,7 @@ function Server.register ()
   local redis = Redis:new ()
   assert (redis:connect (Config.redis.host, Config.redis.port))
   while true do
-    if redis:setnx ("ardoises:lock:register", "locked") then
+    if redis:setnx (Config.patterns.lock "register", "locked") then
       break
     end
     ngx.sleep (0.1)
@@ -187,7 +187,7 @@ function Server.register ()
       code          = query.code,
     },
   }
-  redis:del "ardoises:lock:register"
+  redis:del (Config.patterns.lock "register")
   if status ~= ngx.HTTP_OK
   or not result.access_token then
     return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
@@ -315,6 +315,12 @@ function Server.webhook ()
   end
   local redis = Redis:new ()
   assert (redis:connect (Config.redis.host, Config.redis.port))
+  while true do
+    if redis:setnx (Config.patterns.lock (repository.full_name), "locked") then
+      break
+    end
+    ngx.sleep (0.1)
+  end
   -- delete collaborators in database:
   local cursor = 0
   repeat
@@ -390,10 +396,8 @@ function Server.webhook ()
         collaborator = collaborator,
       })
     end
-  else
-    redis:set_keepalive ()
-    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
   end
+  redis:del (Config.patterns.lock (repository.full_name))
   redis:set_keepalive ()
   return ngx.exit (ngx.HTTP_OK)
 end

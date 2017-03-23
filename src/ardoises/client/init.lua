@@ -41,7 +41,7 @@ function Mt.__call (_, options)
   local headers = {
     ["Accept"       ] = "application/json",
     ["User-Agent"   ] = Client.user_agent,
-    ["Authorization"] = "token: " .. options.token,
+    ["Authorization"] = "token " .. options.token,
   }
   local user, status = Http {
     url      =  Url.build {
