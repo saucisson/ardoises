@@ -1,7 +1,7 @@
 local Config   = require "ardoises.server.config"
-local Http     = require "ardoises.jsonhttp"
+local Common   = require "ardoises.jsonhttp.common"
 local Json     = require "rapidjson"
-local Httpn    = require "socket.http"
+local Http     = require "socket.http"
 local Https    = require "ssl.https"
 local Ltn12    = require "ltn12"
 local Lustache = require "lustache"
@@ -10,7 +10,7 @@ local Redis    = require "redis"
 local prefix = "ardoises:cache:"
 local delay  = 1 * 24 * 60 * 60 -- 1 day
 
-return Http (function (request, cache)
+return Common (function (request, cache)
   assert (type (request) == "table")
   local json  = {}
   local redis = assert (Redis.connect (Config.redis.host, Config.redis.port))
@@ -30,7 +30,7 @@ return Http (function (request, cache)
   local result   = {}
   request.sink   = Ltn12.sink.table (result)
   request.source = request.body  and Ltn12.source.string (request.body)
-  local http = request.url:match "https://" and Https or Httpn
+  local http = request.url:match "https://" and Https or Http
   local _, status, headers = http.request (request)
   print (Lustache:render ("{{{method}}} {{{status}}} {{{url}}}", {
     method = request.method,

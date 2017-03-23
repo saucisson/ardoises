@@ -1,14 +1,14 @@
 local Config   = require "ardoises.server.config"
-local Http     = require "ardoises.jsonhttp"
+local Common   = require "ardoises.jsonhttp.common"
 local Json     = require "rapidjson"
-local Httph    = require "resty.http"
+local Http     = require "resty.http"
 local Lustache = require "lustache"
 local Redis    = require "resty.redis"
 
 local prefix = "ardoises:cache:"
 local delay  = 1 * 24 * 60 * 60 -- 1 day
 
-return Http (function (request, cache)
+return Common (function (request, cache)
   assert (type (request) == "table")
   local json  = {}
   local redis = Redis:new ()
@@ -27,7 +27,7 @@ return Http (function (request, cache)
                                            or json.answer.headers ["Last-Modified"]
     end
   end
-  local client = Httph.new ()
+  local client = Http.new ()
   client:set_timeout (1000) -- milliseconds
   local result = assert (client:request_uri (request.url, request))
   print (Lustache:render ("{{{method}}} {{{status}}} {{{url}}}", {

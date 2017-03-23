@@ -22,37 +22,7 @@ package.preload ["rapidjson"] = function ()
 end
 
 package.preload ["socket.url"] = function ()
-  local Et  = require "etlua"
-  local Url = {}
-  function Url.parse (url)
-    local parser = Adapter.document:createElement "a"
-    parser.href = url
-    return {
-      url       = url,
-      scheme    = parser.protocol:match "%w+",
-      authority = nil,
-      path      = parser.pathname,
-      params    = nil,
-      query     = parser.search,
-      fragment  = nil,
-      userinfo  = nil,
-      host      = parser.hostname,
-      port      = parser.port,
-      user      = nil,
-      password  = nil,
-    }
-  end
-  function Url.build (t)
-    local result
-    if t.port then
-      result = Et.render ("<%- scheme %>://<%- host %>:<%- port %><%- path %>", t)
-    else
-      result = Et.render ("<%- scheme %>://<%- host %><%- path %>", t)
-    end
-    assert (not t.query)
-    return result
-  end
-  return Url
+  return require "net.url"
 end
 
 package.preload ["copas"] = function ()

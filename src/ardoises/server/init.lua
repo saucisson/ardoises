@@ -6,7 +6,7 @@ end
 
 local Config   = require "ardoises.server.config"
 local Cookie   = require "resty.cookie"
-local Http     = require "ardoises.server.jsonhttp"
+local Http     = require "ardoises.jsonhttp.resty-redis"
 local Hmac     = require "openssl.hmac"
 local Json     = require "rapidjson"
 local Jwt      = require "resty.jwt"

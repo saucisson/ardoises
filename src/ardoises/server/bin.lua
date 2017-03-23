@@ -1,6 +1,6 @@
 #! /usr/bin/env lua
 
-local Http     = require "ardoises.util.jsonhttp"
+local Http     = require "ardoises.jsonhttp.socket-redis"
 local Lustache = require "lustache"
 local Setenv   = require "posix.stdlib".setenv
 local Socket   = require "socket"
