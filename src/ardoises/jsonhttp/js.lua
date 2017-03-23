@@ -1,4 +1,4 @@
-local Adapter = require "ardoises.js"
+local Adapter = require "ardoises.client.js"
 local Common  = require "ardoises.jsonhttp.common"
 local Copas   = require "copas"
 local Json    = require "cjson"

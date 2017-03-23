@@ -1,0 +1,125 @@
+{{#user}}
+<section id="dashboard">
+</section>
+<script type="text/lua"
+        lang="Lua">
+  function tojs (t)
+    if type (t) ~= "table" then
+      return t
+    elseif #t ~= 0 then
+      local result = _G.js.new (_G.window.Array)
+      for i = 1, #t do
+        result [result.length] = tojs (t [i])
+      end
+      return result
+    else
+      local result = _G.js.new (_G.window.Object)
+      for k, v in pairs (t) do
+        assert (type (k) == "string")
+        result [k] = tojs (v)
+      end
+      return result
+    end
+  end
+  function _G.require (name)
+    if package.loaded [name] then
+      return package.loaded [name]
+    end
+    local reasons = {}
+    for _, searcher in ipairs (package.searchers) do
+      local loader, value = searcher (name)
+      if type (loader) == "function" then
+        return loader (value)
+      elseif type (loader) == "string" then
+        reasons [#reasons+1] = loader
+      end
+    end
+    error ("module " .. name .. " not found:" .. table.concat (reasons))
+  end
+  local Copas
+  -- Taken from lua.vm.js:
+  local function load_lua_over_http (url)
+    print ("require", url)
+    local running = {
+      copas = Copas and Copas.running,
+      co    = coroutine.running (),
+    }
+    local response, err
+    local r1 = _G.window:fetch (url, tojs {
+      method   = "GET",
+      mode     = "cors",
+      redirect = "follow",
+      cache    = "force-cache",
+    })
+    local r2 = r1 ["then"] (r1, function (_, r)
+      assert (r.status >= 200 and r.status < 400)
+      return r:text ()
+    end)
+    local r3 = r2 ["then"] (r2, function (_, text)
+      response = text
+      if running.copas then
+        Copas.wakeup (running.copas)
+      else
+        coroutine.resume (running.co)
+      end
+    end)
+    r2:catch (function (_, e)
+      err = e
+      if running.copas then
+        Copas.wakeup (running.copas)
+      else
+        coroutine.resume (running.co)
+      end
+    end)
+    r3:catch (function (_, e)
+      err = e
+      if running.copas then
+        Copas.wakeup (running.copas)
+      else
+        coroutine.resume (running.co)
+      end
+    end)
+    if running.copas then
+      Copas.sleep (-math.huge)
+    else
+      coroutine.yield ()
+    end
+    if response then
+      return load (response, url, "t")
+    else
+      return nil, err
+    end
+  end
+  package.searchers [#package.searchers] = nil
+  package.searchers [#package.searchers] = nil
+  table.insert (package.searchers, function (mod_name)
+    if not mod_name:match "/" then
+      local full_url  = "/lua/" .. mod_name
+      local func, err = load_lua_over_http (full_url)
+      if func ~= nil then return func end
+      return "\n    " .. tostring (err)
+    end
+  end)
+  -- run client:
+  local co = coroutine.create (function ()
+    xpcall (function ()
+      require "ardoises.client.js"
+      Copas = require "copas"
+      Copas.addthread (function ()
+        require "ardoises.client.web"
+      end)
+      Copas.addthread (function ()
+        while true do
+          print "ping!"
+          Copas.sleep (5)
+        end
+      end)
+      Copas.loop ()
+    end, function (err)
+      print ("error:", err)
+      print (debug.traceback ())
+    end)
+  end)
+  coroutine.resume (co)
+</script>
+{{/user}}

@@ -35,7 +35,7 @@ end
 
 local Server = {}
 
-function Server.template (what, data)
+function Server.include (what)
   local file, err = io.open ("/static/" .. what .. ".template", "r")
   if not file then
     print (err)
@@ -43,8 +43,23 @@ function Server.template (what, data)
   end
   local template = assert (file:read "*a")
   assert (file:close ())
-  _G.ngx.header ["Content-type"] = "text/html"
-  return Lustache:render (template, data)
+  return template
+end
+
+function Server.template (what, data)
+  data = data or {}
+  local file, err = io.open ("/static/" .. what .. ".template", "r")
+  if not file then
+    print (err)
+    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
+  end
+  local template = assert (file:read "*a")
+  assert (file:close ())
+  repeat
+    local previous = template
+    template = Lustache:render (template, data)
+  until previous == template
+  return template
 end
 
 function Server.authenticate (noexit)
@@ -83,8 +98,12 @@ end
 
 function Server.root ()
   local user = Server.authenticate (true)
+  _G.ngx.header ["Content-type"] = "text/html"
   ngx.say (Server.template ("index", {
-    user = user,
+    user    = user,
+    content = user
+          and Server.include "dashboard"
+           or Server.include "overview"
   }))
   return ngx.exit (ngx.HTTP_OK)
 end
@@ -214,14 +233,47 @@ function Server.user ()
   return ngx.exit (ngx.HTTP_OK)
 end
 
-function Server.repositories ()
-
+function Server.my_user ()
+  local user = Server.authenticate ()
+  ngx.say (Json.encode {
+    login      = user.login,
+    name       = user.name,
+    company    = user.company,
+    location   = user.location,
+    bio        = user.bio,
+    avatar_url = user.avatar_url,
+  })
+  return ngx.exit (ngx.HTTP_OK)
 end
 
-function Server.editor ()
-end
-
-function Server.execution ()
+function Server.my_repositories ()
+  local user   = Server.authenticate ()
+  local result = {}
+  local redis  = Redis:new ()
+  assert (redis:connect (Config.redis.host, Config.redis.port))
+  -- find collaborators in database:
+  local cursor = 0
+  repeat
+    local res = redis:scan (cursor,
+      "match", Config.patterns.collaborator ({
+        owner = { login = "*" },
+        name  = "*",
+      }, { login = user.login }),
+      "count", 100)
+    if res == ngx.null or not res then
+      break
+    end
+    cursor = res [1]
+    local keys = res [2]
+    for _, key in ipairs (keys) do
+      local entry = redis:get (key)
+      if entry ~= ngx.null and entry then
+        result [#result+1] = Json.decode (entry)
+      end
+    end
+  until cursor == "0"
+  ngx.say (Json.encode (result))
+  return ngx.exit (ngx.HTTP_OK)
 end
 
 function Server.webhook ()
@@ -245,6 +297,22 @@ function Server.webhook ()
   end
   local redis = Redis:new ()
   assert (redis:connect (Config.redis.host, Config.redis.port))
+  -- delete collaborators in database:
+  local cursor = 0
+  repeat
+    local res = redis:scan (cursor,
+      "match", Config.patterns.collaborator (repository, { login = "*" }),
+      "count", 100)
+    if res == ngx.null or not res then
+      break
+    end
+    cursor = res [1]
+    local keys = res [2]
+    for _, key in ipairs (keys) do
+      redis:del (key)
+    end
+  until cursor == "0"
+  -- update data:
   local collaborators, status = Http {
     url     = repository.collaborators_url:gsub ("{/collaborator}", ""),
     method  = "GET",
@@ -255,7 +323,9 @@ function Server.webhook ()
     },
   }
   if status >= 400 and status < 500 then
-    -- delete webhook:
+    -- delete repository:
+    redis:del (Config.patterns.repository (repository))
+    -- delete webhook(s):
     (function ()
       local user = redis:get (Config.patterns.user (repository.owner))
       if user == ngx.null or not user then
@@ -291,25 +361,16 @@ function Server.webhook ()
         end
       end
     end) ()
-    -- delete collaborators in database:
-    local cursor     = 0
-    repeat
-      local res = redis:scan (cursor,
-        "match", Config.patterns.collaborator (repository, { login = "*" }),
-        "count", 100)
-      if res == ngx.null or not res then
-        break
-      end
-      cursor = res [1]
-      local keys = res [2]
-      for _, key in ipairs (keys) do
-        redis:del (key)
-      end
-    until cursor == "0"
   elseif status == 200 then
+    -- update repository:
+    redis:set (Config.patterns.repository (repository), Json.encode (repository))
+    -- update collaborators:
     for _, collaborator in ipairs (collaborators) do
       local key = Config.patterns.collaborator (repository, collaborator)
-      redis:set (key, Json.encode (collaborator))
+      redis:set (key, Json.encode {
+        repository   = repository,
+        collaborator = collaborator,
+      })
     end
   else
     redis:set_keepalive ()

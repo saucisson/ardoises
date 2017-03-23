@@ -1,0 +1,26 @@
+<div class="section">
+  <div class="container">
+    <div class="row">
+      <div class="col-md-12 text-center">
+        <h1 class="text-primary">Ardoises</h1>
+        <p class="text-info">Collaborative Edition for Formal Models</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="container">
+    <div class="row">
+      <div class="col-md-12">
+        <h1 class="text-primary">Why?</h1>
+        <p>Ardoises is a formal modeling platform. It aims at providing user-friendly
+           edition of models expressed in several formalisms, such as automata, process
+           algebra or different breeds of Petri nets. It also offers to launch services
+           on the models, for instance to transform it or to check properties . This
+           platform differs from most others, because it allows its users to define
+           themselves new formalisms, either from scratch or built upon existing ones.</p>
+      </div>
+    </div>
+  </div>
+</div>
