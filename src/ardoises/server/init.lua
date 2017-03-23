@@ -6,6 +6,7 @@ end
 
 local Config   = require "ardoises.server.config"
 local Cookie   = require "resty.cookie"
+local Gettime  = require "socket".gettime
 local Http     = require "ardoises.jsonhttp.resty-redis"
 local Hmac     = require "openssl.hmac"
 local Json     = require "rapidjson"
@@ -93,7 +94,6 @@ function Server.authenticate (noexit)
   if not user then
     return not noexit and ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR) or nil
   end
-  user.authentication = token
   return user
 end
 
@@ -111,7 +111,8 @@ function Server.dashboard ()
   _G.ngx.header ["Content-type"] = "text/html"
   ngx.say (Server.template ("index", {
     user    = user,
-    content = "{{{dashboard}}}"
+    content = "{{{dashboard}}}",
+    code    = "{{{dashboard-code}}}",
   }))
   return ngx.exit (ngx.HTTP_OK)
 end
@@ -205,16 +206,9 @@ function Server.register ()
     return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
   end
   local key = Config.patterns.user (user)
-  user.token = result.access_token
-  redis:set (key, Json.encode (user))
-  local cookie = Cookie:new ()
-  cookie:set {
-    expires  = nil,
-    httponly = true,
-    secure   = false,
-    samesite = "Strict",
-    key      = "Ardoises-Token",
-    value    = Jwt:sign (Config.application.secret, {
+  user.tokens = {
+    github   = result.access_token,
+    ardoises = Jwt:sign (Config.application.secret, {
       header  = {
         typ = "JWT",
         alg = "HS256",
@@ -224,31 +218,17 @@ function Server.register ()
       },
     }),
   }
+  redis:set (key, Json.encode (user))
+  local cookie = Cookie:new ()
+  cookie:set {
+    expires  = nil,
+    httponly = true,
+    secure   = false,
+    samesite = "Strict",
+    key      = "Ardoises-Token",
+    value    = user.tokens.ardoises,
+  }
   return ngx.redirect "/"
-end
-
-function Server.user ()
-  local _     = Server.authenticate ()
-  local query = ngx.req.get_uri_args ()
-  local redis = Redis:new ()
-  assert (redis:connect (Config.redis.host, Config.redis.port))
-  local result = redis:get (Config.patterns.user (query))
-  if result == ngx.null or not result then
-    return ngx.exit (ngx.HTTP_NOT_FOUND)
-  end
-  result = Json.decode (result)
-  if not result then
-    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
-  end
-  ngx.say (Json.encode {
-    login      = result.login,
-    name       = result.name,
-    company    = result.company,
-    location   = result.location,
-    bio        = result.bio,
-    avatar_url = result.avatar_url,
-  })
-  return ngx.exit (ngx.HTTP_OK)
 end
 
 function Server.my_user ()
@@ -264,7 +244,7 @@ function Server.my_user ()
   return ngx.exit (ngx.HTTP_OK)
 end
 
-function Server.my_repositories ()
+function Server.my_ardoises ()
   local user   = Server.authenticate ()
   local result = {}
   local redis  = Redis:new ()
@@ -276,7 +256,7 @@ function Server.my_repositories ()
       "match", Config.patterns.collaborator ({
         owner = { login = "*" },
         name  = "*",
-      }, { login = user.login }),
+      }, user),
       "count", 100)
     if res == ngx.null or not res then
       break
@@ -291,6 +271,164 @@ function Server.my_repositories ()
     end
   until cursor == "0"
   ngx.say (Json.encode (result))
+  return ngx.exit (ngx.HTTP_OK)
+end
+
+function Server.editor ()
+  local user  = Server.authenticate ()
+  local redis = Redis:new ()
+  assert (redis:connect (Config.redis.host, Config.redis.port))
+  -- check collaborator:
+  local ckey = Config.patterns.collaborator ({
+    owner = { login = ngx.var.owner },
+    name  = ngx.var.name,
+  }, user)
+  local collaboration = redis:get (ckey)
+  if collaboration == ngx.null or not collaboration then
+    return ngx.exit (ngx.HTTP_FORBIDDEN)
+  end
+  collaboration = Json.decode (collaboration)
+  if not collaboration then
+    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
+  end
+  -- get editor:
+  local lock = Config.patterns.lock (Lustache:render ("editor:{{{owner}}}/{{{name}}}/{{{branch}}}", ngx.var))
+  while true do
+    if redis:setnx (lock, "locked") then
+      break
+    end
+    ngx.sleep (0.1)
+  end
+  local key = Config.patterns.editor ({
+    owner = { login = ngx.var.owner },
+    name  = ngx.var.name,
+  }, ngx.var.branch)
+  local editor = redis:get (key)
+  if editor == ngx.null or not editor then
+    xpcall (function ()
+      Http {
+        url    = Lustache:render ("http://{{{host}}}:{{{port}}}/images/create", {
+          host = Config.docker.host,
+          port = Config.docker.port,
+        }),
+        method = "POST",
+        query  = {
+          fromImage = Config.image,
+          tag       = "latest",
+        },
+        timeout = math.huge,
+      }
+      local service, status = Http {
+        url    = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/create", {
+          host = Config.docker.host,
+          port = Config.docker.port,
+        }),
+        method = "POST",
+        body   = {
+          Entrypoint   = "ardoises-editor",
+          Cmd          = {
+            Lustache:render ("{{{owner}}}/{{{name}}}:{{{branch}}}", ngx.var),
+            Config.application.token,
+          },
+          Image        = Config.image,
+          ExposedPorts = {
+            ["8080/tcp"] = {},
+          },
+          HostConfig   = {
+            PublishAllPorts = true,
+          },
+        },
+      }
+      assert (status == 201, status)
+      local created_at = Gettime ()
+      local _
+      _, status = Http {
+        method = "POST",
+        url    = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}/start", {
+          host = Config.docker.host,
+          port = Config.docker.port,
+          id   = service.Id,
+        }),
+      }
+      assert (status == 204, status)
+      local start = Gettime ()
+      local docker_url = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}", {
+        host = Config.docker.host,
+        port = Config.docker.port,
+        id   = service.Id,
+      })
+      redis:set (key, Json.encode {
+        repository = collaboration.repository,
+        docker_id  = service.Id,
+        created_at = created_at,
+      })
+      local info
+      while Gettime () - start <= 120 do
+        info, status = Http {
+          method = "GET",
+          url    = docker_url .. "/json",
+        }
+        assert (status == 200, status)
+        if info.State.Running then
+          local data = ((info.NetworkSettings.Ports ["8080/tcp"] or {}) [1] or {})
+          if data.HostPort then
+            redis:set (key, Json.encode {
+              repository = collaboration.repository,
+              docker_id  = service.Id,
+              created_at = created_at,
+              started_at = Gettime (),
+              editor_url = Lustache:render ("ws://{{{host}}}:{{{port}}}", {
+                host = data.HostIp,
+                port = data.HostPort,
+              }),
+            })
+            return
+          end
+        elseif info.State.Dead then
+          assert (false)
+        else
+          _G.ngx.sleep (1)
+        end
+      end
+    end, function (err)
+      print (err)
+      print (debug.traceback ())
+    end)
+  end
+  redis:del (lock)
+  editor = redis:get (key)
+  redis:set_keepalive ()
+  if editor == ngx.null or not editor then
+    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
+  end
+  editor = Json.decode (editor)
+  if not editor then
+    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
+  end
+  if not editor.editor_url then
+    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
+  end
+  local headers = ngx.req.get_headers ()
+  if headers ["Accept"] == "application/json" then
+    ngx.say (Json.encode {
+      user        = user,
+      permissions = collaboration.collaborator.permissions,
+      repository  = collaboration.repository,
+      branch      = ngx.var.branch,
+      editor_url  = editor.editor_url,
+    })
+  else
+    _G.ngx.header ["Content-type"] = "text/html"
+    ngx.say (Server.template ("index", {
+      user        = user,
+      permissions = collaboration.collaborator.permissions,
+      repository  = collaboration.repository,
+      branch      = ngx.var.branch,
+      editor_url  = editor.editor_url,
+      content     = "{{{editor}}}",
+      code        = "{{{editor-code}}}",
+    }))
+  end
   return ngx.exit (ngx.HTTP_OK)
 end
 
@@ -403,297 +541,3 @@ function Server.webhook ()
 end
 
 return Server
-
--- local Http     = require "ardoises.server.jsonhttp"
--- local Json     = require "rapidjson"
--- local Jwt      = require "jwt"
--- local Mime     = require "mime"
--- local Patterns = require "ardoises.patterns"
---
--- local function authenticate (self)
---   if self.session.user then
---     return true
---   end
---   local authorization = Patterns.authorization:match (self.req.headers ["Authorization"] or "")
---   if not authorization then
---     return nil
---   end
---   local account = Model.accounts:find {
---     token = authorization,
---   }
---   if account then
---     self.session.user = Json.decode (account.contents)
---     self.session.user.token = authorization
---     return true
---   end
---   local user, status = Http {
---     url     = "https://api.github.com/user",
---     method  = "GET",
---     headers = {
---       ["Accept"       ] = "application/vnd.github.v3+json",
---       ["Authorization"] = "token " .. (authorization or ""),
---       ["User-Agent"   ] = Config.application.name,
---     },
---   }
---   if status ~= 200 then
---     return nil
---   end
---   pcall (function ()
---     Model.accounts:create {
---       id       = user.id,
---       token    = authorization,
---       contents = Json.encode (user),
---     }
---   end)
---   assert (Model.accounts:find {
---     id = user.id,
---   })
---   self.session.user = user
---   self.session.user.token = authorization
---   return true
--- end
---
--- app.handle_error = function (self, error, trace)
---   print (error)
---   print (trace)
---   if self.req.headers.accept == "application/json" then
---     return {
---       status = 500,
---       json   = {},
---     }
---   else
---     self.status = 500
---     return {
---       status = 500,
---       layout = "ardoises",
---       render = "error",
---     }
---   end
--- end
---
--- app.handle_404 = function (self)
---   if self.req.headers.accept == "application/json" then
---     return {
---       status = 500,
---       json   = {},
---     }
---   else
---     self.status = 404
---     return {
---       status = 404,
---       layout = "ardoises",
---       render = "error",
---     }
---   end
--- end
---
--- app:match ("/", function (self)
---   if authenticate (self) then
---     local result = {}
---     local request = Et.render ([[
---       permissions.permission, repositories.contents
---       FROM permissions, repositories
---       WHERE permissions.account = <%- account %>
---         AND permissions.repository = repositories.id
---     ]], {
---       account = self.session.user.id,
---     })
---     for _, t in ipairs (Database.select (request)) do
---       local repository = Json.decode (t.contents)
---       repository.description = repository.description == Json.null
---                            and ""
---                             or repository.description
---       if repository.full_name  :match (self.params.search or "")
---       or repository.description:match (self.params.search or "") then
---         result [#result+1] = repository
---         repository.permission       = t.permission
---         repository.user_permissions = {
---           pull = t.permission == "read"
---               or t.permission == "write",
---           push = t.permission == "write",
---         }
---       end
---     end
---     if self.req.headers.accept == "application/json" then
---       return {
---         status = 200,
---         json   = result,
---       }
---     else
---       table.sort (result, function (l, r)
---         return l.permission > r.permission -- write > read
---       end)
---       table.sort (result, function (l, r)
---         return l.pushed_at > r.pushed_at -- last push
---       end)
---       table.sort (result, function (l, r)
---         return l.full_name < r.full_name -- name
---       end)
---       self.search       = self.params.search
---       self.repositories = result
---       return {
---         status = 200,
---         layout = "ardoises",
---         render = "dashboard",
---       }
---     end
---   else
---     if self.req.headers.accept == "application/json" then
---       return {
---         status = 200,
---         json   = {},
---       }
---     else
---       return {
---         status = 200,
---         layout = "ardoises",
---         render = "overview",
---       }
---     end
---   end
--- end)
---
--- app:match ("/login", function (self)
---   return {
---     redirect_to = Et.render ("https://github.com/login/oauth/authorize?state=<%- state %>&scope=<%- scope %>&client_id=<%- client_id %>", {
---       client_id = Config.application.id,
---       state     = Mime.b64 (Csrf.generate_token (self)),
---       scope     = Util.escape "user:email",
---     })
---   }
--- end)
---
--- app:match ("/logout", function (self)
---   self.session.user = nil
---   return { redirect_to = "/" }
--- end)
---
--- app:match ("/register", function (self)
---   self.params.csrf_token = Mime.unb64 (self.params.state)
---   assert (Csrf.validate_token (self))
---   local user, result, status
---   result, status = Http {
---     url     = "https://github.com/login/oauth/access_token",
---     method  = "POST",
---     headers = {
---       ["Accept"    ] = "application/json",
---       ["User-Agent"] = Config.application.name,
---     },
---     body    = {
---       client_id     = Config.application.id,
---       client_secret = Config.application.secret,
---       state         = Config.application.state,
---       code          = self.params.code,
---     },
---   }
---   assert (status == 200, status)
---   user, status = Http {
---     url     = "https://api.github.com/user",
---     method  = "GET",
---     headers = {
---       ["Accept"       ] = "application/vnd.github.v3+json",
---       ["Authorization"] = "token " .. result.access_token,
---       ["User-Agent"   ] = Config.application.name,
---     },
---   }
---   assert (status == 200, status)
---   local account = Model.accounts:find {
---     id = user.id,
---   }
---   if account then
---     account:update {
---       token    = user.token,
---       contents = Json.encode (user),
---     }
---   elseif not account then
---     pcall (function ()
---       Model.accounts:create {
---         id       = user.id,
---         token    = user.token,
---         contents = Json.encode (user),
---       }
---     end)
---     assert (Model.accounts:find {
---       id = user.id,
---     })
---   end
---   self.session.user = user
---   self.session.user.token = result.access_token
---   return { redirect_to = "/" }
--- end)
---
--- app:match ("/editors/", "/editors/:owner/:repository(/:branch)", function (self)
---   if not authenticate (self) then
---     return { redirect_to = "/" }
---   end
---   local repository, status
---   for _, token in ipairs { self.session.user.token, Config.application.token } do
---     repository, status = Http {
---       url     = Et.render ("https://api.github.com/repos/<%- owner %>/<%- repository %>", {
---         owner      = self.params.owner,
---         repository = self.params.repository,
---       }),
---       method  = "GET",
---       headers = {
---         ["Accept"       ] = "application/vnd.github.v3+json",
---         ["Authorization"] = "token " .. tostring (token),
---         ["User-Agent"   ] = Config.application.name,
---       },
---     }
---     if status == 404 then
---       return { status = 404 }
---     end
---     assert (status == 200, status)
---     if not repository.permissions.pull then
---       return { status = 403 }
---     end
---   end
---   if not self.params.branch then
---     return {
---       redirect_to = self:url_for ("/editors/", {
---         owner      = self.params.owner,
---         repository = self.params.repository,
---         branch     = repository.default_branch,
---       })
---     }
---   end
---   local repository_name = Et.render ("<%- owner %>/<%- repository %>:<%- branch %>", self.params)
---   local editor = Model.editors:find {
---     repository = repository_name,
---   }
---   if not editor then
---     local qless = Qless.new (Config.redis)
---     local queue = qless.queues ["ardoises"]
---     queue:put ("ardoises.server.job.editor.start", {
---       owner      = self.params.owner,
---       repository = self.params.repository,
---       branch     = self.params.branch,
---     })
---   end
---   repeat
---     _G.ngx.sleep (1)
---     editor = editor
---          and editor:update ()
---           or Model.editors:find {
---                repository = repository_name,
---              }
---   until editor and editor.url
---   repository.editor_url = editor.url
---   repository.branch     = self.params.branch
---   if self.req.headers.accept == "application/json" then
---     return {
---       status = 200,
---       json   = repository,
---     }
---   else
---     self.user       = self.session.user
---     self.repository = repository
---     return {
---       status = 200,
---       layout = "ardoises",
---       render = "editor",
---     }
---   end
--- end)
---
--- return app

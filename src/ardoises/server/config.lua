@@ -3,13 +3,13 @@ local Url      = require "net.url"
 
 local result = {
   patterns = {
-    lock         = function (what)
+    lock = function (what)
       return Lustache:render ("ardoises:lock:{{{what}}}", { what = what })
     end,
-    user         = function (user)
+    user = function (user)
       return Lustache:render ("ardoises:user:{{{login}}}", user)
     end,
-    repository   = function (repository)
+    repository = function (repository)
       return Lustache:render ("ardoises:repository:{{{owner.login}}}/{{{name}}}", repository)
     end,
     collaborator = function (repository, collaborator)
@@ -18,7 +18,14 @@ local result = {
         collaborator = collaborator,
       })
     end,
+    editor = function (repository, branch)
+      return Lustache:render ("ardoises:editor:{{{repository.owner.login}}}/{{{repository.name}}}/{{{branch}}}", {
+        repository = repository,
+        branch     = branch,
+      })
+    end,
   },
+  image    = assert (os.getenv "ARDOISES_IMAGE"),
   ardoises = assert (Url.parse (os.getenv "ARDOISES_URL")),
   docker   = assert (Url.parse (os.getenv "DOCKER_URL"  )),
   redis    = assert (Url.parse (os.getenv "REDIS_URL"   )),

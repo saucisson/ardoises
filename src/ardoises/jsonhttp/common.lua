@@ -10,9 +10,10 @@ return function (what)
     for name, value in pairs (options.query or {}) do
       url.query [name] = value
     end
-    request.url    = tostring (url)
-    request.method = options.method or "GET"
-    request.body   = options.body   and Json.encode (options.body, {
+    request.timeout = options.timeout
+    request.url     = tostring (url)
+    request.method  = options.method or "GET"
+    request.body    = options.body   and Json.encode (options.body, {
       sort_keys = true,
     })
     request.headers = {}
@@ -44,10 +45,12 @@ return function (what)
       request.url   = nil
       request.query = nil
       request.body  = nil
-      if result.headers ["Link"] and result.status == 304 then
+      if  result.headers
+      and result.headers ["Link"]
+      and result.status == 304 then
         cache = true
       end
-      for link in (result.headers ["Link"] or ""):gmatch "[^,]+" do
+      for link in ((result.headers or {}) ["Link"] or ""):gmatch "[^,]+" do
         request.url = link:match [[<([^>]+)>;%s*rel="next"]] or request.url
       end
     until not request.url

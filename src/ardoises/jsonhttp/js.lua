@@ -9,7 +9,7 @@ return Common (function (request)
     copas = Copas.running,
     co    = coroutine.running (),
   }
-  local response, json, err
+  local response, json, text, err
   if request.headers then
     request.headers ["User-Agent"] = nil
   end
@@ -22,12 +22,13 @@ return Common (function (request)
     cache    = "force-cache",
   })
   local r2 = r1 ["then"] (r1, function (_, r)
-    assert (r.status >= 200 and r.status < 400)
     response = r
+    assert (r.status >= 200 and r.status < 400)
     return response:text ()
   end)
-  local r3 = r2 ["then"] (r2, function (_, text)
-    json = Json.decode (text)
+  local r3 = r2 ["then"] (r2, function (_, t)
+    text = t
+    json = Json.decode (t)
     if running.copas then
       Copas.wakeup (running.copas)
     else
@@ -55,13 +56,10 @@ return Common (function (request)
   else
     coroutine.yield ()
   end
-  if json then
-    return {
-      status  = response.status,
-      headers = response.headers,
-      body    = json,
-    }
-  else
-    return nil, err
-  end
+  assert (not err, err)
+  return {
+    status  = response.status,
+    headers = response.headers,
+    body    = json or text,
+  }
 end)

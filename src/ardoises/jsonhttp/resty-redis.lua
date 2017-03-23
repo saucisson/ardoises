@@ -28,7 +28,7 @@ return Common (function (request, cache)
     end
   end
   local client = Http.new ()
-  client:set_timeout (1000) -- milliseconds
+  client:set_timeout (request.timeout or 1000) -- milliseconds
   local result = assert (client:request_uri (request.url, request))
   ngx.log (ngx.NOTICE, Lustache:render ("{{{status}}} {{{method}}} {{{url}}}", {
     method = request.method,

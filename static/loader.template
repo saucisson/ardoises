@@ -346,7 +346,7 @@ local co = coroutine.create (function ()
   xpcall (function ()
     Copas = require "copas"
     Copas.addthread (function ()
-      {{{dashboard-code}}}
+      {{{code}}}
     end)
     Copas.addthread (function ()
       while true do

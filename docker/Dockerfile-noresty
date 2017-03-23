@@ -6,7 +6,6 @@ RUN apk add --no-cache --virtual .build-deps \
         build-base \
         cmake \
         curl \
-        git \
         make \
         openssl-dev \
         perl \
@@ -18,6 +17,7 @@ RUN apk add --no-cache --virtual .build-deps \
         dockerize \
  && apk add --no-cache \
         bash \
+        git \
         libstdc++ \
         openssl \
  && pip3 install hererocks \

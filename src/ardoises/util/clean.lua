@@ -38,49 +38,60 @@ local redis  = assert (Redis.connect (Config.redis.host, Config.redis.port))
 local cursor = "0"
 local keys
 
+print "Cleaning redis cache..."
+repeat
+  cursor, keys = unpack (redis:scan (cursor, {
+    match = "ardoises:cache:*",
+    count = 100,
+  }))
+  for _, key in ipairs (keys) do
+    redis:del (key)
+  end
+until cursor == "0"
+
+cursor = "0"
 while true do
   print "Cleaning..."
   local start = Gettime ()
   xpcall (function ()
     cursor, keys = unpack (redis:scan (cursor, {
-        match = Config.patterns.repository {
-          name  = "*",
+        match = Config.patterns.editor ({
           owner = { login = "*" },
-        },
+          name  = "*",
+        }, "*"),
         count = 100,
     }))
     for _, key in ipairs (keys) do
-      redis:watch (key)
-      local repository = redis:get (key)
-      repository = repository and Json.decode (repository)
-      redis:multi ()
-      if repository and repository.docker_url then
+      local editor = redis:get (key)
+      editor = editor and Json.decode (editor)
+      if editor
+      and (editor.started_at
+        or not editor.created_at
+        or Gettime () - editor.created_at > 120) then
+        local docker_url = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}", {
+          host = Config.docker.host,
+          port = Config.docker.port,
+          id   = editor.docker_id,
+        })
         local info, status = Http {
           method = "GET",
-          url    = repository.docker_url .. "/json",
+          url    = docker_url .. "/json",
         }
         if status == 200 and not info.State.Running then
-          print (Lustache:render ("  ...cleaning docker for {{{repository}}}.", {
-            repository = repository.full_name,
-          }))
-          _, status = Http {
+          print (Lustache:render ("  ...cleaning docker for {{{repository.full_name}}}.", editor))
+          Http {
             method = "DELETE",
-            url    = repository.docker_url,
+            url    = editor.docker_url,
             query  = {
               v     = true,
               force = true,
             },
           }
-          if status == 204 or status == 404 then
-            repository.docker_url = nil
-            redis:set (key, Json.encode (repository))
-          end
+          redis:del (key)
         elseif status == 404 then
-          repository.docker_url = nil
-          redis:set (key, Json.encode (repository))
+          redis:del (key)
         end
       end
-      assert (redis:exec ())
     end
   end, function (err)
     print (err, debug.traceback ())

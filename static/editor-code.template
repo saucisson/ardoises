@@ -1,0 +1,122 @@
+local Editor = _G.js.global.document:getElementById "editor"
+Editor.innerHTML = [[
+  <h1 class="text-primary">
+    <i class="fully-centered fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </h1>
+]]
+
+local Copas  = require "copas"
+local Client = require "ardoises.client"
+local Et     = require "etlua"
+local client = Client {
+  server = "http://localhost:8080",
+  tokens = {
+    ardoises = "{{{user.tokens.ardoises}}}",
+    github   = "{{{user.tokens.github}}}",
+  },
+}
+local ardoise
+for _, a in ipairs (client:ardoises ()) do
+  if  a.repository.full_name == "{{{repository.full_name}}}"
+  and a.branch == "{{{branch}}}" then
+    ardoise = a
+    break
+  end
+end
+assert (ardoise)
+local editor = ardoise:edit ()
+
+Editor.innerHTML = [[
+  <section>
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-md-2">
+          <div class="list-group">
+            <div class="list-group-item row">
+              <div class="input-group">
+                <span class="input-xlarge uneditable-input">{{repository.owner.login}}/{{repository.name}}:{{branch}}</span>
+                <span class="input-group-addon js-gitter-toggle-chat-button"><i class="fa fa-comments fa-inverse" aria-hidden="true"></i></span>
+              </div>
+            </div>
+          </div>
+          <div id="layers"></div>
+        </div>
+        <div id="ardoise" class="col-md-10">
+          <h1 class="text-primary">
+            <i class="fully-centered fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+          </h1>
+        </div>
+      </div>
+    </div>
+  </section>
+]]
+
+local Layers  = _G.js.global.document:getElementById "layers"
+local Ardoise = _G.js.global.document:getElementById "ardoise"
+
+local renderers = {
+  layers  = nil,
+  ardoise = nil,
+}
+renderers.layers = Copas.addthread (function ()
+  local layers = {}
+  for name, module in editor:list () do
+    layers [#layers+1] = {
+      id     = #layers+1,
+      name   = name,
+      module = module,
+    }
+  end
+  table.sort (layers, function (l, r) return l.name < r.name end)
+  Layers.innerHTML = Et.render ([[
+    <div class="list-group">
+      <div class="list-group-item row">
+        <div class="input-group">
+          <input id="layer-name" type="text" class="form-control" placeholder="Module" />
+          <span id="layer-create" class="input-group-addon"><i class="fa fa-plus fa-inverse" aria-hidden="true"></i></span>
+        </div>
+      </div>
+      <% for _, layer in ipairs (layers) do %>
+        <div class="list-group-item row">
+          <div class="input-group">
+            <span id="layer-get-<%- layer.id %>" class="input-xlarge uneditable-input"><%= layer.name %></span>
+            <span id="layer-delete-<%- layer.id %>" class="input-group-addon"><i class="fa fa-trash fa-inverse" aria-hidden="true"></i></span>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  ]], {
+    layers = layers,
+  })
+  do
+    local link = _G.js.global.document:getElementById "layer-create"
+    link.onclick = function ()
+      local name = _G.js.global.document:getElementById "layer-name".value
+      Copas.addthread (function ()
+        editor:create (name)
+        Copas.wakeup (renderers.layers)
+      end)
+      return false
+    end
+  end
+  for _, layer in ipairs (layers) do
+    local link = _G.js.global.document:getElementById ("layer-get-" .. tostring (layer.id))
+    link.onclick = function ()
+      Copas.addthread (function ()
+        Copas.wakeup (renderers.ardoise)
+      end)
+      return false
+    end
+  end
+  for _, layer in ipairs (layers) do
+    local link = _G.js.global.document:getElementById ("layer-delete-" .. tostring (layer.id))
+    link.onclick = function ()
+      Copas.addthread (function ()
+        editor:delete (layer.name)
+        Copas.wakeup (renderers.layers)
+        Copas.wakeup (renderers.ardoise)
+      end)
+      return false
+    end
+  end
+end)

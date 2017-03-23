@@ -1,5 +1,5 @@
-local dashboard = _G.js.global.document:getElementById "dashboard"
-dashboard.innerHTML = [[
+local Dashboard = _G.js.global.document:getElementById "dashboard"
+Dashboard.innerHTML = [[
   <h1 class="text-primary">
     <i class="fully-centered fa fa-spinner fa-pulse fa-5x fa-fw"></i>
   </h1>
@@ -10,12 +10,15 @@ local Client = require "ardoises.client"
 local Et     = require "etlua"
 local client = Client {
   server = "http://localhost:8080",
-  token  = "{{user.authentication}}",
+  tokens = {
+    ardoises = "{{{user.tokens.ardoises}}}",
+    github   = "{{{user.tokens.github}}}",
+  },
 }
-local data = client:repositories ()
+local ardoises = client:ardoises ()
 local output
 
-dashboard.innerHTML = [[
+Dashboard.innerHTML = [[
   <div class="container">
     <div class="row">
       <div class="col-md-4">
@@ -35,26 +38,26 @@ dashboard.innerHTML = [[
       </div>
     </div>
   </div>
-  <section id="repositories">
+  <section id="ardoises">
   </section>
 ]]
 
-local input        = _G.js.global.document:getElementById "search"
-local repositories = _G.js.global.document:getElementById "repositories"
+local Input    = _G.js.global.document:getElementById "search"
+local Ardoises = _G.js.global.document:getElementById "ardoises"
 
 Copas.addthread (function ()
   while true do
     Copas.sleep (30) -- seconds
-    data = client:repositories ()
+    ardoises = client:ardoises ()
     Copas.wakeup (output)
   end
 end)
 
 Copas.addthread (function ()
   while true do
-    local back = input.value
+    local back = Input.value
     Copas.sleep (0.5)
-    if back ~= input.value then
+    if back ~= Input.value then
       Copas.wakeup (output)
     end
   end
@@ -63,26 +66,26 @@ end)
 output = Copas.addthread (function ()
   while true do
     local filtered = {}
-    for _, t in ipairs (data) do
-      if t.repository.full_name:match (input.value)
-      or (t.repository.description or ""):match (input.value) then
-        filtered [#filtered+1] = t
+    for _, ardoise in ipairs (ardoises) do
+      if ardoise.repository.full_name:match (Input.value)
+      or (ardoise.repository.description or ""):match (Input.value) then
+        filtered [#filtered+1] = ardoise
       end
     end
-    repositories.innerHTML = Et.render ([[
+    Ardoises.innerHTML = Et.render ([[
       <div class="container">
         <div class="list-group">
-        <% for _, t in ipairs (data) do %>
+        <% for _, ardoise in ipairs (ardoises) do %>
           <div class="list-group-item row">
-            <a href="/editors/<%- t.repository.owner.login %>/<%- t.repository.name %>/<%- t.branch %>"
-              aria-label="Editor for <%- t.repository.owner.login %>/<%- t.repository.name %>:<%- t.branch %>">
+            <a href="/editors/<%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>/<%- ardoise.branch %>"
+              aria-label="Editor for <%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>:<%- ardoise.branch %>">
               <div class="col-md-10">
-                <h4 class="list-group-item-heading"><%= t.repository.full_name %></h4>
-                <p class="list-group-item-text"><%= t.repository.description or ""%></p>
+                <h4 class="list-group-item-heading"><%= ardoise.repository.full_name %></h4>
+                <p class="list-group-item-text"><%= ardoise.repository.description or ""%></p>
               </div>
               <div class="col-md-2">
-                <img class="circle" src="<%- t.collaborator.avatar_url %>"/>
-                <% if t.collaborator.permissions.push then %>
+                <img class="circle" src="<%- ardoise.collaborator.avatar_url %>"/>
+                <% if ardoise.collaborator.permissions.push then %>
                 <span class="fa-stack fa-lg">
                   <i class="fa fa-pencil fa-flip-horizontal fa-stack-1x"></i>
                 </span>
@@ -99,7 +102,7 @@ output = Copas.addthread (function ()
         </div>
       </div>
     ]], {
-      data = filtered,
+      ardoises = filtered,
     })
     Copas.sleep (-math.huge)
   end

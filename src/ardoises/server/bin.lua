@@ -1,6 +1,5 @@
 #! /usr/bin/env lua
 
-local Http     = require "ardoises.jsonhttp.socket-redis"
 local Lustache = require "lustache"
 local Setenv   = require "posix.stdlib".setenv
 local Socket   = require "socket"
@@ -14,17 +13,6 @@ os.execute (Lustache:render ([[
   docker = os.getenv "DOCKER_URL",
   redis  = os.getenv "REDIS_URL",
 }))
-
-print "Getting the docker image name..."
-local info, status = Http {
-  method = "GET",
-  url    = Lustache:render ("{{{docker}}}/containers/{{{id}}}/json", {
-    docker = os.getenv "DOCKER_URL":gsub ("^tcp://", "http://"),
-    id     = os.getenv "HOSTNAME",
-  }),
-}
-assert (status == 200, status)
-Setenv ("ARDOISES_IMAGE", info.Config.Image)
 
 -- FIXME:  nginx resolver does not seem to work within docker-compose,
 -- so we convert all service hostnames to IPs before launching the server.
