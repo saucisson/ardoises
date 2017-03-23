@@ -20,7 +20,7 @@ local Patterns = {}
 Lpeg.locale (Patterns)
 
 Patterns.authorization =
-    Lpeg.P"Token:"
+    Lpeg.P"token:"
   * Lpeg.S"\r\n\f\t "^1
   * ((Patterns.alnum + Lpeg.S "-_.")^1 / tostring)
 
@@ -67,7 +67,7 @@ function Server.authenticate (noexit)
   local cookie  = Cookie:new ()
   local field   = cookie:get "Ardoises-Token"
   local header  = field
-              and "Token: " .. field
+              and "token: " .. field
                or headers ["Authorization"]
   if not header then
     return not noexit and ngx.exit (ngx.HTTP_UNAUTHORIZED) or nil
@@ -76,15 +76,15 @@ function Server.authenticate (noexit)
   if not token then
     return not noexit and ngx.exit (ngx.HTTP_UNAUTHORIZED) or nil
   end
-  token = Jwt:verify (Config.application.secret, token)
-  if not token then
+  local jwt = Jwt:verify (Config.application.secret, token)
+  if not jwt then
     return not noexit and ngx.exit (ngx.HTTP_UNAUTHORIZED) or nil
   end
   local redis = Redis:new ()
   if not redis:connect (Config.redis.host, Config.redis.port) then
     return not noexit and ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR) or nil
   end
-  local user = redis:get (Config.patterns.user (token.payload))
+  local user = redis:get (Config.patterns.user (jwt.payload))
   redis:set_keepalive ()
   if user == ngx.null or not user then
     return not noexit and ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR) or nil
@@ -93,6 +93,7 @@ function Server.authenticate (noexit)
   if not user then
     return not noexit and ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR) or nil
   end
+  user.authentication = token
   return user
 end
 

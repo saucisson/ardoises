@@ -36,8 +36,13 @@ function Mt.__call (_, options)
   if type (options.token) ~= "string" then
     return nil, "argument.token must be an authentication token"
   end
-  local server = Url.parse (options.server)
-  local token  = options.token
+  local server  = Url.parse (options.server)
+  local token   = options.token
+  local headers = {
+    ["Accept"       ] = "application/json",
+    ["User-Agent"   ] = Client.user_agent,
+    ["Authorization"] = "token: " .. options.token,
+  }
   local user, status = Http {
     url      =  Url.build {
       scheme = server.scheme,
@@ -46,19 +51,16 @@ function Mt.__call (_, options)
       path   = "/my/user",
     },
     method   = "GET",
-    headers  = {
-      ["Accept"       ] = "application/json",
-      ["User-Agent"   ] = Client.user_agent,
-      ["Authorization"] = "token " .. token,
-    },
+    headers  = headers,
   }
   if status ~= 200 then
     return nil, "authentication failure: " .. tostring (status)
   end
   return setmetatable ({
-    server    = server,
-    token     = token,
-    user      = user,
+    headers = headers,
+    server  = server,
+    token   = token,
+    user    = user,
   }, Client)
 end
 
@@ -77,11 +79,7 @@ function Client.repositories (client)
       path   = "/my/repositories",
     },
     method  = "GET",
-    headers = {
-      ["Accept"       ] = "application/json",
-      ["User-Agent"   ] = Client.user_agent,
-      ["Authorization"] = "token " .. client.token,
-    },
+    headers = client.headers,
   }
   if status ~= 200 then
     return nil, "unable to obtain repositories: " .. tostring (status)

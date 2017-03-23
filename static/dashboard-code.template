@@ -10,7 +10,7 @@ local Client = require "ardoises.client"
 local Et     = require "etlua"
 local client = Client {
   server = "http://localhost:8080",
-  token  = "{{user.token}}",
+  token  = "{{user.authentication}}",
 }
 local data   = client:repositories ()
 
