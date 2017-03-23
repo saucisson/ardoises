@@ -35,19 +35,19 @@ end
 
 local Server = {}
 
-function Server.include (what)
-  local file, err = io.open ("/static/" .. what .. ".template", "r")
-  if not file then
-    print (err)
-    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
-  end
-  local template = assert (file:read "*a")
-  assert (file:close ())
-  return template
-end
-
 function Server.template (what, data)
   data = data or {}
+  setmetatable (data, {
+    __index = function (_, key)
+      local file = io.open ("/static/" .. key .. ".template", "r")
+      if not file then
+        return nil
+      end
+      local template = assert (file:read "*a")
+      assert (file:close ())
+      return template
+    end,
+  })
   local file, err = io.open ("/static/" .. what .. ".template", "r")
   if not file then
     print (err)
@@ -100,10 +100,7 @@ function Server.root ()
   local user = Server.authenticate (true)
   _G.ngx.header ["Content-type"] = "text/html"
   ngx.say (Server.template ("index", {
-    user    = user,
-    content = user
-          and Server.include "dashboard"
-           or Server.include "overview"
+    user = user,
   }))
   return ngx.exit (ngx.HTTP_OK)
 end

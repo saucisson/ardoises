@@ -102,7 +102,12 @@
       </div>
     </div>
 
-    {{{content}}}
+    {{#user}}
+    {{{dashboard}}}
+    {{/user}}
+    {{^user}}
+    {{{overview}}}
+    {{/user}}
 
     <nav class="navbar navbar-fixed-bottom">
       <div class="container">

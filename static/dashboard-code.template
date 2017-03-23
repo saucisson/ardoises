@@ -1,0 +1,46 @@
+local dashboard = _G.js.global.document:getElementById "dashboard"
+dashboard.innerHTML = [[
+  <h1 class="text-primary">
+    <i class="fully-centered fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </h1>
+]]
+
+local Client = require "ardoises.client"
+local Et     = require "etlua"
+local client = Client {
+  server = "http://localhost:8080",
+  token  = "{{user.token}}",
+}
+local data = client:repositories ()
+dashboard.innerHTML = Et.render ([[
+  <div class="container">
+    <div class="list-group">
+    <% for _, t in ipairs (data) do %>
+      <div class="list-group-item row">
+        <a href="/editors/<%- t.repository.owner.login %>/<%- t.repository.name %>/<%- t.branch %>"
+          aria-label="Editor for <%- t.repository.owner.login %>/<%- t.repository.name %>:<%- t.branch %>">
+          <div class="col-md-10">
+            <h4 class="list-group-item-heading"><%= t.repository.full_name %></h4>
+            <p class="list-group-item-text"><%= t.repository.description or ""%></p>
+          </div>
+          <div class="col-md-2">
+            <img class="circle" src="<%- t.collaborator.avatar_url %>"/>
+            <% if t.collaborator.permissions.push then %>
+            <span class="fa-stack fa-lg">
+              <i class="fa fa-pencil fa-flip-horizontal fa-stack-1x"></i>
+            </span>
+            <% else %>
+            <span class="fa-stack fa-lg">
+              <i class="fa fa-pencil fa-flip-horizontal fa-stack-1x"></i>
+              <i class="fa fa-ban fa-stack-2x text-danger"></i>
+            </span>
+            <% end %>
+          </div>
+        </a>
+      </div>
+    <% end %>
+    </div>
+  </div>
+]], {
+  data = data,
+})

@@ -5,22 +5,6 @@ function _G.print (...)
   Adapter.window.console:log (...)
 end
 
--- function _G.require (name)
---   if package.loaded [name] then
---     return package.loaded [name]
---   end
---   local reasons = {}
---   for _, searcher in ipairs (package.searchers) do
---     local loader, value = searcher (name)
---     if type (loader) == "function" then
---       return loader (value)
---     elseif type (loader) == "string" then
---       reasons [#reasons+1] = loader
---     end
---   end
---   error ("module " .. name .. " not found:" .. table.concat (reasons))
--- end
-
 package.preload ["jit"] = function ()
   return false
 end
