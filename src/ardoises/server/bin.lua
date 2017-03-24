@@ -23,8 +23,8 @@ for _, address in ipairs { "DOCKER_URL", "REDIS_URL" } do
 end
 
 print "Starting server..."
-assert (os.execute ([[
+assert (os.execute [[
   nginx \
     -p /usr/local/openresty/nginx/ \
     -c /etc/nginx/nginx.conf
-]]))
+]])

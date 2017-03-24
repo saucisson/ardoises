@@ -53,6 +53,7 @@ build = {
   install = {
     bin = {
       ["ardoises-editor"    ] = "src/ardoises/editor/bin.lua",
+      ["ardoises-cert"      ] = "src/ardoises/server/cert",
       ["ardoises-server"    ] = "src/ardoises/server/bin.lua",
       ["ardoises-clean"     ] = "src/ardoises/util/clean.lua",
       ["ardoises-invitation"] = "src/ardoises/util/invitation.lua",

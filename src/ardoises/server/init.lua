@@ -34,6 +34,33 @@ local function tohex (b)
   return x
 end
 
+local function wrap (f)
+  return function ()
+    local redis = Redis:new ()
+    if not redis:connect (Config.redis.host, Config.redis.port) then
+      return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
+    end
+    local ok, result = xpcall (function ()
+      return f {
+        redis = redis,
+      }
+    end, function (err)
+      print (tostring (err))
+      print (debug.traceback ())
+    end)
+    redis:close ()
+    if not ok then
+      return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
+    elseif not result then
+      return
+    elseif result.redirect then
+      return ngx.redirect (result.redirect)
+    else
+      return ngx.exit (result.status)
+    end
+  end
+end
+
 local Server = {}
 
 function Server.template (what, data)
@@ -49,11 +76,7 @@ function Server.template (what, data)
       return template
     end,
   })
-  local file, err = io.open ("/static/" .. what .. ".template", "r")
-  if not file then
-    print (err)
-    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
-  end
+  local file     = assert (io.open ("/static/" .. what .. ".template", "r"))
   local template = assert (file:read "*a")
   assert (file:close ())
   repeat
@@ -63,7 +86,7 @@ function Server.template (what, data)
   return template
 end
 
-function Server.authenticate (noexit)
+function Server.authenticate (context)
   local headers = ngx.req.get_headers ()
   local cookie  = Cookie:new ()
   local field   = cookie:get "Ardoises-Token"
@@ -71,43 +94,42 @@ function Server.authenticate (noexit)
               and "token " .. field
                or headers ["Authorization"]
   if not header then
-    return not noexit and ngx.exit (ngx.HTTP_UNAUTHORIZED) or nil
+    return nil, ngx.HTTP_UNAUTHORIZED
   end
   local token = Patterns.authorization:match (header)
   if not token then
-    return not noexit and ngx.exit (ngx.HTTP_UNAUTHORIZED) or nil
+    return nil, ngx.HTTP_UNAUTHORIZED
   end
   local jwt = Jwt:verify (Config.application.secret, token)
   if not jwt then
-    return not noexit and ngx.exit (ngx.HTTP_UNAUTHORIZED) or nil
+    return nil, ngx.HTTP_UNAUTHORIZED
   end
-  local redis = Redis:new ()
-  if not redis:connect (Config.redis.host, Config.redis.port) then
-    return not noexit and ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR) or nil
-  end
-  local user = redis:get (Config.patterns.user (jwt.payload))
-  redis:set_keepalive ()
+  local user = context.redis:get (Config.patterns.user (jwt.payload))
   if user == ngx.null or not user then
-    return not noexit and ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR) or nil
+    return nil, ngx.HTTP_INTERNAL_SERVER_ERROR
   end
   user = Json.decode (user)
   if not user then
-    return not noexit and ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR) or nil
+    return nil, ngx.HTTP_INTERNAL_SERVER_ERROR
   end
   return user
 end
 
-function Server.root ()
-  local user = Server.authenticate (true)
+Server.root = wrap (function (context)
+  local user = Server.authenticate (context)
+  context.redis:close ()
   if user then
-    return ngx.redirect "/dashboard"
+    return { redirect = "/dashboard" }
   else
-    return ngx.redirect "/overview"
+    return { redirect = "/overview" }
   end
-end
+end)
 
-function Server.dashboard ()
-  local user = Server.authenticate ()
+Server.dashboard = wrap (function (context)
+  local user, err = Server.authenticate (context)
+  if not user then
+    return { status = err }
+  end
   _G.ngx.header ["Content-type"] = "text/html"
   ngx.say (Server.template ("index", {
     server  = Url.build (Config.ardoises),
@@ -115,21 +137,21 @@ function Server.dashboard ()
     content = "{{{dashboard}}}",
     code    = "{{{dashboard-code}}}",
   }))
-  return ngx.exit (ngx.HTTP_OK)
-end
+  return { status = ngx.HTTP_OK }
+end)
 
-function Server.overview ()
-  local user = Server.authenticate (true)
+Server.overview = wrap (function (context)
+  local user = Server.authenticate (context)
   _G.ngx.header ["Content-type"] = "text/html"
   ngx.say (Server.template ("index", {
     server  = Url.build (Config.ardoises),
     user    = user,
     content = "{{{overview}}}"
   }))
-  return ngx.exit (ngx.HTTP_OK)
-end
+  return { status = ngx.HTTP_OK }
+end)
 
-function Server.login ()
+Server.login = wrap (function ()
   local url           = Url.parse "https://github.com/login/oauth/authorize"
   url.query.client_id = Config.application.id
   url.query.scope     = "user:email admin:repo_hook"
@@ -142,10 +164,10 @@ function Server.login ()
       csrf = true,
     },
   })
-  return ngx.redirect (tostring (url))
-end
+  return { redirect  = Url.build (url) }
+end)
 
-function Server.logout ()
+Server.logout = wrap (function ()
   local cookie = Cookie:new ()
   cookie:set {
     key      = "Ardoises-Token",
@@ -155,21 +177,19 @@ function Server.logout ()
     secure   = false,
     samesite = "Strict",
   }
-  return ngx.redirect "/"
-end
+  return { redirect = "/" }
+end)
 
-function Server.register ()
+Server.register = wrap (function (context)
   local query = ngx.req.get_uri_args ()
   local token = Jwt:verify (Config.application.secret, query.state)
   if not token
   or not token.payload
   or not token.payload.csrf then
-    return ngx.exit (ngx.HTTP_UNAUTHORIZED)
+    return { status = ngx.HTTP_UNAUTHORIZED }
   end
-  local redis = Redis:new ()
-  assert (redis:connect (Config.redis.host, Config.redis.port))
   while true do
-    if redis:setnx (Config.patterns.lock "register", "locked") then
+    if context.redis:setnx (Config.patterns.lock "register", "locked") then
       break
     end
     ngx.sleep (0.1)
@@ -190,10 +210,9 @@ function Server.register ()
       code          = query.code,
     },
   }
-  redis:del (Config.patterns.lock "register")
-  if status ~= ngx.HTTP_OK
-  or not result.access_token then
-    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
+  context.redis:del (Config.patterns.lock "register")
+  if status ~= ngx.HTTP_OK or not result.access_token then
+    return { status = ngx.HTTP_INTERNAL_SERVER_ERROR }
   end
   user, status = Http {
     url     = "https://api.github.com/user",
@@ -205,7 +224,7 @@ function Server.register ()
     },
   }
   if status ~= ngx.HTTP_OK then
-    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
+    return { status = ngx.HTTP_INTERNAL_SERVER_ERROR }
   end
   local key = Config.patterns.user (user)
   user.tokens = {
@@ -220,7 +239,7 @@ function Server.register ()
       },
     }),
   }
-  redis:set (key, Json.encode (user))
+  context.redis:set (key, Json.encode (user))
   local cookie = Cookie:new ()
   cookie:set {
     expires  = nil,
@@ -230,11 +249,14 @@ function Server.register ()
     key      = "Ardoises-Token",
     value    = user.tokens.ardoises,
   }
-  return ngx.redirect "/"
-end
+  return { redirect = "/" }
+end)
 
-function Server.my_user ()
-  local user = Server.authenticate ()
+Server.my_user = wrap (function (context)
+  local user, err = Server.authenticate (context)
+  if not user then
+    return { status = err }
+  end
   ngx.say (Json.encode {
     login      = user.login,
     name       = user.name,
@@ -243,18 +265,19 @@ function Server.my_user ()
     bio        = user.bio,
     avatar_url = user.avatar_url,
   })
-  return ngx.exit (ngx.HTTP_OK)
-end
+  return { status = ngx.HTTP_OK }
+end)
 
-function Server.my_ardoises ()
-  local user   = Server.authenticate ()
+Server.my_ardoises = wrap (function (context)
+  local user, err = Server.authenticate (context)
+  if not user then
+    return { status = err }
+  end
   local result = {}
-  local redis  = Redis:new ()
-  assert (redis:connect (Config.redis.host, Config.redis.port))
   -- find collaborators in database:
   local cursor = 0
   repeat
-    local res = redis:scan (cursor,
+    local res = context.redis:scan (cursor,
       "match", Config.patterns.collaborator ({
         owner = { login = "*" },
         name  = "*",
@@ -266,49 +289,44 @@ function Server.my_ardoises ()
     cursor = res [1]
     local keys = res [2]
     for _, key in ipairs (keys) do
-      local entry = redis:get (key)
+      local entry = context.redis:get (key)
       if entry ~= ngx.null and entry then
         entry = Json.decode (entry)
-        local repository = redis:get (Config.patterns.repository (entry.repository))
+        local repository = context.redis:get (Config.patterns.repository (entry.repository))
         entry.repository = Json.decode (repository)
         result [#result+1] = entry
       end
     end
   until cursor == "0"
   ngx.say (Json.encode (result))
-  return ngx.exit (ngx.HTTP_OK)
-end
+  return { status = ngx.HTTP_OK }
+end)
 
-function Server.editor ()
-  local user  = Server.authenticate ()
-  local redis = Redis:new ()
-  assert (redis:connect (Config.redis.host, Config.redis.port))
+Server.editor = wrap (function (context)
+  local user, err = Server.authenticate (context)
+  if not user then
+    return { status = err }
+  end
   -- check collaborator:
   local ckey = Config.patterns.collaborator ({
     owner = { login = ngx.var.owner },
     name  = ngx.var.name,
   }, user)
-  local collaboration = redis:get (ckey)
+  local collaboration = context.redis:get (ckey)
   if collaboration == ngx.null or not collaboration then
-    return ngx.exit (ngx.HTTP_FORBIDDEN)
+    return { status = ngx.HTTP_FORBIDDEN }
   end
-  collaboration = Json.decode (collaboration)
-  if not collaboration then
-    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
-  end
+  collaboration = assert (Json.decode (collaboration))
   -- get repository:
-  local repository = redis:get (Config.patterns.repository (collaboration.repository))
+  local repository = context.redis:get (Config.patterns.repository (collaboration.repository))
   if repository == ngx.null or not repository then
-    return ngx.exit (ngx.HTTP_FORBIDDEN)
+    return { status = ngx.HTTP_FORBIDDEN }
   end
-  repository = Json.decode (repository)
-  if not repository then
-    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
-  end
+  repository = assert (Json.decode (repository))
   -- get editor:
   local lock = Config.patterns.lock (Lustache:render ("editor:{{{owner}}}/{{{name}}}/{{{branch}}}", ngx.var))
   while true do
-    if redis:setnx (lock, "locked") then
+    if context.redis:setnx (lock, "locked") then
       break
     end
     ngx.sleep (0.1)
@@ -317,127 +335,120 @@ function Server.editor ()
     owner = { login = ngx.var.owner },
     name  = ngx.var.name,
   }, ngx.var.branch)
-  local editor = redis:get (key)
+  local editor = context.redis:get (key)
   if editor == ngx.null or not editor then
-    xpcall (function ()
-      local info, status = Http {
-        url    = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}/json", {
-          host = Config.docker.host,
-          port = Config.docker.port,
-          id   = Config.docker_id,
-        }),
-        method = "GET",
-      }
-      assert (status == 200)
-      Http {
-        url    = Lustache:render ("http://{{{host}}}:{{{port}}}/images/create", {
-          host = Config.docker.host,
-          port = Config.docker.port,
-        }),
-        method = "POST",
-        query  = {
-          fromImage = Config.image,
-          tag       = "latest",
+    local info, status = Http {
+      url    = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}/json", {
+        host = Config.docker.host,
+        port = Config.docker.port,
+        id   = Config.docker_id,
+      }),
+      method = "GET",
+    }
+    assert (status == ngx.HTTP_OK, status)
+    Http {
+      url    = Lustache:render ("http://{{{host}}}:{{{port}}}/images/create", {
+        host = Config.docker.host,
+        port = Config.docker.port,
+      }),
+      method = "POST",
+      query  = {
+        fromImage = Config.image,
+        tag       = "latest",
+      },
+      timeout = 120,
+    }
+    local service
+    service, status = Http {
+      url     = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/create", {
+        host = Config.docker.host,
+        port = Config.docker.port,
+      }),
+      method  = "POST",
+      timeout = 120,
+      body    = {
+        Entrypoint   = "ardoises-editor",
+        Cmd          = {
+          Lustache:render ("{{{owner}}}/{{{name}}}:{{{branch}}}", ngx.var),
+          Config.application.token,
         },
-        timeout = math.huge,
-      }
-      local service
-      service, status = Http {
-        url    = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/create", {
-          host = Config.docker.host,
-          port = Config.docker.port,
-        }),
-        method = "POST",
-        body   = {
-          Entrypoint   = "ardoises-editor",
-          Cmd          = {
-            Lustache:render ("{{{owner}}}/{{{name}}}:{{{branch}}}", ngx.var),
-            Config.application.token,
-          },
-          Image        = Config.image,
-          ExposedPorts = {
-            ["8080/tcp"] = {},
-          },
-          HostConfig   = {
-            PublishAllPorts = false,
-            NetworkMode     = info.HostConfig.NetworkMode,
-          },
+        Image        = Config.image,
+        ExposedPorts = {
+          ["8080/tcp"] = {},
         },
-      }
-      assert (status == 201, status)
-      local created_at = Gettime ()
-      local _
-      _, status = Http {
-        method = "POST",
-        url    = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}/start", {
-          host = Config.docker.host,
-          port = Config.docker.port,
-          id   = service.Id,
-        }),
-      }
-      assert (status == 204, status)
-      local start = Gettime ()
-      local docker_url = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}", {
+        HostConfig   = {
+          PublishAllPorts = false,
+          NetworkMode     = info.HostConfig.NetworkMode,
+        },
+      },
+    }
+    assert (status == ngx.HTTP_CREATED, status)
+    local created_at = Gettime ()
+    local _
+    _, status = Http {
+      method  = "POST",
+      timeout = 120,
+      url     = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}/start", {
         host = Config.docker.host,
         port = Config.docker.port,
         id   = service.Id,
-      })
-      redis:set (key, Json.encode {
-        repository = collaboration.repository,
-        docker_id  = service.Id,
-        created_at = created_at,
-      })
-      while Gettime () - start <= 120 do
-        info, status = Http {
-          method = "GET",
-          url    = docker_url .. "/json",
-        }
-        assert (status == 200, status)
-        if info.State.Running then
-          local _, network = next (info.NetworkSettings.Networks)
-          redis:set (key, Json.encode {
-            repository = collaboration.repository,
-            docker_id  = service.Id,
-            created_at = created_at,
-            started_at = Gettime (),
-            target_url = Lustache:render ("http://{{{host}}}:8080", {
-              host = network.IPAddress,
+      }),
+    }
+    assert (status == ngx.HTTP_NO_CONTENT, status)
+    local start = Gettime ()
+    local docker_url = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}", {
+      host = Config.docker.host,
+      port = Config.docker.port,
+      id   = service.Id,
+    })
+    context.redis:set (key, Json.encode {
+      repository = collaboration.repository,
+      docker_id  = service.Id,
+      created_at = created_at,
+    })
+    while Gettime () - start <= 120 do
+      info, status = Http {
+        method = "GET",
+        url    = docker_url .. "/json",
+      }
+      assert (status == ngx.HTTP_OK, status)
+      if info.State.Running then
+        local _, network = next (info.NetworkSettings.Networks)
+        context.redis:set (key, Json.encode {
+          repository = collaboration.repository,
+          docker_id  = service.Id,
+          created_at = created_at,
+          started_at = Gettime (),
+          target_url = Lustache:render ("http://{{{host}}}:8080", {
+            host = network.IPAddress,
+          }),
+          editor_url = Url.build {
+            scheme = "wss",
+            host   = Config.ardoises.host,
+            port   = Config.ardoises.port,
+            path   = Lustache:render ("/websockets/{{{owner}}}/{{{name}}}/{{{branch}}}", {
+              owner  = ngx.var.owner,
+              name   = ngx.var.name,
+              branch = ngx.var.branch,
             }),
-            editor_url = Url.build {
-              scheme = "wss",
-              host   = Config.ardoises.host,
-              port   = Config.ardoises.port,
-              path   = Lustache:render ("/websockets/{{{owner}}}/{{{name}}}/{{{branch}}}", {
-                owner  = ngx.var.owner,
-                name   = ngx.var.name,
-                branch = ngx.var.branch,
-              }),
-            },
-          })
-          return
-        elseif info.State.Dead then
-          assert (false)
-        else
-          _G.ngx.sleep (1)
-        end
+          },
+        })
+        break
+      elseif info.State.Dead then
+        assert (false)
+      else
+        _G.ngx.sleep (1)
       end
-    end, function (err)
-      print (err)
-      print (debug.traceback ())
-    end)
+    end
   end
-  redis:del (lock)
-  editor = redis:get (key)
-  redis:set_keepalive ()
+  context.redis:del (lock)
+  editor = context.redis:get (key)
   if editor == ngx.null or not editor then
-    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
+    return { status = ngx.HTTP_NOT_FOUND }
   end
-  editor = Json.decode (editor)
-  if not editor then
-    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
-  end
+  editor = assert (Json.decode (editor))
   if not editor.target_url or not editor.editor_url then
-    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
+    return { status = ngx.HTTP_NOT_FOUND }
   end
   local headers = ngx.req.get_headers ()
   if headers ["Accept"] == "application/json" then
@@ -461,54 +472,43 @@ function Server.editor ()
       code        = "{{{editor-code}}}",
     }))
   end
-  return ngx.exit (ngx.HTTP_OK)
-end
+  return { status = ngx.HTTP_OK }
+end)
 
-function Server.websocket ()
-  local redis = Redis:new ()
-  assert (redis:connect (Config.redis.host, Config.redis.port))
+Server.websocket = wrap (function (context)
   local key = Config.patterns.editor ({
     owner = { login = ngx.var.owner },
     name  = ngx.var.name,
   }, ngx.var.branch)
-  local editor = redis:get (key)
-  redis:set_keepalive ()
+  local editor = context.redis:get (key)
   if editor == ngx.null or not editor then
-    return ngx.exit (ngx.HTTP_NOT_FOUND)
+    return { status = ngx.HTTP_NOT_FOUND }
   end
-  editor = Json.decode (editor)
-  if not editor then
-    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
-  end
+  editor = assert (Json.decode (editor))
   if not editor.target_url then
-    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
+    return { status = ngx.HTTP_NOT_FOUND }
   end
   _G.ngx.var.target = editor.target_url
-end
+end)
 
-function Server.webhook ()
+Server.webhook = wrap (function (context)
   ngx.req.read_body ()
   local data    = ngx.req.get_body_data ()
   local headers = ngx.req.get_headers ()
   local hmac    = Hmac.new (Config.application.secret)
   if not data then
-    return ngx.exit (ngx.HTTP_BAD_REQUEST)
+    return { status = ngx.HTTP_BAD_REQUEST }
   end
   if "sha1=" .. tohex (hmac:final (data)) ~= headers ["X-Hub-Signature"] then
-    return ngx.exit (ngx.HTTP_BAD_REQUEST)
+    return { status = ngx.HTTP_BAD_REQUEST }
   end
-  data = Json.decode (data)
-  if not data then
-    return ngx.exit (ngx.HTTP_BAD_REQUEST)
-  end
+  data = assert (Json.decode (data))
   local repository = data.repository
   if not repository then
-    return ngx.exit (ngx.HTTP_OK)
+    return { status = ngx.HTTP_OK }
   end
-  local redis = Redis:new ()
-  assert (redis:connect (Config.redis.host, Config.redis.port))
   while true do
-    if redis:setnx (Config.patterns.lock (repository.full_name), "locked") then
+    if context.redis:setnx (Config.patterns.lock (repository.full_name), "locked") then
       break
     end
     ngx.sleep (0.1)
@@ -516,7 +516,7 @@ function Server.webhook ()
   -- delete collaborators in database:
   local cursor = 0
   repeat
-    local res = redis:scan (cursor,
+    local res = context.redis:scan (cursor,
       "match", Config.patterns.collaborator (repository, { login = "*" }),
       "count", 100)
     if res == ngx.null or not res then
@@ -525,7 +525,7 @@ function Server.webhook ()
     cursor = res [1]
     local keys = res [2]
     for _, key in ipairs (keys) do
-      redis:del (key)
+      context.redis:del (key)
     end
   until cursor == "0"
   -- update data:
@@ -540,10 +540,10 @@ function Server.webhook ()
   }
   if status >= 400 and status < 500 then
     -- delete repository:
-    redis:del (Config.patterns.repository (repository))
+    context.redis:del (Config.patterns.repository (repository))
     -- delete webhook(s):
     (function ()
-      local user = redis:get (Config.patterns.user (repository.owner))
+      local user = context.redis:get (Config.patterns.user (repository.owner))
       if user == ngx.null or not user then
         return
       end
@@ -589,14 +589,14 @@ function Server.webhook ()
         ["User-Agent"   ] = "Ardoises",
       },
     }
-    assert (status == 200, status)
+    assert (status == ngx.HTTP_OK, status)
     repository.branches = branches
     -- update repository:
-    redis:set (Config.patterns.repository (repository), Json.encode (repository))
+    context.redis:set (Config.patterns.repository (repository), Json.encode (repository))
     -- update collaborators:
     for _, collaborator in ipairs (collaborators) do
       local key = Config.patterns.collaborator (repository, collaborator)
-      redis:set (key, Json.encode {
+      context.redis:set (key, Json.encode {
         repository   = {
           owner = { login = repository.owner.login },
           name  = repository.name,
@@ -605,9 +605,8 @@ function Server.webhook ()
       })
     end
   end
-  redis:del (Config.patterns.lock (repository.full_name))
-  redis:set_keepalive ()
-  return ngx.exit (ngx.HTTP_OK)
-end
+  context.redis:del (Config.patterns.lock (repository.full_name))
+  return { status = ngx.HTTP_OK }
+end)
 
 return Server

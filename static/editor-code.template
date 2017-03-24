@@ -57,33 +57,33 @@ loading = false
 
 Copas.addthread (function ()
   while true do
-    print (editor.websocket.state)
+    print (editor.websocket and editor.websocket.websocket)
     Copas.sleep (10)
   end
 end)
 
--- local function default_togui (parameters)
---   assert (type (parameters) == "table")
---   local editor = assert (parameters.editor)
---   local what   = assert (parameters.what  )
---   local target = assert (parameters.target)
---   target.innerHTML = [[
---     <div class="panel panel-default">
---       <div class="panel-body">
---         <div class="editor" id="layer">
---         </div>
---       </div>
---     </div>
---   ]]
---   local sourced = Adapter.window.ace:edit "layer"
---   sourced:setReadOnly (true)
---   sourced ["$blockScrolling"] = true
---   sourced:setTheme "ace/theme/monokai"
---   sourced:getSession ():setMode "ace/mode/lua"
---   sourced:setValue (what.code)
---   coroutine.yield ()
---   target.innerHTML = [[]]
--- end
+local function default_togui (parameters)
+  assert (type (parameters) == "table")
+  -- local editor = assert (parameters.editor)
+  local what   = assert (parameters.what  )
+  local target = assert (parameters.target)
+  target.innerHTML = [[
+    <div class="panel panel-default">
+      <div class="panel-body">
+        <div class="editor" id="layer">
+        </div>
+      </div>
+    </div>
+  ]]
+  local sourced = _G.window.ace:edit "layer"
+  sourced:setReadOnly (true)
+  sourced ["$blockScrolling"] = true
+  sourced:setTheme "ace/theme/monokai"
+  sourced:getSession ():setMode "ace/mode/lua"
+  sourced:setValue (what.code)
+  coroutine.yield ()
+  target.innerHTML = [[]]
+end
 
 Editor.innerHTML = [[
   <section>
@@ -101,9 +101,6 @@ Editor.innerHTML = [[
           <div id="layers"></div>
         </div>
         <div id="ardoise" class="col-md-10">
-          <h1 class="text-primary">
-            <i class="fully-centered fa fa-spinner fa-pulse fa-5x fa-fw"></i>
-          </h1>
         </div>
       </div>
     </div>
@@ -154,13 +151,9 @@ renderers.layers = Copas.addthread (function ()
       link.onclick = function ()
         local name = _G.js.global.document:getElementById "layer-name".value
         Copas.addthread (function ()
-          print ("create", 1)
           active = editor:create (name)
-          print ("create", 2)
           Copas.wakeup (renderers.layers)
-          print ("create", 3)
           Copas.wakeup (renderers.ardoise)
-          print ("create", 4)
         end)
         return false
       end
@@ -195,24 +188,24 @@ end)
 
 renderers.ardoise = Copas.addthread (function ()
   while true do
---     if active then
---       local what  = editor:require (active)
---       local gui   = what.layer [Layer.key.meta]
---                 and what.layer [Layer.key.meta].gui
---       local togui = what.layer [Layer.key.meta]
---                 and what.layer [Layer.key.meta] [gui]
---                 and what.layer [Layer.key.meta] [gui].render
---                  or Adapter.default_togui
---       active.co = coroutine.create (togui)
---       coroutine.resume (active.co, {
---         name   = active.name,
---         editor = editor,
---         what   = what,
---         target = Editor,
---         width  = Adapter.window.innerWidth  * 0.8,
---         height = Adapter.window.innerHeight * 0.8,
---       })
---     end
+    if active then
+      local what  = editor:require (active)
+      local gui   = what.layer [Layer.key.meta]
+                and what.layer [Layer.key.meta].gui
+      local togui = what.layer [Layer.key.meta]
+                and what.layer [Layer.key.meta] [gui]
+                and what.layer [Layer.key.meta] [gui].render
+                 or default_togui
+      local co = coroutine.create (togui)
+      coroutine.resume (co, {
+        name   = active.name,
+        editor = editor,
+        what   = what,
+        target = Ardoise,
+        width  = _G.window.innerWidth  * 0.8,
+        height = _G.window.innerHeight * 0.8,
+      })
+    end
     Copas.sleep (-math.huge)
   end
 end)

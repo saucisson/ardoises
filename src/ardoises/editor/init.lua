@@ -234,24 +234,31 @@ function Editor.dispatch (editor, client)
   editor.last = os.time ()
   ok, message = pcall (Json.decode, message)
   if not ok then
-    client.websocket:send (Json.encode {
+    return client.websocket:send (Json.encode {
       type    = "answer",
       success = false,
       reason  = "invalid JSON",
     })
   elseif type (message) ~= "table" then
-    client.websocket:send (Json.encode {
+    return client.websocket:send (Json.encode {
       type    = "answer",
       success = false,
       reason  = "invalid message",
     })
   elseif not message.id or not message.type then
-    client.websocket:send (Json.encode {
+    return client.websocket:send (Json.encode {
       id      = message.id,
       type    = "answer",
       success = false,
       reason  = "invalid message",
     })
+  elseif message.type == "ping" then
+    return client.websocket:send (Json.encode {
+      id   = message.id,
+      type = "pong",
+    })
+  elseif message.type == "pong" then
+    return
   end
   message.client = client
   editor.queue [#editor.queue+1] = message

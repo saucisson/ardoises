@@ -158,6 +158,15 @@ function Ardoise.edit (ardoise)
   if not res.success then
     return nil, "authentication failure"
   end
+  Copas.addthread (function ()
+    while true do
+      websocket:send (Json.encode {
+        id   = "ping",
+        type = "ping",
+      })
+      Copas.sleep (10)
+    end
+  end)
   local editor = setmetatable ({
     Layer       = setmetatable ({}, { __index = Layer }),
     ardoise     = ardoise,
@@ -471,7 +480,14 @@ function Editor.receive (editor)
   end
   print ("received", message)
   message = Json.decode (message)
-  if message.type == "answer" then
+  if message.type == "ping" then
+    editor.websocket:send (Json.encode {
+      id   = message.id,
+      type = "pong",
+    })
+  elseif message.type == "pong" then
+    local _ = false
+  elseif message.type == "answer" then
     local request  = editor.requests  [message.id]
     local callback = editor.callbacks [message.id]
     request.success = message.success

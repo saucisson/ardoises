@@ -13,7 +13,7 @@ RUN apk add --no-cache --virtual .build-deps \
         openssl-dev \
         pcre-dev \
         perl \
-        python3 \
+        py-pip \
         readline-dev \
         unzip \
         zlib-dev \
@@ -21,6 +21,7 @@ RUN apk add --no-cache --virtual .build-deps \
         dockerize \
  && apk add --no-cache \
         bash \
+        certbot \
         curl \
         diffutils \
         grep \
@@ -29,7 +30,8 @@ RUN apk add --no-cache --virtual .build-deps \
         pcre \
         readline \
         sed \
- && pip3 install hererocks \
+ && pip install packaging \
+ && pip install hererocks \
  && hererocks --luajit=2.1 --luarocks=^ --compat=5.2 /usr \
  && luarocks install luasec \
  && cd /tmp \
@@ -52,30 +54,13 @@ RUN apk add --no-cache --virtual .build-deps \
  && luarocks install rockspec/lulpeg-develop-0.rockspec \
  && luarocks install rockspec/redis-lua-develop-0.rockspec \
  && luarocks make    rockspec/ardoises-master-1.rockspec \
- && mkdir -p /etc/nginx/ssl \
+ && mkdir -p /etc/nginx \
  && cp src/ardoises/server/nginx.conf /etc/nginx/nginx.conf \
- && cat cert.info | openssl req \
-      -x509 \
-      -nodes \
-      -days 365 \
-      -newkey rsa:2048 \
-      -keyout /etc/nginx/ssl/nginx.key \
-      -out    /etc/nginx/ssl/nginx.crt \
- && rm -rf /src/ardoises \
  && apk del .build-deps \
+ && rm -rf /src/ardoises \
  && rm -rf /tmp/* \
  && true
 
-# && mkdir -p /static
-# && cp -r static/* /static/
-# && cd /tmp \
-# && git clone https://github.com/saucisson/lua-resty-shell.git \
-# && cd lua-resty-shell \
-# && luarocks make lua-resty-shell-scm-1.rockspec \
-# && cd /tmp \
-# && git clone https://github.com/saucisson/lua-resty-auto-ssl.git \
-# && cd lua-resty-auto-ssl \
-# && luarocks make lua-resty-auto-ssl-develop-0.rockspec \
-
 ENV PATH /usr/local/openresty/bin/:/usr/local/openresty/nginx/sbin/:$PATH
 VOLUME ["/static"]
+EXPOSE 80 443
