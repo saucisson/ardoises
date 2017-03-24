@@ -1,11 +1,38 @@
-local Editor = _G.js.global.document:getElementById "editor"
-Editor.innerHTML = [[
-  <h1 class="text-primary">
-    <i class="fully-centered fa fa-spinner fa-pulse fa-5x fa-fw"></i>
-  </h1>
-]]
+local Copas = require "copas"
 
-local Copas  = require "copas"
+local Editor  = _G.js.global.document:getElementById "editor"
+local loading = 0
+Editor.innerHTML = [[
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col-md-6 col-md-offset-3">
+        <div class="progress">
+          <div id="progress"
+               class="progress-bar progress-bar-success progress-bar-striped active"
+               role="progressbar"
+               aria-valuenow="0"
+               aria-valuemin="0"
+               aria-valuemax="100"
+               style="width:0%">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+]]
+local Progress = _G.js.global.document:getElementById "progress"
+
+Copas.addthread (function ()
+  local expected = 5 -- seconds
+  local step     = 0.25 -- seconds
+  while loading do
+    local speed = (100 - loading) / (expected / step)
+    loading = loading + speed
+    Progress:setAttribute ("style", "width:" .. tostring (loading) .. "%")
+    Copas.sleep (math.random (0.1, 0.5))
+  end
+end)
+
 local Client = require "ardoises.client"
 local Et     = require "etlua"
 local Layer  = require "layeredata"
@@ -26,6 +53,14 @@ for _, a in ipairs (client:ardoises ()) do
 end
 assert (ardoise)
 local editor = ardoise:edit ()
+loading = false
+
+Copas.addthread (function ()
+  while true do
+    print (editor.websocket.state)
+    Copas.sleep (10)
+  end
+end)
 
 -- local function default_togui (parameters)
 --   assert (type (parameters) == "table")
