@@ -1,11 +1,12 @@
 local Coromake  = require "coroutine.make"
 local Copas     = require "copas"
-local Lustache  = require "lustache"
-local Json      = require "rapidjson"
-local Url       = require "net.url"
-local Layer     = require "layeredata"
+local Gettime   = os.time
 local Http      = require "ardoises.jsonhttp.copas"
+local Json      = require "rapidjson"
+local Layer     = require "layeredata"
+local Lustache  = require "lustache"
 local Patterns  = require "ardoises.patterns"
+local Url       = require "net.url"
 local Websocket = require "websocket"
 
 local Client  = {}
@@ -139,7 +140,14 @@ function Ardoise.edit (ardoise)
   }
   assert (status == 200, status)
   local websocket = Websocket.client.copas {}
-  assert (websocket:connect (info.editor_url, "ardoise"))
+  local start     = Gettime ()
+  repeat
+    local connected = websocket:connect (info.editor_url, "ardoise")
+    assert (Gettime () - start <= 30)
+    if not connected then
+      Copas.sleep (1)
+    end
+  until connected
   assert (websocket:send (Json.encode {
     id    = 1,
     type  = "authenticate",

@@ -78,10 +78,10 @@ while true do
           url    = docker_url .. "/json",
         }
         if status == 200 and not info.State.Running then
-          print (Lustache:render ("  ...cleaning docker for {{{repository.full_name}}}.", editor))
+          print (Lustache:render ("  ...cleaning docker container {{{docker_id}}}.", editor))
           Http {
             method = "DELETE",
-            url    = editor.docker_url,
+            url    = docker_url,
             query  = {
               v     = true,
               force = true,

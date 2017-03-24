@@ -12,18 +12,12 @@ services:
       context: .
       dockerfile: docker/Dockerfile-noresty-quick
     entrypoint: ardoises-clean
-    links:
-      - docker
-      - redis
   invitation:
     env_file: .environment
     build:
       context: .
       dockerfile: docker/Dockerfile-noresty-quick
     entrypoint: ardoises-invitation
-    links:
-      - docker
-      - redis
   ardoises:
     env_file: .environment
     build:
@@ -33,8 +27,5 @@ services:
     ports:
       - "8080:80"
       - "8081:443"
-    links:
-      - docker
-      - redis
     volumes:
       - ./static:/static

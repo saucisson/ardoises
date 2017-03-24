@@ -110,6 +110,7 @@ function Server.dashboard ()
   local user = Server.authenticate ()
   _G.ngx.header ["Content-type"] = "text/html"
   ngx.say (Server.template ("index", {
+    server  = Url.build (Config.ardoises),
     user    = user,
     content = "{{{dashboard}}}",
     code    = "{{{dashboard-code}}}",
@@ -121,6 +122,7 @@ function Server.overview ()
   local user = Server.authenticate (true)
   _G.ngx.header ["Content-type"] = "text/html"
   ngx.say (Server.template ("index", {
+    server  = Url.build (Config.ardoises),
     user    = user,
     content = "{{{overview}}}"
   }))
@@ -266,7 +268,10 @@ function Server.my_ardoises ()
     for _, key in ipairs (keys) do
       local entry = redis:get (key)
       if entry ~= ngx.null and entry then
-        result [#result+1] = Json.decode (entry)
+        entry = Json.decode (entry)
+        local repository = redis:get (Config.patterns.repository (entry.repository))
+        entry.repository = Json.decode (repository)
+        result [#result+1] = entry
       end
     end
   until cursor == "0"
@@ -291,6 +296,15 @@ function Server.editor ()
   if not collaboration then
     return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
   end
+  -- get repository:
+  local repository = redis:get (Config.patterns.repository (collaboration.repository))
+  if repository == ngx.null or not repository then
+    return ngx.exit (ngx.HTTP_FORBIDDEN)
+  end
+  repository = Json.decode (repository)
+  if not repository then
+    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
+  end
   -- get editor:
   local lock = Config.patterns.lock (Lustache:render ("editor:{{{owner}}}/{{{name}}}/{{{branch}}}", ngx.var))
   while true do
@@ -306,6 +320,15 @@ function Server.editor ()
   local editor = redis:get (key)
   if editor == ngx.null or not editor then
     xpcall (function ()
+      local info, status = Http {
+        url    = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}/json", {
+          host = Config.docker.host,
+          port = Config.docker.port,
+          id   = Config.docker_id,
+        }),
+        method = "GET",
+      }
+      assert (status == 200)
       Http {
         url    = Lustache:render ("http://{{{host}}}:{{{port}}}/images/create", {
           host = Config.docker.host,
@@ -318,7 +341,8 @@ function Server.editor ()
         },
         timeout = math.huge,
       }
-      local service, status = Http {
+      local service
+      service, status = Http {
         url    = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/create", {
           host = Config.docker.host,
           port = Config.docker.port,
@@ -335,7 +359,8 @@ function Server.editor ()
             ["8080/tcp"] = {},
           },
           HostConfig   = {
-            PublishAllPorts = true,
+            PublishAllPorts = false,
+            NetworkMode     = info.HostConfig.NetworkMode,
           },
         },
       }
@@ -362,7 +387,6 @@ function Server.editor ()
         docker_id  = service.Id,
         created_at = created_at,
       })
-      local info
       while Gettime () - start <= 120 do
         info, status = Http {
           method = "GET",
@@ -370,20 +394,27 @@ function Server.editor ()
         }
         assert (status == 200, status)
         if info.State.Running then
-          local data = ((info.NetworkSettings.Ports ["8080/tcp"] or {}) [1] or {})
-          if data.HostPort then
-            redis:set (key, Json.encode {
-              repository = collaboration.repository,
-              docker_id  = service.Id,
-              created_at = created_at,
-              started_at = Gettime (),
-              editor_url = Lustache:render ("ws://{{{host}}}:{{{port}}}", {
-                host = data.HostIp,
-                port = data.HostPort,
+          local _, network = next (info.NetworkSettings.Networks)
+          redis:set (key, Json.encode {
+            repository = collaboration.repository,
+            docker_id  = service.Id,
+            created_at = created_at,
+            started_at = Gettime (),
+            target_url = Lustache:render ("http://{{{host}}}:8080", {
+              host = network.IPAddress,
+            }),
+            editor_url = Url.build {
+              scheme = "wss",
+              host   = Config.ardoises.host,
+              port   = Config.ardoises.port,
+              path   = Lustache:render ("/websockets/{{{owner}}}/{{{name}}}/{{{branch}}}", {
+                owner  = ngx.var.owner,
+                name   = ngx.var.name,
+                branch = ngx.var.branch,
               }),
-            })
-            return
-          end
+            },
+          })
+          return
         elseif info.State.Dead then
           assert (false)
         else
@@ -405,7 +436,7 @@ function Server.editor ()
   if not editor then
     return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
   end
-  if not editor.editor_url then
+  if not editor.target_url or not editor.editor_url then
     return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
   end
   local headers = ngx.req.get_headers ()
@@ -413,16 +444,17 @@ function Server.editor ()
     ngx.say (Json.encode {
       user        = user,
       permissions = collaboration.collaborator.permissions,
-      repository  = collaboration.repository,
+      repository  = repository,
       branch      = ngx.var.branch,
       editor_url  = editor.editor_url,
     })
   else
     _G.ngx.header ["Content-type"] = "text/html"
     ngx.say (Server.template ("index", {
+      server      = Url.build (Config.ardoises),
       user        = user,
       permissions = collaboration.collaborator.permissions,
-      repository  = collaboration.repository,
+      repository  = repository,
       branch      = ngx.var.branch,
       editor_url  = editor.editor_url,
       content     = "{{{editor}}}",
@@ -430,6 +462,28 @@ function Server.editor ()
     }))
   end
   return ngx.exit (ngx.HTTP_OK)
+end
+
+function Server.websocket ()
+  local redis = Redis:new ()
+  assert (redis:connect (Config.redis.host, Config.redis.port))
+  local key = Config.patterns.editor ({
+    owner = { login = ngx.var.owner },
+    name  = ngx.var.name,
+  }, ngx.var.branch)
+  local editor = redis:get (key)
+  redis:set_keepalive ()
+  if editor == ngx.null or not editor then
+    return ngx.exit (ngx.HTTP_NOT_FOUND)
+  end
+  editor = Json.decode (editor)
+  if not editor then
+    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
+  end
+  if not editor.target_url then
+    return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
+  end
+  _G.ngx.var.target = editor.target_url
 end
 
 function Server.webhook ()
@@ -502,7 +556,7 @@ function Server.webhook ()
         method  = "GET",
         headers = {
           ["Accept"       ] = "application/vnd.github.v3+json",
-          ["Authorization"] = "token " .. user.token,
+          ["Authorization"] = "token " .. user.tokens.github,
           ["User-Agent"   ] = "Ardoises",
         },
       }
@@ -516,7 +570,7 @@ function Server.webhook ()
             method  = "DELETE",
             headers = {
               ["Accept"       ] = "application/vnd.github.v3+json",
-              ["Authorization"] = "token " .. user.token,
+              ["Authorization"] = "token " .. user.tokens.github,
               ["User-Agent"   ] = "Ardoises",
             },
           }
@@ -524,13 +578,29 @@ function Server.webhook ()
       end
     end) ()
   elseif status == 200 then
+    -- get branches:
+    local branches
+    branches, status = Http {
+      url     = repository.branches_url:gsub ("{/branch}", ""),
+      method  = "GET",
+      headers = {
+        ["Accept"       ] = "application/vnd.github.loki-preview+json",
+        ["Authorization"] = "token " .. Config.application.token,
+        ["User-Agent"   ] = "Ardoises",
+      },
+    }
+    assert (status == 200, status)
+    repository.branches = branches
     -- update repository:
     redis:set (Config.patterns.repository (repository), Json.encode (repository))
     -- update collaborators:
     for _, collaborator in ipairs (collaborators) do
       local key = Config.patterns.collaborator (repository, collaborator)
       redis:set (key, Json.encode {
-        repository   = repository,
+        repository   = {
+          owner = { login = repository.owner.login },
+          name  = repository.name,
+        },
         collaborator = collaborator,
       })
     end

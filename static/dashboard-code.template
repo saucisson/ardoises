@@ -9,7 +9,7 @@ local Copas  = require "copas"
 local Client = require "ardoises.client"
 local Et     = require "etlua"
 local client = Client {
-  server = "http://localhost:8080",
+  server = "{{{server}}}",
   tokens = {
     ardoises = "{{{user.tokens.ardoises}}}",
     github   = "{{{user.tokens.github}}}",
@@ -77,26 +77,34 @@ output = Copas.addthread (function ()
         <div class="list-group">
         <% for _, ardoise in ipairs (ardoises) do %>
           <div class="list-group-item row">
-            <a href="/editors/<%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>/<%- ardoise.branch %>"
-              aria-label="Editor for <%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>:<%- ardoise.branch %>">
-              <div class="col-md-10">
-                <h4 class="list-group-item-heading"><%= ardoise.repository.full_name %></h4>
-                <p class="list-group-item-text"><%= ardoise.repository.description or ""%></p>
-              </div>
-              <div class="col-md-2">
-                <img class="circle" src="<%- ardoise.collaborator.avatar_url %>"/>
-                <% if ardoise.collaborator.permissions.push then %>
-                <span class="fa-stack fa-lg">
-                  <i class="fa fa-pencil fa-flip-horizontal fa-stack-1x"></i>
-                </span>
-                <% else %>
-                <span class="fa-stack fa-lg">
-                  <i class="fa fa-pencil fa-flip-horizontal fa-stack-1x"></i>
-                  <i class="fa fa-ban fa-stack-2x text-danger"></i>
-                </span>
+            <div class="col-md-1">
+              <% if ardoise.collaborator.permissions.push then %>
+              <span class="fa-stack fa-lg">
+                <i class="fa fa-pencil fa-flip-horizontal fa-stack-1x"></i>
+              </span>
+              <% else %>
+              <span class="fa-stack fa-lg">
+                <i class="fa fa-pencil fa-flip-horizontal fa-stack-1x"></i>
+                <i class="fa fa-ban fa-stack-2x text-danger"></i>
+              </span>
+              <% end %>
+            </div>
+            <div class="col-md-11">
+              <h4 class="list-group-item-heading"><%= ardoise.repository.full_name %></h4>
+              <p class="list-group-item-text"><%= ardoise.repository.description or ""%></p>
+              <ul class="list-inline">
+                <% for _, branch in ipairs (ardoise.repository.branches) do %>
+                <% if not branch.protected then %>
+                <li>
+                  <a href="/editors/<%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>/<%- ardoise.branch %>"
+                    aria-label="Editor for <%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>:<%- ardoise.branch %>">
+                    <%= branch.name %>
+                  </a>
+                </li>
                 <% end %>
-              </div>
-            </a>
+                <% end %>
+              </ul>
+            </div>
           </div>
         <% end %>
         </div>

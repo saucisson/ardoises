@@ -20,6 +20,8 @@ RUN apk add --no-cache --virtual .build-deps \
         git \
         libstdc++ \
         openssl \
+ && git config --global user.email "editor@ardoises.ovh" \
+ && git config --global user.name  "Ardoises" \
  && pip3 install hererocks \
  && hererocks --luajit=2.1 --luarocks=^ --compat=5.2 /usr \
  && luarocks install luasec \

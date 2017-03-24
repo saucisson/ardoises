@@ -74,7 +74,7 @@ while true do
         method  = "POST",
         headers = {
           ["Accept"       ] = "application/vnd.github.v3+json",
-          ["Authorization"] = "token " .. user.token,
+          ["Authorization"] = "token " .. user.tokens.github,
           ["User-Agent"   ] = "Ardoises",
         },
         body    = {
