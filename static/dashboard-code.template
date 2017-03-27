@@ -1,38 +1,9 @@
-local Copas = require "copas"
+local Progress = require "progressbar"
+local progress = Progress {
+  expected = 2, -- seconds
+}
 
-local Dashboard = _G.js.global.document:getElementById "content"
-local loading   = 0
-Dashboard.innerHTML = [[
-  <div class="container-fluid">
-    <div class="row">
-      <div class="col-md-6 col-md-offset-3">
-        <div class="progress">
-          <div id="progress"
-               class="progress-bar progress-bar-success progress-bar-striped active"
-               role="progressbar"
-               aria-valuenow="0"
-               aria-valuemin="0"
-               aria-valuemax="100"
-               style="width:0%">
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-]]
-local Progress = _G.js.global.document:getElementById "progress"
-
-Copas.addthread (function ()
-  local expected = 5 -- seconds
-  local step     = 0.25 -- seconds
-  while loading do
-    local speed = (100 - loading) / (expected / step)
-    loading = loading + speed
-    Progress:setAttribute ("style", "width:" .. tostring (loading) .. "%")
-    Copas.sleep (math.random (0.1, 0.5))
-  end
-end)
-
+local Copas  = require "copas"
 local Client = require "ardoises.client"
 local Et     = require "etlua"
 local client = Client {
@@ -44,9 +15,10 @@ local client = Client {
 }
 local ardoises = client:ardoises ()
 local output
-loading = false
+progress.finished = true
 
-Dashboard.innerHTML = [[
+local Content = _G.js.global.document:getElementById "content"
+Content.innerHTML = [[
   <div class="container">
     <div class="row">
       <div class="col-md-4">

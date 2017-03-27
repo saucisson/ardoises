@@ -47,6 +47,49 @@ package.preload ["socket.url"] = function ()
   return require "net.url"
 end
 
+package.preload ["progressbar"] = function ()
+  local Progress_mt = {}
+  local Progress    = setmetatable ({}, Progress_mt)
+  function Progress_mt.__call (_, options)
+    local Content  = _G.js.global.document:getElementById "content"
+    local progress = setmetatable ({
+      finished = false,
+      elapsed  = 0,
+      expected = options.expected or 5,    -- seconds
+      step     = options.step     or 0.1, -- seconds
+    }, Progress)
+    Content.innerHTML = [[
+      <div class="container-fluid">
+        <div class="row">
+          <div class="col-md-6 col-md-offset-3">
+            <div class="progress">
+              <div id="progress"
+                   class="progress-bar progress-bar-success progress-bar-striped active"
+                   role="progressbar"
+                   aria-valuenow="0"
+                   aria-valuemin="0"
+                   aria-valuemax="100"
+                   style="width:0%">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    ]]
+    local Element = _G.js.global.document:getElementById "progress"
+    Copas.addthread (function ()
+      while not progress.finished do
+        local speed = (100 - progress.elapsed) / (progress.expected / progress.step)
+        progress.elapsed = progress.elapsed + speed
+        Element:setAttribute ("style", "width:" .. tostring (progress.elapsed) .. "%")
+        Copas.sleep (math.random (0, 2 * progress.step))
+      end
+    end)
+    return progress
+  end
+  return Progress
+end
+
 package.preload ["ardoises.jsonhttp.copas"] = function ()
   local Common = require "ardoises.jsonhttp.common"
   local Json   = require "dkjson"
