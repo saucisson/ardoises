@@ -88,6 +88,7 @@ local renderers = {
   ardoise = nil,
 }
 renderers.layers = Copas.addthread (function ()
+  local in_delete
   while true do
     local layers = {}
     for name, module in editor:list () do
@@ -110,7 +111,7 @@ renderers.layers = Copas.addthread (function ()
           <div class="list-group-item row">
             <div class="input-group">
               <span id="layer-get-<%- layer.id %>" class="input-xlarge uneditable-input"><%= layer.name %></span>
-              <span id="layer-delete-<%- layer.id %>" class="input-group-addon"><i class="fa fa-trash fa-inverse" aria-hidden="true"></i></span>
+              <span class="input-group-addon"><button id="layer-delete-<%- layer.id %>" class="btn btn-xs"><i class="fa fa-trash fa-inverse" aria-hidden="true"></i></button></span>
             </div>
           </div>
         <% end %>
@@ -134,7 +135,7 @@ renderers.layers = Copas.addthread (function ()
       local link = _G.js.global.document:getElementById ("layer-get-" .. tostring (layer.id))
       link.onclick = function ()
         Copas.addthread (function ()
-          active = layer.name
+          active = layer.module
           Copas.wakeup (renderers.ardoise)
         end)
         return false
@@ -143,14 +144,33 @@ renderers.layers = Copas.addthread (function ()
     for _, layer in ipairs (layers) do
       local link = _G.js.global.document:getElementById ("layer-delete-" .. tostring (layer.id))
       link.onclick = function ()
-        Copas.addthread (function ()
-          if active == layer.name then
-            active = nil
-          end
-          editor:delete (layer.name)
-          Copas.wakeup (renderers.layers)
-          Copas.wakeup (renderers.ardoise)
-        end)
+        if link.disabled then
+          return false
+        elseif in_delete == link then
+          in_delete.classList:remove "btn-warning"
+          in_delete.disabled = false
+          Copas.addthread (function ()
+            if active == layer.module then
+              active = nil
+            end
+            editor:delete (layer.module)
+            Copas.wakeup (renderers.layers)
+            Copas.wakeup (renderers.ardoise)
+          end)
+        else
+          link.disabled = true
+          in_delete     = link
+          in_delete.classList:add "btn-warning"
+          Copas.addthread (function ()
+            Copas.sleep (2) -- second
+            link.disabled = false
+            Copas.sleep (5) -- seconds
+            link.classList:remove "btn-warning"
+            if in_delete == link then
+              in_delete = nil
+            end
+          end)
+        end
         return false
       end
     end
@@ -177,6 +197,8 @@ renderers.ardoise = Copas.addthread (function ()
         width  = _G.window.innerWidth  * 0.8,
         height = _G.window.innerHeight * 0.8,
       })
+    else
+      Ardoise.innerHTML = ""
     end
     Copas.sleep (-math.huge)
   end
