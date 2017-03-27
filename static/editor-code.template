@@ -124,7 +124,10 @@ renderers.layers = Copas.addthread (function ()
       link.onclick = function ()
         local name = _G.js.global.document:getElementById "layer-name".value
         Copas.addthread (function ()
-          active = editor:create (name)
+          active = {
+            module = editor:create (name),
+            link   = link,
+          }
           Copas.wakeup (renderers.layers)
           Copas.wakeup (renderers.ardoise)
         end)
@@ -134,8 +137,17 @@ renderers.layers = Copas.addthread (function ()
     for _, layer in ipairs (layers) do
       local link = _G.js.global.document:getElementById ("layer-get-" .. tostring (layer.id))
       link.onclick = function ()
+        if active then
+          local parent = active.link.parentNode.parentNode
+          parent.classList:remove "active"
+        end
         Copas.addthread (function ()
-          active = layer.module
+          active = {
+            module = layer.module,
+            link   = link,
+          }
+          local parent = active.link.parentNode.parentNode
+          parent.classList:add "active"
           Copas.wakeup (renderers.ardoise)
         end)
         return false
@@ -150,7 +162,7 @@ renderers.layers = Copas.addthread (function ()
           in_delete.classList:remove "btn-warning"
           in_delete.disabled = false
           Copas.addthread (function ()
-            if active == layer.module then
+            if active and active.module == layer.module then
               active = nil
             end
             editor:delete (layer.module)
@@ -181,7 +193,7 @@ end)
 renderers.ardoise = Copas.addthread (function ()
   while true do
     if active then
-      local what  = editor:require (active)
+      local what  = editor:require (active.module)
       local gui   = what.layer [Layer.key.meta]
                 and what.layer [Layer.key.meta].gui
       local togui = what.layer [Layer.key.meta]
@@ -190,7 +202,6 @@ renderers.ardoise = Copas.addthread (function ()
                  or default_togui
       local co = coroutine.create (togui)
       coroutine.resume (co, {
-        name   = active.name,
         editor = editor,
         what   = what,
         target = Ardoise,
