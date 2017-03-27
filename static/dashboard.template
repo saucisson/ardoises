@@ -1,8 +1,0 @@
-{{#user}}
-<section id="dashboard">
-</section>
-<script type="text/lua"
-        lang="Lua">
-  {{{loader}}}
-</script>
-{{/user}}

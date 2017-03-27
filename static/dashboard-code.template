@@ -1,6 +1,6 @@
 local Copas = require "copas"
 
-local Dashboard = _G.js.global.document:getElementById "dashboard"
+local Dashboard = _G.js.global.document:getElementById "content"
 local loading   = 0
 Dashboard.innerHTML = [[
   <div class="container-fluid">
@@ -124,7 +124,7 @@ output = Copas.addthread (function ()
                 <% for _, branch in ipairs (ardoise.repository.branches) do %>
                 <% if not branch.protected then %>
                 <li>
-                  <a href="/editors/<%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>/<%- ardoise.branch %>"
+                  <a href="/views/<%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>/<%- ardoise.branch %>"
                     aria-label="Editor for <%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>:<%- ardoise.branch %>">
                     <%= branch.name %>
                   </a>

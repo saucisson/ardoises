@@ -90,7 +90,19 @@
       </div>
     </div>
 
-    {{{content}}}
+    <section id="content">
+      {{#content}}
+      {{{content}}}
+      {{/content}}
+    </section>
+    {{#user}}
+    <script type="text/lua"
+            lang="Lua">
+    do
+      {{{loader}}}
+    end
+    </script>
+    {{/user}}
 
     <nav class="navbar navbar-fixed-bottom">
       <div class="container">

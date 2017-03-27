@@ -134,7 +134,6 @@ Server.dashboard = wrap (function (context)
   ngx.say (Server.template ("index", {
     server  = Url.build (Config.ardoises),
     user    = user,
-    content = "{{{dashboard}}}",
     code    = "{{{dashboard-code}}}",
   }))
   return { status = ngx.HTTP_OK }
@@ -147,6 +146,39 @@ Server.overview = wrap (function (context)
     server  = Url.build (Config.ardoises),
     user    = user,
     content = "{{{overview}}}"
+  }))
+  return { status = ngx.HTTP_OK }
+end)
+
+Server.view = wrap (function (context)
+  local user, err = Server.authenticate (context)
+  if not user then
+    return { status = err }
+  end
+  -- check collaborator:
+  local ckey = Config.patterns.collaborator ({
+    owner = { login = ngx.var.owner },
+    name  = ngx.var.name,
+  }, user)
+  local collaboration = context.redis:get (ckey)
+  if collaboration == ngx.null or not collaboration then
+    return { status = ngx.HTTP_FORBIDDEN }
+  end
+  collaboration = assert (Json.decode (collaboration))
+  -- get repository:
+  local repository = context.redis:get (Config.patterns.repository (collaboration.repository))
+  if repository == ngx.null or not repository then
+    return { status = ngx.HTTP_FORBIDDEN }
+  end
+  repository = assert (Json.decode (repository))
+  -- answer:
+  _G.ngx.header ["Content-type"] = "text/html"
+  ngx.say (Server.template ("index", {
+    server     = Url.build (Config.ardoises),
+    user       = user,
+    repository = repository,
+    branch     = ngx.var.branch,
+    code       = "{{{editor-code}}}",
   }))
   return { status = ngx.HTTP_OK }
 end)
@@ -450,28 +482,13 @@ Server.editor = wrap (function (context)
   if not editor.target_url or not editor.editor_url then
     return { status = ngx.HTTP_NOT_FOUND }
   end
-  local headers = ngx.req.get_headers ()
-  if headers ["Accept"] == "application/json" then
-    ngx.say (Json.encode {
-      user        = user,
-      permissions = collaboration.collaborator.permissions,
-      repository  = repository,
-      branch      = ngx.var.branch,
-      editor_url  = editor.editor_url,
-    })
-  else
-    _G.ngx.header ["Content-type"] = "text/html"
-    ngx.say (Server.template ("index", {
-      server      = Url.build (Config.ardoises),
-      user        = user,
-      permissions = collaboration.collaborator.permissions,
-      repository  = repository,
-      branch      = ngx.var.branch,
-      editor_url  = editor.editor_url,
-      content     = "{{{editor}}}",
-      code        = "{{{editor-code}}}",
-    }))
-  end
+  ngx.say (Json.encode {
+    user        = user,
+    permissions = collaboration.collaborator.permissions,
+    repository  = repository,
+    branch      = ngx.var.branch,
+    editor_url  = editor.editor_url,
+  })
   return { status = ngx.HTTP_OK }
 end)
 

@@ -1,6 +1,6 @@
 local Copas = require "copas"
 
-local Editor  = _G.js.global.document:getElementById "editor"
+local Editor  = _G.js.global.document:getElementById "content"
 local loading = 0
 Editor.innerHTML = [[
   <div class="container-fluid">
