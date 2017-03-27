@@ -86,37 +86,131 @@ function Server.template (what, data)
   return template
 end
 
-function Server.authenticate (context)
-  local headers = ngx.req.get_headers ()
-  local cookie  = Cookie:new ()
-  local field   = cookie:get "Ardoises-Token"
-  local header  = field
-              and "token " .. field
-               or headers ["Authorization"]
-  if not header then
+function Server.register (context)
+  local query = ngx.req.get_uri_args ()
+  if not query.code and not query.state then
+    return true
+  end
+  local token = Jwt:verify (Config.application.secret, query.state)
+  if not token
+  or not token.payload
+  or not token.payload.csrf then
     return nil, ngx.HTTP_UNAUTHORIZED
   end
-  local token = Patterns.authorization:match (header)
-  if not token then
-    return nil, ngx.HTTP_UNAUTHORIZED
+  while true do
+    if context.redis:setnx (Config.patterns.lock "register", "locked") then
+      break
+    end
+    ngx.sleep (0.1)
   end
-  local jwt = Jwt:verify (Config.application.secret, token)
-  if not jwt then
-    return nil, ngx.HTTP_UNAUTHORIZED
-  end
-  local user = context.redis:get (Config.patterns.user (jwt.payload))
-  if user == ngx.null or not user then
+  local user, result, status
+  result, status = Http {
+    cache   = true,
+    url     = "https://github.com/login/oauth/access_token",
+    method  = "POST",
+    headers = {
+      ["Accept"    ] = "application/json",
+      ["User-Agent"] = "Ardoises",
+    },
+    body    = {
+      client_id     = Config.application.id,
+      client_secret = Config.application.secret,
+      state         = query.state,
+      code          = query.code,
+    },
+  }
+  context.redis:del (Config.patterns.lock "register")
+  if status ~= ngx.HTTP_OK or not result.access_token then
     return nil, ngx.HTTP_INTERNAL_SERVER_ERROR
   end
-  user = Json.decode (user)
-  if not user then
+  user, status = Http {
+    url     = "https://api.github.com/user",
+    method  = "GET",
+    headers = {
+      ["Accept"       ] = "application/vnd.github.v3+json",
+      ["Authorization"] = "token " .. result.access_token,
+      ["User-Agent"   ] = "Ardoises",
+    },
+  }
+  if status ~= ngx.HTTP_OK then
     return nil, ngx.HTTP_INTERNAL_SERVER_ERROR
   end
+  local key = Config.patterns.user (user)
+  user.tokens = {
+    github   = result.access_token,
+    ardoises = Jwt:sign (Config.application.secret, {
+      header  = {
+        typ = "JWT",
+        alg = "HS256",
+      },
+      payload = {
+        login = user.login,
+      },
+    }),
+  }
+  context.redis:set (key, Json.encode (user))
+  local cookie = Cookie:new ()
+  cookie:set {
+    expires  = nil,
+    httponly = true,
+    secure   = false,
+    samesite = "Strict",
+    key      = "Ardoises-Token",
+    value    = user.tokens.ardoises,
+  }
   return user
 end
 
+function Server.authenticate (context, options)
+  local user, err = Server.register (context)
+  if not user then
+    return nil, err
+  elseif type (user) == "table" then
+    return user -- the user
+  end
+  user, err = (function ()
+    local headers = ngx.req.get_headers ()
+    local cookie  = Cookie:new ()
+    local field   = cookie:get "Ardoises-Token"
+    local header  = field
+                and "token " .. field
+                 or headers ["Authorization"]
+    if not header then
+      return nil, ngx.HTTP_UNAUTHORIZED
+    end
+    local token = Patterns.authorization:match (header)
+    if not token then
+      return nil, ngx.HTTP_UNAUTHORIZED
+    end
+    local jwt = Jwt:verify (Config.application.secret, token)
+    if not jwt then
+      return nil, ngx.HTTP_UNAUTHORIZED
+    end
+    local info = context.redis:get (Config.patterns.user (jwt.payload))
+    if info == ngx.null or not info then
+      return nil, ngx.HTTP_INTERNAL_SERVER_ERROR
+    end
+    info = Json.decode (info)
+    if not info then
+      return nil, ngx.HTTP_INTERNAL_SERVER_ERROR
+    end
+    return info
+  end) ()
+  if not user and not (options or {}).optional then
+    local url = Url.parse (Url.build (Config.ardoises))
+    url.path               = "/login"
+    url.query.redirect_uri = ngx.var.request_uri
+    context.redis:close ()
+    print (Url.build (url))
+    return ngx.redirect (Url.build (url))
+  end
+  return user, err
+end
+
 Server.root = wrap (function (context)
-  local user = Server.authenticate (context)
+  local user = Server.authenticate (context, {
+    optional = true,
+  })
   context.redis:close ()
   if user then
     return { redirect = "/dashboard" }
@@ -140,7 +234,9 @@ Server.dashboard = wrap (function (context)
 end)
 
 Server.overview = wrap (function (context)
-  local user = Server.authenticate (context)
+  local user = Server.authenticate (context, {
+    optional = true,
+  })
   _G.ngx.header ["Content-type"] = "text/html"
   ngx.say (Server.template ("index", {
     server  = Url.build (Config.ardoises),
@@ -184,10 +280,14 @@ Server.view = wrap (function (context)
 end)
 
 Server.login = wrap (function ()
-  local url           = Url.parse "https://github.com/login/oauth/authorize"
-  url.query.client_id = Config.application.id
-  url.query.scope     = "user:email admin:repo_hook"
-  url.query.state     = Jwt:sign (Config.application.secret, {
+  local query            = ngx.req.get_uri_args ()
+  local url              = Url.parse "https://github.com/login/oauth/authorize"
+  local redirect         = Url.parse (Url.build (Config.ardoises))
+  redirect.path          = query.redirect_uri or "/"
+  url.query.redirect_uri = Url.build (redirect)
+  url.query.client_id    = Config.application.id
+  url.query.scope        = "user:email admin:repo_hook"
+  url.query.state        = Jwt:sign (Config.application.secret, {
     header  = {
       typ = "JWT",
       alg = "HS256",
@@ -208,78 +308,6 @@ Server.logout = wrap (function ()
     httponly = true,
     secure   = false,
     samesite = "Strict",
-  }
-  return { redirect = "/" }
-end)
-
-Server.register = wrap (function (context)
-  local query = ngx.req.get_uri_args ()
-  local token = Jwt:verify (Config.application.secret, query.state)
-  if not token
-  or not token.payload
-  or not token.payload.csrf then
-    return { status = ngx.HTTP_UNAUTHORIZED }
-  end
-  while true do
-    if context.redis:setnx (Config.patterns.lock "register", "locked") then
-      break
-    end
-    ngx.sleep (0.1)
-  end
-  local user, result, status
-  result, status = Http {
-    cache   = true,
-    url     = "https://github.com/login/oauth/access_token",
-    method  = "POST",
-    headers = {
-      ["Accept"    ] = "application/json",
-      ["User-Agent"] = "Ardoises",
-    },
-    body    = {
-      client_id     = Config.application.id,
-      client_secret = Config.application.secret,
-      state         = query.state,
-      code          = query.code,
-    },
-  }
-  context.redis:del (Config.patterns.lock "register")
-  if status ~= ngx.HTTP_OK or not result.access_token then
-    return { status = ngx.HTTP_INTERNAL_SERVER_ERROR }
-  end
-  user, status = Http {
-    url     = "https://api.github.com/user",
-    method  = "GET",
-    headers = {
-      ["Accept"       ] = "application/vnd.github.v3+json",
-      ["Authorization"] = "token " .. result.access_token,
-      ["User-Agent"   ] = "Ardoises",
-    },
-  }
-  if status ~= ngx.HTTP_OK then
-    return { status = ngx.HTTP_INTERNAL_SERVER_ERROR }
-  end
-  local key = Config.patterns.user (user)
-  user.tokens = {
-    github   = result.access_token,
-    ardoises = Jwt:sign (Config.application.secret, {
-      header  = {
-        typ = "JWT",
-        alg = "HS256",
-      },
-      payload = {
-        login = user.login,
-      },
-    }),
-  }
-  context.redis:set (key, Json.encode (user))
-  local cookie = Cookie:new ()
-  cookie:set {
-    expires  = nil,
-    httponly = true,
-    secure   = false,
-    samesite = "Strict",
-    key      = "Ardoises-Token",
-    value    = user.tokens.ardoises,
   }
   return { redirect = "/" }
 end)
