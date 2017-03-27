@@ -51,7 +51,7 @@ package.preload ["progressbar"] = function ()
   local Progress_mt = {}
   local Progress    = setmetatable ({}, Progress_mt)
   function Progress_mt.__call (_, options)
-    local Content  = _G.js.global.document:getElementById "content"
+    local Content  = _G.js.global.document:getElementById "progress-bar"
     local progress = setmetatable ({
       finished = false,
       elapsed  = 0,
@@ -84,6 +84,7 @@ package.preload ["progressbar"] = function ()
         Element:setAttribute ("style", "width:" .. tostring (progress.elapsed) .. "%")
         Copas.sleep (math.random (0, 2 * progress.step))
       end
+      Content.innerHTML = ""
     end)
     return progress
   end

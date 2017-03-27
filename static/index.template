@@ -69,6 +69,8 @@
             </ul>
           </div>
           <div class="col-sm-4">
+            <div id="progress-bar">
+            </div>
           </div>
           <div class="col-sm-4">
             <ul class="lead nav navbar-nav navbar-right">

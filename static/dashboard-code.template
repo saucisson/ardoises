@@ -1,6 +1,6 @@
 local Progress = require "progressbar"
 local progress = Progress {
-  expected = 2, -- seconds
+  expected = 1, -- seconds
 }
 
 local Copas  = require "copas"
