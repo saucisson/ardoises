@@ -84,6 +84,8 @@ package.preload ["progressbar"] = function ()
         Element:setAttribute ("style", "width:" .. tostring (progress.elapsed) .. "%")
         Copas.sleep (math.random (0, 2 * progress.step))
       end
+      Element:setAttribute ("style", "width:100%")
+      Copas.sleep (0.5)
       Content.innerHTML = ""
     end)
     return progress
