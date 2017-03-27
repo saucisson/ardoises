@@ -20,7 +20,8 @@ return Common (function (request, cache)
     })
     local answer = redis:get (prefix .. json.request)
     if answer then
-      json.answer = Json.decode (answer)
+      json.answer         = Json.decode (answer)
+      json.answer.headers = json.answer.headers or {}
       request.headers ["If-None-Match"    ] = json.answer.headers ["etag"         ]
                                            or json.answer.headers ["ETag"         ]
       request.headers ["If-Modified-Since"] = json.answer.headers ["last-modified"]
