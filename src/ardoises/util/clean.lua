@@ -20,7 +20,7 @@ local parser = Arguments () {
 }
 parser:option "--delay" {
   description = "Delay between iterations (in seconds)",
-  default     = "60",
+  default     = "15",
   convert     = tonumber,
 }
 local arguments = parser:parse ()

@@ -55,6 +55,20 @@ Copas.addthread (function ()
   while true do
     Copas.sleep (10)
     if editor.websocket.state ~= "OPEN" then
+      Content.innerHTML = [[
+        <section>
+          <div class="container-fluid">
+            <div class="row">
+              <div class="col-md-12">
+                <div class="alert alert-danger">
+                  <strong>Disconnected!</strong> This page will be reloaded soon.
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      ]]
+      Copas.sleep (5)
       _G.js.global.location:reload ()
     end
   end

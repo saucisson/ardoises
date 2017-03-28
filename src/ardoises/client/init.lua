@@ -123,33 +123,35 @@ end
 
 function Ardoise.edit (ardoise)
   assert (getmetatable (ardoise) == Ardoise)
-  local client = ardoise.client
-  local info, status = Http {
-    method  = "GET",
-    headers = ardoise.client.headers,
-    url     = Url.build {
-      scheme = client.server.scheme,
-      host   = client.server.host,
-      port   = client.server.port,
-      path   = Lustache:render ("/editors/{{{owner}}}/{{{repository}}}/{{{branch}}}", {
-        owner      = ardoise.repository.owner.login,
-        repository = ardoise.repository.name,
-        branch     = ardoise.branch,
-      }),
-    },
-  }
-  assert (status == 200, status)
+  local client    = ardoise.client
   local websocket = Websocket.client.copas {}
   local start     = Gettime ()
+  local info
   repeat
+    assert (Gettime () - start <= 60)
+    local status
+    info, status = Http {
+      method  = "GET",
+      headers = ardoise.client.headers,
+      url     = Url.build {
+        scheme = client.server.scheme,
+        host   = client.server.host,
+        port   = client.server.port,
+        path   = Lustache:render ("/editors/{{{owner}}}/{{{repository}}}/{{{branch}}}", {
+          owner      = ardoise.repository.owner.login,
+          repository = ardoise.repository.name,
+          branch     = ardoise.branch,
+        }),
+      },
+    }
+    assert (status == 200)
     local connected = websocket:connect (info.editor_url, "ardoise")
-    assert (Gettime () - start <= 30)
     if not connected then
       Copas.sleep (1)
     end
   until connected
   assert (websocket:send (Json.encode {
-    id    = 1,
+    id    = "authenticate",
     type  = "authenticate",
     token = client.tokens.github,
   }))

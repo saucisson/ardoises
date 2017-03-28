@@ -60,12 +60,12 @@ body {
   height: 95%;
 }
 .editor-model {
-  height: 55vh;
-  min-height: 55vh;
+  height: 60vh;
+  min-height: 60vh;
 }
 .editor-patch {
-  height: 25vh;
-  min-height: 25vh;
+  height: 30vh;
+  min-height: 30vh;
 }
 
 a:link {
