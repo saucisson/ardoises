@@ -100,6 +100,7 @@ function Editor.start (editor)
     default   = function () end,
     protocols = {
       ardoise = function (ws)
+        print "-> client"
         editor.last  = os.time ()
         local client = setmetatable ({
           websocket   = ws,
@@ -117,6 +118,7 @@ function Editor.start (editor)
           editor:dispatch (client)
         end
         editor.clients [client] = nil
+        print "<- client"
         ws:close ()
       end,
     },

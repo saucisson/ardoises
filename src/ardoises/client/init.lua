@@ -158,20 +158,11 @@ function Ardoise.edit (ardoise)
   if not res.success then
     return nil, "authentication failure"
   end
-  Copas.addthread (function ()
-    while true do
-      websocket:send (Json.encode {
-        id   = "ping",
-        type = "ping",
-      })
-      Copas.sleep (10)
-    end
-  end)
   local editor = setmetatable ({
     Layer       = setmetatable ({}, { __index = Layer }),
     ardoise     = ardoise,
     client      = client,
-    url         = ardoise.editor_url,
+    url         = info.editor_url,
     websocket   = websocket,
     running     = true,
     modules     = {},
@@ -186,6 +177,15 @@ function Ardoise.edit (ardoise)
       branch     = ardoise.branch,
     }),
   }, Editor)
+  Copas.addthread (function ()
+    while editor.running do
+      editor:send {
+        id   = "ping",
+        type = "ping",
+      }
+      Copas.sleep (30)
+    end
+  end)
   editor.Layer.require = function (name)
     if not Patterns.require:match (name) then
       name = name .. "@" .. assert (editor.current)
@@ -198,10 +198,23 @@ function Ardoise.edit (ardoise)
   end
   editor.receiver = Copas.addthread (function ()
     while editor.running do
-      pcall (Editor.receive, editor)
+      pcall (Editor.answer, editor)
     end
   end)
   return editor
+end
+
+function Editor.send (editor, data)
+  assert (editor.websocket.state == "OPEN")
+  return editor.websocket:send (Json.encode (data))
+end
+
+function Editor.receive (editor)
+  local result = editor.websocket:receive ()
+  if result then
+    result = assert (Json.decode (result))
+    return result
+  end
 end
 
 function Editor.__tostring (editor)
@@ -220,7 +233,7 @@ function Editor.list (editor)
   editor.callbacks [request.id] = function ()
     Copas.wakeup (co)
   end
-  assert (editor.websocket:send (Json.encode (request)))
+  assert (editor:send (request))
   Copas.sleep (-math.huge)
   assert (request.answer)
   local coroutine = Coromake ()
@@ -257,7 +270,7 @@ function Editor.require (editor, name)
   editor.callbacks [request.id] = function ()
     Copas.wakeup (co)
   end
-  assert (editor.websocket:send (Json.encode (request)))
+  assert (editor:send (request))
   Copas.sleep (-math.huge)
   if not request.success then
     return nil, request.errors
@@ -265,11 +278,11 @@ function Editor.require (editor, name)
   local code = request.answer.code
   local loaded, err_loaded = _G.load (code, module.name, "t")
   if not loaded then
-    return nil, "invalid layer: " .. err_loaded
+    return nil, "invalid layer: " .. tostring (err_loaded)
   end
   local ok, chunk = pcall (loaded)
   if not ok then
-    return nil, "invalid layer: " .. chunk
+    return nil, "invalid layer: " .. tostring (chunk)
   end
   local remote, ref = Layer.new {
     name = module.name,
@@ -278,7 +291,7 @@ function Editor.require (editor, name)
   editor.current   = Lustache:render ("{{{owner}}}/{{{repository}}}:{{{branch}}}", module)
   local ok_apply, err_apply = pcall (chunk, editor.Layer, remote, ref)
   if not ok_apply then
-    return nil, "invalid layer: " .. err_apply
+    return nil, "invalid layer: " .. tostring (err_apply)
   end
   editor.current = oldcurrent
   local layer = Layer.new {
@@ -334,7 +347,7 @@ function Editor.create (editor, name)
       editor.modules [module.name] = nil
     end
   end
-  assert (editor.websocket:send (Json.encode (request)))
+  assert (editor:send (request))
   return module.name
 end
 
@@ -363,7 +376,7 @@ function Editor.delete (editor, name)
       editor.modules [module.name] = back
     end
   end
-  assert (editor.websocket:send (Json.encode (request)))
+  assert (editor:send (request))
   return true
 end
 
@@ -387,21 +400,22 @@ function Editor.patch (editor, what)
     end
   end
   for name, code in pairs (what) do
-    if Patterns.module:match (name) then
+    if  not Patterns.require:match (name)
+    and Patterns.module:match (name) then
       name = name .. "@" .. assert (editor.current)
     end
     local module = editor.modules [name]
     if not module then
-      return nil, "unknown module: " .. name
+      return nil, "unknown module: " .. tostring (name)
     end
     if type (code) == "string" then
       local chunk, err_chunk = _G.load (code, name, "t")
       if not chunk then
-        return nil, "invalid patch: " .. err_chunk
+        return nil, "invalid patch: " .. tostring (err_chunk)
       end
       local ok_loaded, loaded = pcall (chunk)
       if not ok_loaded then
-        return nil, "invalid patch: " .. loaded
+        return nil, "invalid patch: " .. tostring (loaded)
       end
       code = loaded
     elseif type (code) == "function" then
@@ -432,7 +446,7 @@ function Editor.patch (editor, what)
     local dumped, err = Layer.dump (module.current)
     if not dumped then
       rollback ()
-      return nil, "unable to dump patch: " .. err
+      return nil, "unable to dump patch: " .. tostring (err)
     end
     request.patches [#request.patches+1] = {
       module = module.name,
@@ -445,7 +459,7 @@ function Editor.patch (editor, what)
     for module, layer in pairs (modules) do
       Layer.write_to (module.layer, nil)
       local refines = module.layer [Layer.key.refines]
-      for i, l in ipairs (refines) do
+      for i, l in ipairs (refines or {}) do
         if layer == l then
           for j = i+1, #refines do
             refines [j-1] = refines [j]
@@ -468,23 +482,21 @@ function Editor.patch (editor, what)
       end
     end
   end
-  assert (editor.websocket:send (Json.encode (request)))
+  assert (editor:send (request))
   return true
 end
 
-function Editor.receive (editor)
+function Editor.answer (editor)
   assert (getmetatable (editor) == Editor)
-  local message = editor.websocket:receive ()
+  local message = editor:receive ()
   if not message then
     return
   end
-  print ("received", message)
-  message = Json.decode (message)
   if message.type == "ping" then
-    editor.websocket:send (Json.encode {
+    editor:send {
       id   = message.id,
       type = "pong",
-    })
+    }
   elseif message.type == "pong" then
     local _ = false
   elseif message.type == "answer" then
@@ -512,11 +524,11 @@ function Editor.receive (editor)
       if module then
         local chunk, err_chunk = _G.load (patch.code, module, "t")
         if not chunk then
-          return nil, "invalid patch: " .. err_chunk
+          return nil, "invalid patch: " .. tostring (err_chunk)
         end
         local ok_loaded, loaded = pcall (chunk)
         if not ok_loaded then
-          return nil, "invalid patch: " .. loaded
+          return nil, "invalid patch: " .. tostring (loaded)
         end
         module.current = Layer.new {
           temporary = true,

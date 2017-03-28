@@ -7,6 +7,7 @@ local Copas  = require "copas"
 local Client = require "ardoises.client"
 local Et     = require "etlua"
 local Layer  = require "layeredata"
+local tojs   = require "tojs"
 local client = Client {
   server = "{{{server}}}",
   tokens = {
@@ -14,6 +15,7 @@ local client = Client {
     github   = "{{{user.tokens.github}}}",
   },
 }
+
 local ardoise
 for _, a in ipairs (client:ardoises ()) do
   if  a.repository.full_name == "{{{repository.full_name}}}"
@@ -28,33 +30,10 @@ progress.finished = true
 
 Copas.addthread (function ()
   while true do
-    print (editor.websocket and editor.websocket.websocket)
     Copas.sleep (10)
+    print (editor.websocket.state)
   end
 end)
-
-local function default_togui (parameters)
-  assert (type (parameters) == "table")
-  -- local editor = assert (parameters.editor)
-  local what   = assert (parameters.what  )
-  local target = assert (parameters.target)
-  target.innerHTML = [[
-    <div class="panel panel-default">
-      <div class="panel-body">
-        <div class="editor" id="layer">
-        </div>
-      </div>
-    </div>
-  ]]
-  local sourced = _G.window.ace:edit "layer"
-  sourced:setReadOnly (true)
-  sourced ["$blockScrolling"] = true
-  sourced:setTheme "ace/theme/monokai"
-  sourced:getSession ():setMode "ace/mode/lua"
-  sourced:setValue (what.code)
-  coroutine.yield ()
-  target.innerHTML = [[]]
-end
 
 local Content = _G.js.global.document:getElementById "content"
 Content.innerHTML = [[
@@ -81,8 +60,8 @@ Content.innerHTML = [[
 
 local Layers  = _G.js.global.document:getElementById "layers"
 local Ardoise = _G.js.global.document:getElementById "ardoise"
-local active
-local layers
+local active  = nil
+local layers  = {}
 
 local renderers = {
   layers  = nil,
@@ -105,7 +84,7 @@ renderers.layers = Copas.addthread (function ()
       <div class="list-group">
         <div class="list-group-item row">
           <div class="input-group">
-            <input id="layer-name" type="text" class="form-control" placeholder="Module" />
+            <input id="layer-name" type="text" class="form-control" placeholder="New module" />
             <span id="layer-create" class="input-group-addon"><i class="fa fa-plus fa-inverse" aria-hidden="true"></i></span>
           </div>
         </div>
@@ -202,20 +181,22 @@ renderers.active = Copas.addthread (function ()
   end
 end)
 
+local default_togui
+
 renderers.ardoise = Copas.addthread (function ()
   while true do
     if active then
-      local what  = editor:require (active.module)
-      local gui   = what.layer [Layer.key.meta]
-                and what.layer [Layer.key.meta].gui
-      local togui = what.layer [Layer.key.meta]
-                and what.layer [Layer.key.meta] [gui]
-                and what.layer [Layer.key.meta] [gui].render
-                 or default_togui
+      local edited = editor:require (active.module)
+      local gui    = edited.layer [Layer.key.meta]
+                 and edited.layer [Layer.key.meta].gui
+      local togui  = edited.layer [Layer.key.meta]
+                 and edited.layer [Layer.key.meta] [gui]
+                 and edited.layer [Layer.key.meta] [gui].render
+                  or default_togui
       local co = coroutine.create (togui)
       coroutine.resume (co, {
         editor = editor,
-        what   = what,
+        module = active.module,
         target = Ardoise,
         width  = _G.window.innerWidth  * 0.8,
         height = _G.window.innerHeight * 0.8,
@@ -226,3 +207,108 @@ renderers.ardoise = Copas.addthread (function ()
     Copas.sleep (-math.huge)
   end
 end)
+
+default_togui = function (parameters)
+  assert (type (parameters) == "table")
+  -- local editor = assert (parameters.editor)
+  local module = assert (parameters.module)
+  local target = assert (parameters.target)
+  local edited = editor:require (module)
+  target.innerHTML = [[
+    <div class="panel panel-default">
+      <div class="panel-body">
+      <div class="container-fluid">
+        <div class="row">
+          <div class="col-md-12 editor-model">
+            <div id="editor-model" class="editor">
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-11 editor-patch">
+            <div id="editor-patch" class="editor">
+            </div>
+          </div>
+          <div class="col-md-1">
+            <div class="input-group">
+              <span class="input-group-addon">
+                <button id="patch-submit" class="btn btn-xs">
+                  <i class="fa fa-paper-plane fa-inverse" aria-hidden="true"></i>
+                </button>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  ]]
+  local source = _G.window.ace:edit "editor-model"
+  source:setReadOnly (true)
+  source ["$blockScrolling"] = true
+  source:setTheme "ace/theme/monokai"
+  source:getSession ():setMode "ace/mode/lua"
+  source:setValue (edited.code)
+  local patch = _G.window.ace:edit "editor-patch"
+  patch:setReadOnly (false)
+  patch ["$blockScrolling"] = true
+  patch:setTheme "ace/theme/monokai"
+  patch:getSession ():setMode "ace/mode/lua"
+  local running = true
+  local changed = 0
+  local submit  = _G.js.global.document:getElementById "patch-submit"
+  patch:on ("change", function ()
+    changed = os.clock ()
+  end)
+  Copas.addthread (function ()
+    local last = -math.huge
+    while running do
+      if os.clock () - changed > 1 and changed ~= last then
+        last = changed
+        local code = patch:getValue ()
+        local ok, err = load (code, "patch", "t")
+        patch:getSession ():clearAnnotations ()
+        if ok then
+          submit.disabled = false
+        else
+          local pattern = [[%[string "patch"%]:(%d+):%s+(.*)]]
+          local line, problem = err:match (pattern)
+          submit.disabled = true
+          patch:getSession ():setAnnotations (tojs {
+            { row    = line-1,
+              column = 0,
+              text   = problem,
+              type   = "error",
+            },
+          })
+        end
+      end
+      Copas.sleep (1)
+    end
+  end)
+  patch:setValue [[
+return function (Layer, layer, ref)
+  -- Write your patch here...
+  ...
+end
+]]
+  patch:gotoLine (3, 5, true)
+  patch:focus ()
+  submit.onclick = function ()
+    local ok, err = editor:patch {
+      [active.module] = patch:getValue (),
+    }
+    if not ok then
+      patch:getSession ():setAnnotations (tojs {
+        { row    = 0,
+          column = 0,
+          text   = tostring (err),
+          type   = "error",
+        },
+      })
+    end
+    return false
+  end
+  coroutine.yield ()
+  running = false
+  target.innerHTML = [[]]
+end

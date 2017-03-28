@@ -27,6 +27,10 @@ local function tojs (t)
   end
 end
 
+package.preload ["tojs"] = function ()
+  return tojs
+end
+
 package.preload ["jit"] = function ()
   return false
 end
@@ -256,6 +260,7 @@ package.preload ["websocket"] = function ()
     local co        = coroutine.running ()
     function websocket.onopen ()
       what.websocket = websocket
+      what.state     = "OPEN"
       Copas.wakeup (co)
     end
     function websocket.onmessage (_, event)
@@ -270,6 +275,7 @@ package.preload ["websocket"] = function ()
     function websocket.onclose (_, event)
       what.websocket = nil
       what.error     = event
+      what.state     = "CLOSED"
       Copas.wakeup (co)
     end
     Copas.sleep (what.timeout)
@@ -397,7 +403,6 @@ local co = coroutine.create (function ()
     end)
     Copas.addthread (function ()
       while true do
-        print "ping!"
         Copas.sleep (60)
       end
     end)

@@ -16,8 +16,8 @@ body {
   background-position: center;
   background-color: DimGrey;
   background-image: url(/static/ardoises.jpg);
-  padding-top: 70px;
-  padding-bottom: 70px;
+  padding-top: 50px;
+  padding-bottom: 50px;
 }
 
 .text-primary, .text-info {
@@ -56,8 +56,16 @@ body {
 }
 
 .editor {
-  height: 600px;
-  min-height: 600px;
+  width: 100%;
+  height: 95%;
+}
+.editor-model {
+  height: 55vh;
+  min-height: 55vh;
+}
+.editor-patch {
+  height: 25vh;
+  min-height: 25vh;
 }
 
 a:link {
