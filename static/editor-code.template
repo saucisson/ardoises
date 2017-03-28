@@ -201,8 +201,11 @@ local default_togui
 
 renderers.ardoise = Copas.addthread (function ()
   while true do
+    local edited
     if active then
-      local edited = editor:require (active.module)
+      edited = editor:require (active.module)
+    end
+    if edited then
       local gui    = edited.layer [Layer.key.meta]
                  and edited.layer [Layer.key.meta].gui
       local togui  = edited.layer [Layer.key.meta]
@@ -230,6 +233,12 @@ default_togui = function (parameters)
   local module = assert (parameters.module)
   local target = assert (parameters.target)
   local edited = editor:require (module)
+  local default_patch = [[
+return function (Layer, layer, ref)
+  -- Write your patch here...
+  ...
+end
+]]
   target.innerHTML = [[
     <div class="panel panel-default">
       <div class="panel-body">
@@ -263,7 +272,6 @@ default_togui = function (parameters)
   source ["$blockScrolling"] = true
   source:setTheme "ace/theme/monokai"
   source:getSession ():setMode "ace/mode/lua"
-  source:setValue (edited.code)
   local patch = _G.window.ace:edit "editor-patch"
   patch:setReadOnly (false)
   patch ["$blockScrolling"] = true
@@ -274,6 +282,12 @@ default_togui = function (parameters)
   local submit  = _G.js.global.document:getElementById "patch-submit"
   patch:on ("change", function ()
     changed = os.clock ()
+  end)
+  Copas.addthread (function ()
+    repeat
+      source:setValue (edited.code)
+      editor:wait ()
+    until not running
   end)
   Copas.addthread (function ()
     local last = -math.huge
@@ -301,27 +315,38 @@ default_togui = function (parameters)
       Copas.sleep (1)
     end
   end)
-  patch:setValue [[
-return function (Layer, layer, ref)
-  -- Write your patch here...
-  ...
-end
-]]
+  patch:setValue (default_patch)
   patch:gotoLine (3, 5, true)
+  local function save ()
+    Copas.addthread (function ()
+      local ok, err = editor:patch {
+        [active.module] = patch:getValue (),
+      }
+      if ok then
+        patch:setValue (default_patch)
+      else
+        patch:getSession ():setAnnotations (tojs {
+          { row    = 0,
+            column = 0,
+            text   = tostring (err),
+            type   = "error",
+          },
+        })
+      end
+    end)
+  end
   patch:focus ()
-  submit.onclick = function ()
-    local ok, err = editor:patch {
-      [active.module] = patch:getValue (),
-    }
-    if not ok then
-      patch:getSession ():setAnnotations (tojs {
-        { row    = 0,
-          column = 0,
-          text   = tostring (err),
-          type   = "error",
-        },
-      })
+  _G.js.global.document:addEventListener ("keydown", function (_, e)
+    local key = _G.js.global.navigator.platform:match "Mac"
+            and e.metaKey
+             or e.ctrlKey
+    if e.keyCode == 83 and key and not submit.disabled then
+      save ()
+      return false
     end
+  end, false)
+  submit.onclick = function ()
+    save ()
     return false
   end
   coroutine.yield ()

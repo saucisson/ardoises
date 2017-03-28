@@ -684,7 +684,7 @@ function Editor.handlers.patch (editor, message)
       code   = patch.code,
     })
   end
-  assert (os.execute (Et.render ([[
+  os.execute (Et.render ([[
     cd <%- path %> && \
     git commit --quiet \
                --author="<%- name %> <<%- email %>>" \
@@ -694,7 +694,7 @@ function Editor.handlers.patch (editor, message)
     message = string.format ("%q", table.concat (patches, "\n")),
     name    = message.client.user.name,
     email   = message.client.user.email,
-  })))
+  }))
   -- send to other clients
   for client in pairs (editor.clients) do
     if client ~= message.client then

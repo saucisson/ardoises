@@ -406,7 +406,7 @@ function Editor.patch (editor, what)
     and Patterns.module:match (name) then
       name = name .. "@" .. assert (editor.current)
     end
-    local module = editor.modules [name]
+    local module = editor:require (name)
     if not module then
       return nil, "unknown module: " .. tostring (name)
     end
