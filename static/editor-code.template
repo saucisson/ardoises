@@ -28,13 +28,6 @@ assert (ardoise)
 local editor = ardoise:edit ()
 progress.finished = true
 
-Copas.addthread (function ()
-  while true do
-    Copas.sleep (10)
-    print (editor.websocket.state)
-  end
-end)
-
 local Content = _G.js.global.document:getElementById "content"
 Content.innerHTML = [[
   <section>
@@ -57,6 +50,15 @@ Content.innerHTML = [[
     </div>
   </section>
 ]]
+
+Copas.addthread (function ()
+  while true do
+    Copas.sleep (10)
+    if editor.websocket.state ~= "OPEN" then
+      _G.js.global.location:reload ()
+    end
+  end
+end)
 
 local Layers  = _G.js.global.document:getElementById "layers"
 local Ardoise = _G.js.global.document:getElementById "ardoise"
