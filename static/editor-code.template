@@ -82,15 +82,17 @@ Content.innerHTML = [[
 local Layers  = _G.js.global.document:getElementById "layers"
 local Ardoise = _G.js.global.document:getElementById "ardoise"
 local active
+local layers
 
 local renderers = {
   layers  = nil,
   ardoise = nil,
+  active  = nil,
 }
 renderers.layers = Copas.addthread (function ()
   local in_delete
   while true do
-    local layers = {}
+    layers = {}
     for name, module in editor:list () do
       layers [#layers+1] = {
         id     = #layers+1,
@@ -137,18 +139,13 @@ renderers.layers = Copas.addthread (function ()
     for _, layer in ipairs (layers) do
       local link = _G.js.global.document:getElementById ("layer-get-" .. tostring (layer.id))
       link.onclick = function ()
-        if active then
-          local parent = active.link.parentNode.parentNode
-          parent.classList:remove "active"
-        end
         Copas.addthread (function ()
           active = {
             module = layer.module,
             link   = link,
           }
-          local parent = active.link.parentNode.parentNode
-          parent.classList:add "active"
           Copas.wakeup (renderers.ardoise)
+          Copas.wakeup (renderers.active)
         end)
         return false
       end
@@ -184,6 +181,21 @@ renderers.layers = Copas.addthread (function ()
           end)
         end
         return false
+      end
+    end
+    Copas.wakeup (renderers.active)
+    Copas.sleep (-math.huge)
+  end
+end)
+
+renderers.active = Copas.addthread (function ()
+  while true do
+    for _, layer in ipairs (layers) do
+      local link = _G.js.global.document:getElementById ("layer-get-" .. tostring (layer.id))
+      if active and active.module == layer.module then
+        link.parentNode.parentNode.classList:add "active"
+      else
+        link.parentNode.parentNode.classList:remove "active"
       end
     end
     Copas.sleep (-math.huge)
