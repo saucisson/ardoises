@@ -78,6 +78,7 @@ package.preload ["progressbar"] = function ()
     ]]
     local Element = _G.js.global.document:getElementById "progress"
     Copas.addthread (function ()
+      Copas.sleep (0.5)
       while not progress.finished do
         local speed = (100 - progress.elapsed) / (progress.expected / progress.step)
         progress.elapsed = progress.elapsed + speed
