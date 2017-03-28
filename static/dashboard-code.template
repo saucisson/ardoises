@@ -88,6 +88,13 @@ output = Copas.addthread (function ()
                 <i class="fa fa-ban fa-stack-2x text-danger"></i>
               </span>
               <% end %>
+              <% if ardoise.repository.owner.login == user then %>
+                <a href="https://github.com/<%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>/settings/collaboration">
+                  <span class="fa-stack fa-lg">
+                    <i class="fa fa-users fa-stack-1x"></i>
+                  </span>
+                </a>
+              <% end %>
             </div>
             <div class="col-md-11">
               <a href="/views/<%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>/<%- ardoise.repository.default_branch %>">
@@ -113,6 +120,7 @@ output = Copas.addthread (function ()
       </div>
     ]], {
       ardoises = filtered,
+      user     = "{{{user.login}}}",
     })
     Copas.sleep (-math.huge)
   end
