@@ -1,9 +1,0 @@
-<div class="section">
-  <div class="container">
-    <div class="row">
-      <div class="col-md-12 text-center">
-        <h1 class="text-primary"><i class="fa fa-bug fa-5x fa-fw"></i><%= status %></h1>
-      </div>
-    </div>
-  </div>
-</div>
