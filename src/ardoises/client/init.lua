@@ -482,6 +482,7 @@ function Editor.patch (editor, what)
       else
         assert (false)
       end
+      module.code = Layer.dump (module.remote)
     end
   end
   assert (editor:send (request))
@@ -512,19 +513,13 @@ function Editor.answer (editor)
     callback ()
   elseif message.type == "create" then
     editor.modules [message.module] = true
-    for observer in pairs (editor.observers) do
-      observer (message)
-    end
   elseif message.type == "delete" then
     editor.modules [message.module] = nil
-    for observer in pairs (editor.observers) do
-      observer (message)
-    end
   elseif message.type == "patch" then
     for _, patch in ipairs (message.patches) do
       local module = editor.modules [patch.module]
       if module then
-        local chunk, err_chunk = _G.load (patch.code, module, "t")
+        local chunk, err_chunk = _G.load (patch.code, module.name, "t")
         if not chunk then
           return nil, "invalid patch: " .. tostring (err_chunk)
         end
@@ -532,15 +527,25 @@ function Editor.answer (editor)
         if not ok_loaded then
           return nil, "invalid patch: " .. tostring (loaded)
         end
-        module.current = Layer.new {
+        local layer   = Layer.new {
           temporary = true,
         }
-        loaded (editor.Layer, module.remote, module.ref)
+        local current = Layer.new {
+          temporary = true,
+        }
+        layer [Layer.key.refines] = {
+          module.remote,
+          current,
+        }
+        Layer.write_to (layer, current)
+        loaded (editor.Layer, layer, module.ref)
+        Layer.merge (current, module.remote)
+        module.code = Layer.dump (module.remote)
       end
     end
-    for observer in pairs (editor.observers) do
-      observer (message)
-    end
+  end
+  for observer in pairs (editor.observers) do
+    observer (message)
   end
 end
 
@@ -566,18 +571,26 @@ function Editor.wait (editor, t)
   local function f (message)
     if     message.type == "create" and t.create then
       result.type   = "create"
-      result.result = message.module
+      result.result = {
+        module = message.module,
+      }
     elseif message.type == "delete" and t.delete then
       result.type   = "delete"
-      result.result = message.module
-    elseif message.type == "update" and t.update and result.proxy then
-      result.type   = "update"
       result.result = {
+        module = message.module,
+      }
+    elseif message.type == "patch" and t.patch then
+      result.type   = "patch"
+      result.result = {
+        patches   = message.patches,
         proxy     = result.proxy,
         key       = result.key,
         old_value = result.old_value,
         new_value = result.new_value,
       }
+    elseif message.type == "answer" and t.answer then
+      result.type   = "answer"
+      result.result = message.answer
     end
     Copas.addthread (function ()
       Copas.wakeup (co)

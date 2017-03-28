@@ -286,7 +286,13 @@ end
   Copas.addthread (function ()
     repeat
       source:setValue (edited.code)
-      editor:wait ()
+      editor:wait {
+        create   = true,
+        delete   = true,
+        patch    = true,
+        answer   = true,
+        [module] = true,
+      }
     until not running
   end)
   Copas.addthread (function ()
@@ -337,10 +343,9 @@ end
   end
   patch:focus ()
   _G.js.global.document:addEventListener ("keydown", function (_, e)
-    local key = _G.js.global.navigator.platform:match "Mac"
-            and e.metaKey
-             or e.ctrlKey
-    if e.keyCode == 83 and key and not submit.disabled then
+    if  e.keyCode == 83
+    and (e.metaKey or e.ctrlKey)
+    and not submit.disabled then
       save ()
       return false
     end

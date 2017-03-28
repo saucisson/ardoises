@@ -503,7 +503,7 @@ function Editor.handlers.create (editor, message)
   repository.modules [req.module] = true
   for client in pairs (editor.clients) do
     if client ~= message.client then
-      client:send (Json.encode {
+      client.websocket:send (Json.encode {
         type   = "create",
         module = message.module,
       })
@@ -550,7 +550,7 @@ function Editor.handlers.delete (editor, message)
   repository.modules [req.module] = false
   for client in pairs (editor.clients) do
     if client ~= message.client then
-      client:send (Json.encode {
+      client.websocket:send (Json.encode {
         type   = "delete",
         module = message.module,
       })
@@ -698,7 +698,7 @@ function Editor.handlers.patch (editor, message)
   -- send to other clients
   for client in pairs (editor.clients) do
     if client ~= message.client then
-      client:send (Json.encode {
+      client.websocket:send (Json.encode {
         type    = "patch",
         patches = message.patches,
       })

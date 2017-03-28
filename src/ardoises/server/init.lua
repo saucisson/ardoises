@@ -98,7 +98,7 @@ function Server.register (context)
     return nil, ngx.HTTP_UNAUTHORIZED
   end
   while true do
-    if context.redis:setnx (Config.patterns.lock "register", "locked") then
+    if context.redis:setnx (Config.patterns.lock "register", "locked") == 1 then
       break
     end
     ngx.sleep (0.1)
@@ -386,7 +386,7 @@ Server.editor = wrap (function (context)
   -- get editor:
   local lock = Config.patterns.lock (Lustache:render ("editor:{{{owner}}}/{{{name}}}/{{{branch}}}", ngx.var))
   while true do
-    if context.redis:setnx (lock, "locked") then
+    if context.redis:setnx (lock, "locked") == 1 then
       break
     end
     ngx.sleep (0.1)
@@ -396,6 +396,7 @@ Server.editor = wrap (function (context)
     name  = ngx.var.name,
   }, ngx.var.branch)
   local editor = context.redis:get (key)
+  print (key, editor)
   if editor == ngx.null or not editor then
     local info, status = Http {
       url    = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}/json", {
@@ -553,7 +554,7 @@ Server.webhook = wrap (function (context)
     return { status = ngx.HTTP_OK }
   end
   while true do
-    if context.redis:setnx (Config.patterns.lock (repository.full_name), "locked") then
+    if context.redis:setnx (Config.patterns.lock (repository.full_name), "locked") == 1 then
       break
     end
     ngx.sleep (0.1)
