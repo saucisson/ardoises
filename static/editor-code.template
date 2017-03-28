@@ -110,9 +110,9 @@ renderers.layers = Copas.addthread (function ()
           </div>
         </div>
         <% for _, layer in ipairs (layers) do %>
-          <div class="list-group-item row">
+          <div class="list-group-item row" id="layer-get-<%- layer.id %>">
             <div class="input-group">
-              <span id="layer-get-<%- layer.id %>" class="input-xlarge uneditable-input"><%= layer.name %></span>
+              <span class="input-xlarge uneditable-input"><%= layer.name %></span>
               <span class="input-group-addon"><button id="layer-delete-<%- layer.id %>" class="btn btn-xs"><i class="fa fa-trash fa-inverse" aria-hidden="true"></i></button></span>
             </div>
           </div>

@@ -59,3 +59,20 @@ body {
   height: 600px;
   min-height: 600px;
 }
+
+a:link {
+  color: DarkOrange;
+  text-decoration: none;
+}
+a:visited {
+  color: DarkOrange;
+  text-decoration: none;
+}
+a:hover {
+  color: DarkOrange;
+  text-decoration: none;
+}
+a:active {
+  color: DarkOrange;
+  text-decoration: none;
+}

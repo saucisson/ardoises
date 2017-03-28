@@ -90,7 +90,9 @@ output = Copas.addthread (function ()
               <% end %>
             </div>
             <div class="col-md-11">
-              <h4 class="list-group-item-heading"><%= ardoise.repository.full_name %></h4>
+              <a href="/views/<%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>/<%- ardoise.repository.default_branch %>">
+                <h4 class="list-group-item-heading"><%= ardoise.repository.full_name %></h4>
+                </a>
               <p class="list-group-item-text"><%= ardoise.repository.description or ""%></p>
               <ul class="list-inline">
                 <% for _, branch in ipairs (ardoise.repository.branches) do %>
