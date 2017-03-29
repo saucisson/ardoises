@@ -21,7 +21,6 @@ RUN apk add --no-cache --virtual .build-deps \
         dockerize \
  && apk add --no-cache \
         bash \
-        certbot \
         curl \
         diffutils \
         grep \
@@ -30,7 +29,6 @@ RUN apk add --no-cache --virtual .build-deps \
         pcre \
         readline \
         sed \
- && pip install packaging \
  && pip install hererocks \
  && hererocks --luajit=2.1 --luarocks=^ --compat=5.2 /usr \
  && luarocks install luasec \
@@ -62,5 +60,5 @@ RUN apk add --no-cache --virtual .build-deps \
  && true
 
 ENV PATH /usr/local/openresty/bin/:/usr/local/openresty/nginx/sbin/:$PATH
-VOLUME ["/static"]
+VOLUME ["/static", "/etc/letsencrypt"]
 EXPOSE 80 443

@@ -10,23 +10,23 @@ services:
     env_file: .environment
     build:
       context: .
-      dockerfile: docker/Dockerfile-noresty-quick
+      dockerfile: docker/Dockerfile-noresty
     entrypoint: ardoises-clean
   invitation:
     env_file: .environment
     build:
       context: .
-      dockerfile: docker/Dockerfile-noresty-quick
+      dockerfile: docker/Dockerfile-noresty
     entrypoint: ardoises-invitation
   ardoises:
     env_file: .environment
     build:
       context: .
-      dockerfile: docker/Dockerfile-resty-quick
+      dockerfile: docker/Dockerfile-resty
     entrypoint: ardoises-server
     ports:
-      - "8080:80"
-      - "8081:443"
+      - "80:80"
+      - "443:443"
     volumes:
       - ./static:/static
-      - ./etc/letsencrypt:/etc/letsencrypt
+      - /etc/letsencrypt:/etc/letsencrypt
