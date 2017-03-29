@@ -179,15 +179,15 @@ function Ardoise.edit (ardoise)
       branch     = ardoise.branch,
     }),
   }, Editor)
-  Copas.addthread (function ()
-    while editor.running do
-      editor:send {
-        id   = "ping",
-        type = "ping",
-      }
-      Copas.sleep (30)
-    end
-  end)
+  -- Copas.addthread (function ()
+  --   while editor.running do
+  --     editor:send {
+  --       id   = "ping",
+  --       type = "ping",
+  --     }
+  --     Copas.sleep (30)
+  --   end
+  -- end)
   editor.Layer.require = function (name)
     if not Patterns.require:match (name) then
       name = name .. "@" .. assert (editor.current)
@@ -241,7 +241,7 @@ function Editor.list (editor)
   local coroutine = Coromake ()
   return coroutine.wrap (function ()
     for name, module in pairs (request.answer) do
-      editor.modules [module] = true
+      editor.modules [module] = editor.modules [module] or true
       coroutine.yield (name, module)
     end
   end)
@@ -336,12 +336,13 @@ function Editor.create (editor, name)
     layer  = layer,
     remote = remote,
     ref    = ref,
-    code   = [[ return function () end ]],
+    code   = [[return function (Layer, layer, ref) end]],
   }
   local request = {
     id     = #editor.requests+1,
     type   = "create",
     module = module.name,
+    code   = [[return function (Layer, layer, ref) end]],
   }
   editor.requests  [request.id] = request
   editor.callbacks [request.id] = function ()
@@ -374,7 +375,9 @@ function Editor.delete (editor, name)
   }
   editor.requests  [request.id] = request
   editor.callbacks [request.id] = function ()
-    if not request.success then
+    if request.success then
+      editor.modules [module.name] = nil
+    else
       editor.modules [module.name] = back
     end
   end
@@ -426,7 +429,10 @@ function Editor.patch (editor, what)
     module.current = Layer.new {
       temporary = true,
     }
-    modules [module] = module.current
+    modules [module] = {
+      code    = code,
+      current = module.current,
+    }
     Layer.write_to (module.layer, nil)
     local refines = module.layer [Layer.key.refines]
     refines [Layer.len (refines)+1] = module.current
@@ -458,11 +464,11 @@ function Editor.patch (editor, what)
   end
   editor.requests  [request.id] = request
   editor.callbacks [request.id] = function ()
-    for module, layer in pairs (modules) do
+    for module, t in pairs (modules) do
       Layer.write_to (module.layer, nil)
       local refines = module.layer [Layer.key.refines]
       for i, l in ipairs (refines or {}) do
-        if layer == l then
+        if t.current == l then
           for j = i+1, #refines do
             refines [j-1] = refines [j]
           end
@@ -474,14 +480,16 @@ function Editor.patch (editor, what)
     if not request.success then
       return nil, request.error
     end
-    for module, layer in pairs (modules) do
-      if type (what [module.name] == "string") then
-        Layer.merge (layer, module.remote)
-      elseif type (what [module.name] == "function") then
-        what [module.name] (editor.Layer, module.remote, module.ref)
-      else
-        assert (false)
-      end
+    for module, t in pairs (modules) do
+      local layer   = Layer.new { temporary = true }
+      local current = Layer.new { temporary = true }
+      layer [Layer.key.refines] = {
+        module.remote,
+        current,
+      }
+      Layer.write_to (layer, current)
+      t.code (editor.Layer, layer, module.ref)
+      Layer.merge (current, module.remote)
       module.code = Layer.dump (module.remote)
     end
   end
@@ -505,12 +513,15 @@ function Editor.answer (editor)
   elseif message.type == "answer" then
     local request  = editor.requests  [message.id]
     local callback = editor.callbacks [message.id]
+    for k, v in pairs (request) do
+      message [k] = v
+    end
     request.success = message.success
     request.answer  = message.answer
     request.error   = message.error
     editor.requests  [message.id] = nil
     editor.callbacks [message.id] = nil
-    callback ()
+    assert (pcall (callback))
   elseif message.type == "create" then
     editor.modules [message.module] = true
   elseif message.type == "delete" then
@@ -527,12 +538,8 @@ function Editor.answer (editor)
         if not ok_loaded then
           return nil, "invalid patch: " .. tostring (loaded)
         end
-        local layer   = Layer.new {
-          temporary = true,
-        }
-        local current = Layer.new {
-          temporary = true,
-        }
+        local layer   = Layer.new { temporary = true }
+        local current = Layer.new { temporary = true }
         layer [Layer.key.refines] = {
           module.remote,
           current,
@@ -549,57 +556,56 @@ function Editor.answer (editor)
   end
 end
 
-function Editor.wait (editor, t)
+function Editor.events (editor, t)
   assert (getmetatable (editor) == Editor)
-  local result    = {}
-  local co        = coroutine.running ()
-  local observers = {}
-  for name, f in pairs (t or {}) do
-    local module = editor.modules [name]
-    if module then
-      observers [#observers+1] = Layer.observe (module.remote, function (coroutine, proxy, key, value)
-        if f == true or f (proxy, key, value) then
-          result.proxy     = proxy
-          result.key       = key
-          result.old_value = value
-          value = coroutine.yield ()
-          result.new_value = value
-        end
-      end)
+  local function call (what)
+    if not editor.running then
+      return
     end
-  end
-  local function f (message)
-    if     message.type == "create" and t.create then
-      result.type   = "create"
-      result.result = {
-        module = message.module,
-      }
-    elseif message.type == "delete" and t.delete then
-      result.type   = "delete"
-      result.result = {
-        module = message.module,
-      }
-    elseif message.type == "patch" and t.patch then
-      result.type   = "patch"
-      result.result = {
-        patches   = message.patches,
-        proxy     = result.proxy,
-        key       = result.key,
-        old_value = result.old_value,
-        new_value = result.new_value,
-      }
-    elseif message.type == "answer" and t.answer then
-      result.type   = "answer"
-      result.result = message.answer
+    what.co        = Copas.running
+    what.active    = true
+    what.result    = nil
+    what.observers = {}
+    for name, f in pairs (t or {}) do
+      local module = editor:require (name)
+      if module then
+        what.observers [#what.observers+1] = Layer.observe (module.remote, function (_coroutine, proxy, key, value)
+          if f == true or f (proxy, key, value) then
+            local r = {
+              type      = "update",
+              proxy     = proxy,
+              key       = key,
+              old_value = value,
+            }
+            value = _coroutine.yield ()
+            r.new_value = value
+            what.result = r
+            Copas.wakeup (what.co)
+          end
+        end)
+      end
     end
-    Copas.addthread (function ()
-      Copas.wakeup (co)
-    end)
+    what.observer = function (message)
+      what.result = message
+      Copas.wakeup (what.co)
+    end
+    editor.observers [what.observer] = true
+    Copas.sleep (-math.huge)
+    return what.active and what.result or nil
   end
-  editor.observers [f] = true
-  Copas.sleep (-math.huge)
-  editor.observers [f] = nil
-  return result.type, result.result
+  local function clean (what)
+    editor.observers [what.observer] = nil
+    for _, observer in ipairs (what.observers) do
+      observer:disable ()
+    end
+    what.active    = nil
+    what.observer  = nil
+    what.observers = nil
+  end
+  return setmetatable ({}, {
+    __call = call,
+    __gc   = clean,
+  })
 end
 
 function Editor.__call (editor, t)

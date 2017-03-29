@@ -35,6 +35,9 @@ local result = {
     secret = assert (os.getenv "APPLICATION_SECRET"),
     token  = assert (os.getenv "APPLICATION_TOKEN"),
   },
+  locks = {
+    timeout = 5, -- seconds
+  }
 }
 
 result.ardoises.url = tostring (result.ardoises)

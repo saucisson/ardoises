@@ -97,8 +97,10 @@ function Server.register (context)
   or not token.payload.csrf then
     return nil, ngx.HTTP_UNAUTHORIZED
   end
+  local lock = Config.patterns.lock "register"
   while true do
-    if context.redis:setnx (Config.patterns.lock "register", "locked") == 1 then
+    if context.redis:setnx (lock, "locked") == 1 then
+      context.redis:expire (lock, Config.locks.timeout)
       break
     end
     ngx.sleep (0.1)
@@ -387,6 +389,7 @@ Server.editor = wrap (function (context)
   local lock = Config.patterns.lock (Lustache:render ("editor:{{{owner}}}/{{{name}}}/{{{branch}}}", ngx.var))
   while true do
     if context.redis:setnx (lock, "locked") == 1 then
+      context.redis:expire (lock, Config.locks.timeout)
       break
     end
     ngx.sleep (0.1)
@@ -553,8 +556,10 @@ Server.webhook = wrap (function (context)
   if not repository then
     return { status = ngx.HTTP_OK }
   end
+  local lock = Config.patterns.lock (repository.full_name)
   while true do
-    if context.redis:setnx (Config.patterns.lock (repository.full_name), "locked") == 1 then
+    if context.redis:setnx (lock, "locked") == 1 then
+      context.redis:expire (lock, Config.locks.timeout)
       break
     end
     ngx.sleep (0.1)

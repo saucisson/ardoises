@@ -480,10 +480,7 @@ function Editor.handlers.create (editor, message)
   if not file then
     return nil, "module creation failure"
   end
-  file:write (([[
-    return function (Layer, layer, ref)
-    end
-  ]]):gsub ("    ", "") .. "\n")
+  file:write (tostring (message.code))
   file:close ()
   if not os.execute (Et.render ([[
     cd <%- path %> && \
@@ -650,7 +647,16 @@ function Editor.handlers.patch (editor, message)
     return nil, errors
   end
   -- commit
-  local repository = editor.repositories [editor.branch.full_name]
+  local repository   = editor.repositories [editor.branch.full_name]
+  local patches_file = io.open (repository.path .. "/.ardoises-patches.md", "w")
+  patches_file:write (Et.render ([[
+# Patch from <%- name %> <<%- email %>> at <%- date %>
+
+]], {
+    name  = message.client.user.name,
+    email = message.client.user.email,
+    date  = os.date ("%c", os.time ())
+  }))
   for _, patch in ipairs (message.patches) do
     local module = modules [patch.module]
     Layer.merge (module.current, module.remote)
@@ -661,9 +667,19 @@ function Editor.handlers.patch (editor, message)
     end
     module.code    = Layer.dump (module.remote)
     local filename = "src/" .. table.concat (parts, "/") .. ".lua"
-    local file     = io.open (repository.path .. "/" .. filename, "w")
+    local file = io.open (repository.path .. "/" .. filename, "w")
     file:write (module.code .. "\n")
     file:close ()
+    patches_file:write (Et.render ([[
+## Update of <%- module %>
+
+```lua
+<%- code %>
+```
+
+]], { module = patch.module,
+      code   = patch.code,
+    }))
     assert (os.execute (Et.render ([[
       cd <%- path %> && \
       git add <%- filename %>
@@ -672,26 +688,16 @@ function Editor.handlers.patch (editor, message)
       filename = filename,
     })))
   end
+  patches_file:close ()
   rollback ()
-  local patches = {
-    [[Update(s) from the Ardoises Editor]],
-  }
-  for _, patch in ipairs (message.patches) do
-    patches [#patches+1] = Et.render ([[
-===== <%- module %> =====
-<%- code %>
-]], { module = patch.module,
-      code   = patch.code,
-    })
-  end
   os.execute (Et.render ([[
     cd <%- path %> && \
+    git add .ardoises-patches.md && \
     git commit --quiet \
                --author="<%- name %> <<%- email %>>" \
-               --message=<%- message %>
+               --message="Update from the Ardoises Editor"
   ]], {
     path    = repository.path,
-    message = string.format ("%q", table.concat (patches, "\n")),
     name    = message.client.user.name,
     email   = message.client.user.email,
   }))
