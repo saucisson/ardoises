@@ -10,4 +10,4 @@ certbot \
   --test-cert \
   --standalone \
   -w "/" \
-  -d "test.ardoises.ovh"
+  -d "ardoises.ovh"

@@ -83,7 +83,6 @@ local renderers = {
 }
 
 renderers.layers = Copas.addthread (function ()
-  local in_delete
   while true do
     layers = {}
     for name, module in editor:list () do
@@ -363,6 +362,8 @@ end
       }
       if ok then
         renderer.patch:setValue (renderer.default_patch)
+        renderer.patch:gotoLine (3, 5, true)
+        renderer.patch:focus ()
       else
         renderer.patch:getSession ():setAnnotations (tojs {
           { row    = 0,
