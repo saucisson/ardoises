@@ -55,19 +55,6 @@ body {
   left: 45%;
 }
 
-.editor {
-  width: 100%;
-  height: 95%;
-}
-.editor-model {
-  height: 60vh;
-  min-height: 60vh;
-}
-.editor-patch {
-  height: 30vh;
-  min-height: 30vh;
-}
-
 a:link {
   color: DarkOrange;
   text-decoration: none;

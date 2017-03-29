@@ -19,10 +19,21 @@ progress.finished = true
 
 local Content = _G.js.global.document:getElementById "content"
 Content.innerHTML = [[
-  <div class="container">
+  <div class="container-fluid">
     <div class="row">
-      <div class="col-md-4">
-        <form action="/" method="get">
+      <div class="col-sm-12 col-md-8 col-md-offset-2">
+        <p>
+          Ardoises are GitHub repositories
+          shared with the people <em>you</em> choose.
+          In order to create an ardoise,
+          please follow the <a href="https://help.github.com/articles/inviting-collaborators-to-a-personal-repository/">Inviting collaborators to a personal repository</a> guide
+          and share some repositories with <a href="https://github.com/ardoises"><code>@ardoises</code></a>.
+        </p>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-sm-6 col-md-4 col-md-offset-2">
+        <form>
           <div class="input-group">
             <span class="input-group-addon">
               <i class="fa fa-search"></i>
@@ -34,12 +45,10 @@ Content.innerHTML = [[
           </div>
         </form>
       </div>
-      <div class="col-md-8">
-      </div>
+    </div>
+    <div id="ardoises">
     </div>
   </div>
-  <section id="ardoises">
-  </section>
 ]]
 
 local Input    = _G.js.global.document:getElementById "search"
@@ -73,49 +82,70 @@ output = Copas.addthread (function ()
       end
     end
     Ardoises.innerHTML = Et.render ([[
-      <div class="container">
-        <div class="list-group">
-        <% for _, ardoise in ipairs (ardoises) do %>
-          <div class="list-group-item row">
-            <div class="col-md-1">
-              <% if ardoise.collaborator.permissions.push then %>
-              <span class="fa-stack fa-lg">
-                <i class="fa fa-pencil fa-flip-horizontal fa-stack-1x"></i>
-              </span>
-              <% else %>
-              <span class="fa-stack fa-lg">
-                <i class="fa fa-pencil fa-flip-horizontal fa-stack-1x"></i>
-                <i class="fa fa-ban fa-stack-2x text-danger"></i>
-              </span>
-              <% end %>
-              <% if ardoise.repository.owner.login == user then %>
-                <a href="https://github.com/<%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>/settings/collaboration">
-                  <span class="fa-stack fa-lg">
-                    <i class="fa fa-users fa-stack-1x"></i>
-                  </span>
-                </a>
-              <% end %>
+      <div class="row">
+        <div class="col-sm-12 col-md-8 col-md-offset-2">
+          <div class="list-group">
+          <% for _, ardoise in ipairs (ardoises) do %>
+            <div class="list-group-item">
+              <div class="container-fluid">
+                <div class="row">
+                  <div class="col-sm-8 col-md-10">
+                    <span><%= ardoise.repository.full_name %>:</span>
+                    <span><%= ardoise.repository.description or ""%></span>
+                  </div>
+                  <div class="col-sm-2 col-md-1">
+                    <div class="input-group input-group-sm">
+                      <span class="input-group-addon">
+                        <i class="fa fa-pencil"></i>
+                      </span>
+                      <span class="input-group-addon">
+                        <% if ardoise.collaborator.permissions.push then %>
+                        <i class="fa fa-check text-success"></i>
+                        <% else %>
+                        <i class="fa fa-ban text-warning"></i>
+                        <% end %>
+                      </span>
+                    </div>
+                  </div>
+                  <div class="col-sm-2 col-md-1">
+                    <% if ardoise.repository.owner.login == user then %>
+                      <a href="https://github.com/<%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>/settings/collaboration">
+                        <div class="input-group input-group-sm">
+                          <span class="input-group-addon">
+                            <i class="fa fa-users"></i>
+                          </span>
+                          <span class="input-group-btn">
+                            <button type="button" class="btn btn-primary">
+                              Share!
+                            </button>
+                          </span>
+                        </div>
+                      </a>
+                    <% end %>
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="col-sm-12">
+                    <div class="input-group input-group-sm">
+                    <% for _, branch in ipairs (ardoise.repository.branches) do %>
+                    <% if not branch.protected then %>
+                      <a href="/views/<%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>/<%- ardoise.branch %>"
+                        aria-label="Editor for <%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>:<%- ardoise.branch %>">
+                        <span class="input-group-btn">
+                          <button type="button" class="btn btn-primary">
+                            <%= branch.name %>
+                          </button>
+                        </span>
+                      </a>
+                    <% end %>
+                    <% end %>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="col-md-11">
-              <a href="/views/<%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>/<%- ardoise.repository.default_branch %>">
-                <h4 class="list-group-item-heading"><%= ardoise.repository.full_name %></h4>
-                </a>
-              <p class="list-group-item-text"><%= ardoise.repository.description or ""%></p>
-              <ul class="list-inline">
-                <% for _, branch in ipairs (ardoise.repository.branches) do %>
-                <% if not branch.protected then %>
-                <li>
-                  <a href="/views/<%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>/<%- ardoise.branch %>"
-                    aria-label="Editor for <%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>:<%- ardoise.branch %>">
-                    <%= branch.name %>
-                  </a>
-                </li>
-                <% end %>
-                <% end %>
-              </ul>
-            </div>
+          <% end %>
           </div>
-        <% end %>
         </div>
       </div>
     ]], {

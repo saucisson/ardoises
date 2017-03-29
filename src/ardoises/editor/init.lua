@@ -418,10 +418,7 @@ function Editor.handlers.authenticate (editor, message)
     message.client.handlers.create       = Editor.handlers.create
     message.client.handlers.delete       = Editor.handlers.delete
     message.client.handlers.patch        = Editor.handlers.patch
-    return {
-      read  = result.permissions.pull,
-      write = result.permissions.push,
-    }
+    return result.permissions
   end
 end
 

@@ -32,19 +32,16 @@ local Content = _G.js.global.document:getElementById "content"
 Content.innerHTML = [[
   <section>
     <div class="container-fluid">
-      <div class="row">
-        <div class="col-md-2">
+      <div class="row" style="height: 90vh; min-height: 90vh;">
+        <div class="col-sm-4 col-md-3">
           <div class="list-group">
-            <div class="list-group-item row">
-              <div class="input-group">
-                <span class="input-xlarge uneditable-input">{{repository.owner.login}}/{{repository.name}}:{{branch}}</span>
-                <span class="input-group-addon js-gitter-toggle-chat-button"><i class="fa fa-comments fa-inverse" aria-hidden="true"></i></span>
-              </div>
+            <div class="list-group-item text-center">
+              {{repository.owner.login}}/{{repository.name}}:{{branch}}
             </div>
+            <div id="layers"></div>
           </div>
-          <div id="layers"></div>
         </div>
-        <div id="ardoise" class="col-md-10">
+        <div id="ardoise" class="col-sm-8 col-md-9">
         </div>
       </div>
     </div>
@@ -59,7 +56,7 @@ Copas.addthread (function ()
         <section>
           <div class="container-fluid">
             <div class="row">
-              <div class="col-md-12">
+              <div class="col-sm-12 col-md-8 col-md-offset-2">
                 <div class="alert alert-danger">
                   <strong>Disconnected!</strong> This page will be reloaded soon.
                 </div>
@@ -98,22 +95,22 @@ renderers.layers = Copas.addthread (function ()
     end
     table.sort (layers, function (l, r) return l.name < r.name end)
     Layers.innerHTML = Et.render ([[
-      <div class="list-group">
-        <div class="list-group-item row">
-          <div class="input-group">
-            <input id="layer-name" type="text" class="form-control" placeholder="New module" />
-            <span id="layer-create" class="input-group-addon"><i class="fa fa-plus fa-inverse" aria-hidden="true"></i></span>
-          </div>
+      <div class="list-group-item">
+        <div class="input-group">
+          <input id="layer-name" type="text" class="form-control" placeholder="New module" />
+          <span id="layer-create" class="input-group-addon"><i class="fa fa-plus fa-inverse" aria-hidden="true"></i></span>
         </div>
-        <% for _, layer in ipairs (layers) do %>
-          <div class="list-group-item row" id="layer-get-<%- layer.id %>">
-            <div class="input-group">
-              <span class="input-xlarge uneditable-input"><%= layer.name %></span>
-              <span class="input-group-addon"><button id="layer-delete-<%- layer.id %>" class="btn btn-xs"><i class="fa fa-trash fa-inverse" aria-hidden="true"></i></button></span>
-            </div>
-          </div>
-        <% end %>
       </div>
+      <% for _, layer in ipairs (layers) do %>
+      <div class="list-group-item" id="layer-get-<%- layer.id %>">
+        <%= layer.name %>
+        <span class="pull-right">
+          <button id="layer-delete-<%- layer.id %>" class="btn btn-xs btn-warning">
+            <i class="fa fa-trash" style="color: black;" aria-hidden="true"></i>
+          </button>
+        </span>
+      </div>
+      <% end %>
     ]], {
       layers = layers,
     })
@@ -146,32 +143,20 @@ renderers.layers = Copas.addthread (function ()
     for _, layer in ipairs (layers) do
       local link = _G.js.global.document:getElementById ("layer-delete-" .. tostring (layer.id))
       link.onclick = function ()
-        if link.disabled then
-          return false
-        elseif in_delete == link then
-          in_delete.classList:remove "btn-warning"
-          in_delete.disabled = false
-          Copas.addthread (function ()
-            if active and active.module == layer.module then
-              active = nil
-            end
-            editor:delete (layer.module)
-            Copas.wakeup (renderers.ardoise)
-          end)
-        else
-          link.disabled = true
-          in_delete     = link
-          in_delete.classList:add "btn-warning"
-          Copas.addthread (function ()
-            Copas.sleep (2) -- second
-            link.disabled = false
-            Copas.sleep (5) -- seconds
-            link.classList:remove "btn-warning"
-            if in_delete == link then
-              in_delete = nil
-            end
-          end)
-        end
+        _G.window:swal (tojs {
+          title = Et.render ("Do you really want to delete <%- name %>?", layer),
+          text  = "You will not be able to recover this layer!",
+          type  = "warning",
+          showCancelButton  = true,
+          confirmButtonText = "Confirm",
+          closeOnConfirm    = true,
+        }, function ()
+          if active and active.module == layer.module then
+            active = nil
+          end
+          editor:delete (layer.module)
+          Copas.wakeup (renderers.ardoise)
+        end)
         return false
       end
     end
@@ -202,6 +187,11 @@ renderers.active = Copas.addthread (function ()
   end
 end)
 
+_G.window:addEventListener ("resize", function ()
+  Copas.wakeup (renderers.layers)
+  Copas.wakeup (renderers.ardoise)
+end, false)
+
 local default_togui
 
 renderers.ardoise = Copas.addthread (function ()
@@ -227,8 +217,6 @@ renderers.ardoise = Copas.addthread (function ()
         editor = editor,
         module = active.module,
         target = Ardoise,
-        width  = _G.window.innerWidth  * 0.8,
-        height = _G.window.innerHeight * 0.8,
       })
       if ok then
         renderer = r
@@ -238,7 +226,7 @@ renderers.ardoise = Copas.addthread (function ()
           <section>
             <div class="container-fluid">
               <div class="row">
-                <div class="col-md-12">
+                <div class="col-sm-12">
                   <div class="alert alert-danger">
                     <strong>Renderering problem!</strong>
                   </div>
@@ -273,34 +261,45 @@ return function (Layer, layer, ref)
   ...
 end
 ]]
-  renderer.target.innerHTML = [[
-    <div class="panel panel-default">
-      <div class="panel-body">
-      <div class="container-fluid">
-        <div class="row">
-          <div class="col-md-12 editor-model">
-            <div id="editor-model" class="editor">
-            </div>
-          </div>
-        </div>
-        <div class="row">
-          <div class="col-md-11 editor-patch">
-            <div id="editor-patch" class="editor">
-            </div>
-          </div>
-          <div class="col-md-1">
-            <div class="input-group">
-              <span class="input-group-addon">
-                <button id="patch-submit" class="btn btn-xs">
-                  <i class="fa fa-paper-plane fa-inverse" aria-hidden="true"></i>
-                </button>
-              </span>
+  local top    = _G.js.global.document:getElementById "top-bar"
+  local bottom = _G.js.global.document:getElementById "bottom-bar"
+  local size   = (bottom.offsetTop - bottom.scrollTop + bottom.clientTop - 50)
+               - (top.offsetTop - top.scrollTop + top.clientTop + 50)
+  renderer.target.innerHTML = Et.render ([[
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-sm-12">
+          <div class="panel panel-default">
+            <div class="panel-body">
+              <div id="editor-model" class="editor" style="height: <%- model_height %>px;">
+              </div>
             </div>
           </div>
         </div>
       </div>
+      <% if editable then %>
+      <div class="row">
+        <div class="col-sm-11">
+          <div class="panel panel-default">
+            <div class="panel-body">
+              <div id="editor-patch" class="editor" style="height: <%- patch_height %>px;">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-1">
+          <button id="patch-submit" class="btn btn-xs">
+            <i class="fa fa-paper-plane fa-inverse" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
+      <% end %>
     </div>
-  ]]
+  ]], {
+    editable     = editor.permissions.push,
+    model_height = editor.permissions.push and 0.7 * size  or size,
+    patch_height = editor.permissions.push and 0.25 * size or 0,
+  })
   renderer.source = _G.window.ace:edit "editor-model"
   renderer.source:setReadOnly (true)
   renderer.source ["$blockScrolling"] = true
@@ -336,9 +335,13 @@ end
         renderer.patch:getSession ():clearAnnotations ()
         if ok then
           submit.disabled = false
+          submit.classList:remove "btn-danger"
+          submit.classList:add    "btn-success"
         else
           local pattern = [[%[string "patch"%]:(%d+):%s+(.*)]]
           local line, problem = err:match (pattern)
+          submit.classList:remove "btn-success"
+          submit.classList:add    "btn-danger"
           submit.disabled = true
           renderer.patch:getSession ():setAnnotations (tojs {
             { row    = line-1,
@@ -375,11 +378,13 @@ end
   renderer.patch :setValue (renderer.default_patch)
   renderer.patch :gotoLine (3, 5, true)
   renderer.patch :focus ()
-  renderer.listener = _G.js.global.document:addEventListener ("keydown", function (_, e)
-    if  e.keyCode == 83 and (e.metaKey or e.ctrlKey) and not submit.disabled then
+  renderer.keydown = _G.js.global.document:addEventListener ("keydown", function (_, e)
+    if e.keyCode == 83 and (e.metaKey or e.ctrlKey) and not submit.disabled then
       Copas.wakeup (renderer.save)
       return false
     end
+  end, false)
+  renderer.resize = _G.window:addEventListener ("resize", function ()
   end, false)
   submit.onclick = function ()
     Copas.wakeup (renderer.save)
@@ -387,7 +392,8 @@ end
   end
   function renderer.close ()
     renderer.running = false
-    _G.js.global.document:removeEventListener ("keydown", renderer.listener, false)
+    _G.js.global.document:removeEventListener ("keydown", renderer.keydown, false)
+    _G.js.global.document:removeEventListener ("resize" , renderer.resize , false)
   end
   return renderer
 end
