@@ -96,14 +96,12 @@
       {{{content}}}
       {{/content}}
     </section>
-    {{#user}}
     <script type="text/lua"
             lang="Lua">
     do
       {{{loader}}}
     end
     </script>
-    {{/user}}
 
     <div id="bottom-bar" class="navbar navbar-fixed-bottom">
       <div class="container">

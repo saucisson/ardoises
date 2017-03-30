@@ -86,16 +86,30 @@ function Server.template (what, data)
   return template
 end
 
-function Server.register (context)
+local function register ()
+  local query = ngx.req.get_uri_args ()
+  if query.code and query.state then
+    _G.ngx.header ["Content-type"] = "text/html"
+    ngx.say (Server.template ("index", {
+      server = Url.build (Config.ardoises),
+      code   = "{{{register}}}",
+      query  = Json.encode (query),
+    }))
+    ngx.exit (ngx.HTTP_OK)
+  end
+  return true
+end
+
+Server.register = wrap (function (context)
   local query = ngx.req.get_uri_args ()
   if not query.code and not query.state then
-    return true
+    return { status = ngx.HTTP_BAD_REQUEST }
   end
   local token = Jwt:verify (Config.application.secret, query.state)
   if not token
   or not token.payload
   or not token.payload.csrf then
-    return nil, ngx.HTTP_UNAUTHORIZED
+    return { status = ngx.HTTP_UNAUTHORIZED }
   end
   local lock = Config.patterns.lock "register"
   while true do
@@ -123,7 +137,7 @@ function Server.register (context)
   }
   context.redis:del (Config.patterns.lock "register")
   if status ~= ngx.HTTP_OK or not result.access_token then
-    return nil, ngx.HTTP_INTERNAL_SERVER_ERROR
+    return { status = ngx.HTTP_INTERNAL_SERVER_ERROR }
   end
   user, status = Http {
     url     = "https://api.github.com/user",
@@ -135,7 +149,7 @@ function Server.register (context)
     },
   }
   if status ~= ngx.HTTP_OK then
-    return nil, ngx.HTTP_INTERNAL_SERVER_ERROR
+    return { status = ngx.HTTP_INTERNAL_SERVER_ERROR }
   end
   local key = Config.patterns.user (user)
   user.tokens = {
@@ -160,16 +174,18 @@ function Server.register (context)
     key      = "Ardoises-Token",
     value    = user.tokens.ardoises,
   }
-  return user
-end
+  ngx.say (Json.encode {
+    user = user,
+  })
+  return { status = ngx.HTTP_OK }
+end)
 
 function Server.authenticate (context, options)
-  local user, err = Server.register (context)
-  if not user then
+  local ok, err = register (context)
+  if not ok then
     return nil, err
-  elseif type (user) == "table" then
-    return user -- the user
   end
+  local user
   user, err = (function ()
     local headers = ngx.req.get_headers ()
     local cookie  = Cookie:new ()
@@ -203,7 +219,6 @@ function Server.authenticate (context, options)
     url.path               = "/login"
     url.query.redirect_uri = ngx.var.request_uri
     context.redis:close ()
-    print (Url.build (url))
     return ngx.redirect (Url.build (url))
   end
   return user, err
@@ -213,7 +228,6 @@ Server.root = wrap (function (context)
   local user = Server.authenticate (context, {
     optional = true,
   })
-  context.redis:close ()
   if user then
     return { redirect = "/dashboard" }
   else
@@ -258,16 +272,19 @@ Server.legal = wrap (function ()
 end)
 
 Server.view = wrap (function (context)
+print (1)
   local user, err = Server.authenticate (context)
   if not user then
     return { status = err }
   end
+print (2)
   -- check collaborator:
   local ckey = Config.patterns.collaborator ({
     owner = { login = ngx.var.owner },
     name  = ngx.var.name,
   }, user)
   local collaboration = context.redis:get (ckey)
+print (tostring (collaboration))
   if collaboration == ngx.null or not collaboration then
     return { status = ngx.HTTP_FORBIDDEN }
   end
@@ -408,7 +425,6 @@ Server.editor = wrap (function (context)
     name  = ngx.var.name,
   }, ngx.var.branch)
   local editor = context.redis:get (key)
-  print (key, editor)
   if editor == ngx.null or not editor then
     local info, status = Http {
       url    = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}/json", {

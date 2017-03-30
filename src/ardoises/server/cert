@@ -7,7 +7,6 @@ certbot \
   register
 certbot \
   certonly \
-  --test-cert \
   --standalone \
   -w "/" \
   -d "ardoises.ovh"
