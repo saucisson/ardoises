@@ -43,6 +43,7 @@ Copas.addthread (function ()
     _G.js.global.location:reload ()
   else
     progress.finished = true
+    Copas.sleep (1)
     local location = Url.parse (_G.js.global.location)
     location.query = {}
     _G.js.global.location = Url.build (location)
