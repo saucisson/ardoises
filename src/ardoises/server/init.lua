@@ -165,17 +165,26 @@ Server.register = wrap (function (context)
     }),
   }
   context.redis:set (key, Json.encode (user))
-  local cookie = Cookie:new ()
-  cookie:set {
-    expires  = nil,
-    httponly = true,
-    secure   = false,
-    samesite = "Strict",
-    key      = "Ardoises-Token",
-    value    = user.tokens.ardoises,
-  }
+  -- FIXME
+  -- local cookie = Cookie:new ()
+  -- cookie:set {
+  --   key      = "Ardoises-Token",
+  --   expires  = nil,
+  --   httponly = true,
+  --   secure   = true,
+  --   samesite = "Strict",
+  --   value    = user.tokens.ardoises,
+  -- }
   ngx.say (Json.encode {
-    user = user,
+    user   = user,
+    cookie = {
+      key      = "Ardoises-Token",
+      expires  = nil,
+      httponly = true,
+      secure   = true,
+      samesite = "Strict",
+      value    = user.tokens.ardoises,
+    },
   })
   return { status = ngx.HTTP_OK }
 end)
@@ -272,19 +281,16 @@ Server.legal = wrap (function ()
 end)
 
 Server.view = wrap (function (context)
-print (1)
   local user, err = Server.authenticate (context)
   if not user then
     return { status = err }
   end
-print (2)
   -- check collaborator:
   local ckey = Config.patterns.collaborator ({
     owner = { login = ngx.var.owner },
     name  = ngx.var.name,
   }, user)
   local collaboration = context.redis:get (ckey)
-print (tostring (collaboration))
   if collaboration == ngx.null or not collaboration then
     return { status = ngx.HTTP_FORBIDDEN }
   end
@@ -334,7 +340,7 @@ Server.logout = wrap (function ()
     value    = "deleted",
     expires  = "Thu, 01 Jan 1970 00:00:00 GMT",
     httponly = true,
-    secure   = false,
+    secure   = true,
     samesite = "Strict",
   }
   return { redirect = "/" }

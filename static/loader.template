@@ -154,6 +154,14 @@ package.preload ["ardoises.jsonhttp.copas"] = function ()
       coroutine.yield ()
     end
     if json then
+      local headers  = {}
+      local iterator = response.headers:entries ()
+      repeat
+        local data = iterator:next ()
+        if data.value then
+          headers [data.value [0]] = data.value [1]
+        end
+      until data.done
       return {
         status  = response.status,
         headers = response.headers,

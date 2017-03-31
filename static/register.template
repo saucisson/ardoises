@@ -19,9 +19,10 @@ local Copas = require "copas"
 local Http  = require "ardoises.jsonhttp.copas"
 local Json  = require "cjson"
 local Url   = require "net.url"
+local tojs  = require "tojs"
 
 Copas.addthread (function ()
-  local _, status = Http {
+  local data, status = Http {
     url    = "/register",
     query  = Json.decode [[{{{query}}}]],
     method = "GET",
@@ -42,10 +43,21 @@ Copas.addthread (function ()
     Copas.sleep (5)
     _G.js.global.location:reload ()
   else
+    _G.window.Cookies:set (data.cookie.key, data.cookie.value, tojs {
+      secure   = data.cookie.secure,
+      samesite = data.cookie.samesite,
+      httponly = data.cookie.httponly,
+    })
     progress.finished = true
     Copas.sleep (1)
     local location = Url.parse (_G.js.global.location)
-    location.query = {}
+    local keys     = {}
+    for k in pairs (location.query) do
+      keys [k] = true
+    end
+    for k in pairs (keys) do
+      location.query [k] = nil
+    end
     _G.js.global.location = Url.build (location)
   end
 end)

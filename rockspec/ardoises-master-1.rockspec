@@ -41,7 +41,6 @@ build = {
   modules = {
     ["ardoises.jsonhttp.common"      ] = "src/ardoises/jsonhttp/common.lua",
     ["ardoises.jsonhttp.copas"       ] = "src/ardoises/jsonhttp/copas.lua",
-    ["ardoises.jsonhttp.js"          ] = "src/ardoises/jsonhttp/js.lua",
     ["ardoises.jsonhttp.resty-redis" ] = "src/ardoises/jsonhttp/resty-redis.lua",
     ["ardoises.jsonhttp.socket-redis"] = "src/ardoises/jsonhttp/socket-redis.lua",
     ["ardoises.patterns"             ] = "src/ardoises/patterns.lua",
