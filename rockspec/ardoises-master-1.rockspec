@@ -20,6 +20,7 @@ dependencies = {
   "coronest",
   "dkjson",
   "etlua",
+  "jwt",
   "lpeg",
   "layeredata",
   "luaossl",
@@ -42,6 +43,7 @@ build = {
     ["ardoises.jsonhttp.common"      ] = "src/ardoises/jsonhttp/common.lua",
     ["ardoises.jsonhttp.copas"       ] = "src/ardoises/jsonhttp/copas.lua",
     ["ardoises.jsonhttp.resty-redis" ] = "src/ardoises/jsonhttp/resty-redis.lua",
+    ["ardoises.jsonhttp.socket"      ] = "src/ardoises/jsonhttp/socket.lua",
     ["ardoises.jsonhttp.socket-redis"] = "src/ardoises/jsonhttp/socket-redis.lua",
     ["ardoises.patterns"             ] = "src/ardoises/patterns.lua",
     ["ardoises.client"               ] = "src/ardoises/client/init.lua",
@@ -56,6 +58,7 @@ build = {
       ["ardoises-server"    ] = "src/ardoises/server/bin.lua",
       ["ardoises-clean"     ] = "src/ardoises/util/clean.lua",
       ["ardoises-invitation"] = "src/ardoises/util/invitation.lua",
+      ["ardoises-webhook"   ] = "src/ardoises/util/webhook.lua",
     },
   },
 }

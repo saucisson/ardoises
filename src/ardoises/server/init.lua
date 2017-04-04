@@ -367,6 +367,7 @@ Server.my_ardoises = wrap (function (context)
   if not user then
     return { status = err }
   end
+  local seen   = {}
   local result = {}
   -- find collaborators in database:
   local cursor = 0
@@ -389,6 +390,41 @@ Server.my_ardoises = wrap (function (context)
         local repository = context.redis:get (Config.patterns.repository (entry.repository))
         entry.repository = Json.decode (repository)
         result [#result+1] = entry
+        seen   [entry.repository.full_name] = true
+      end
+    end
+  until cursor == "0"
+  -- find public repositories:
+  cursor = 0
+  repeat
+    local res = context.redis:scan (cursor,
+      "match", Config.patterns.repository {
+        owner = { login = "*" },
+        name  = "*",
+      },
+      "count", 100)
+    if res == ngx.null or not res then
+      break
+    end
+    cursor = res [1]
+    local keys = res [2]
+    for _, key in ipairs (keys) do
+      local repository = context.redis:get (key)
+      if repository ~= ngx.null and repository then
+        repository = Json.decode (repository)
+        if not seen [repository.full_name] and not repository.private then
+          local collaborator = Json.decode (Json.encode (user))
+          collaborator.permissions = {
+            pull  = true,
+            push  = false,
+            admin = false,
+          }
+          result [#result+1] = {
+            repository   = repository,
+            collaborator = collaborator,
+          }
+          seen [repository.full_name] = true
+        end
       end
     end
   until cursor == "0"
@@ -615,7 +651,7 @@ Server.webhook = wrap (function (context)
     url     = repository.collaborators_url:gsub ("{/collaborator}", ""),
     method  = "GET",
     headers = {
-      ["Accept"       ] = "application/vnd.github.korra-preview+json",
+      ["Accept"       ] = "application/vnd.github.v3+json",
       ["Authorization"] = "token " .. Config.application.token,
       ["User-Agent"   ] = "Ardoises",
     },
@@ -624,7 +660,7 @@ Server.webhook = wrap (function (context)
     -- delete repository:
     context.redis:del (Config.patterns.repository (repository))
     -- delete webhook(s):
-    (function ()
+    local function create ()
       local user = context.redis:get (Config.patterns.user (repository.owner))
       if user == ngx.null or not user then
         return
@@ -658,7 +694,8 @@ Server.webhook = wrap (function (context)
           }
         end
       end
-    end) ()
+    end
+    create ()
   elseif status == 200 then
     -- get branches:
     local branches

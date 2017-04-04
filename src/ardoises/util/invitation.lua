@@ -33,7 +33,7 @@ os.execute (Lustache:render ([[
   redis  = Config.redis.url,
   docker = Config.docker.url,
 }))
-local redis  = assert (Redis.connect (Config.redis.host, Config.redis.port))
+local redis = assert (Redis.connect (Config.redis.host, Config.redis.port))
 
 while true do
   print "Answering to invitations..."

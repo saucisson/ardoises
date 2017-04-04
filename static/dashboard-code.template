@@ -75,12 +75,25 @@ end)
 output = Copas.addthread (function ()
   while true do
     local filtered = {}
-    for _, ardoise in ipairs (ardoises) do
+    for _, ardoise in pairs (ardoises) do
       if ardoise.repository.full_name:match (Input.value)
       or (ardoise.repository.description or ""):match (Input.value) then
         filtered [#filtered+1] = ardoise
       end
     end
+    table.sort (filtered, function (l, r)
+      if (not l.collaborator.permissions.admin and r.collaborator.permissions.admin)
+      or (not l.collaborator.permissions.push  and r.collaborator.permissions.push)
+      or (not l.collaborator.permissions.pull  and r.collaborator.permissions.pull) then
+        return false
+      elseif (l.collaborator.permissions.admin and not r.collaborator.permissions.admin)
+          or (l.collaborator.permissions.push  and not r.collaborator.permissions.push)
+          or (l.collaborator.permissions.pull  and not r.collaborator.permissions.pull) then
+        return true
+      else
+        return l.repository.full_name < r.repository.full_name
+      end
+    end)
     Ardoises.innerHTML = Et.render ([[
       <div class="row">
         <div class="col-sm-12 col-md-10 col-lg-8 col-md-offset-1 col-lg-offset-2">
@@ -90,7 +103,10 @@ output = Copas.addthread (function ()
               <div class="container-fluid">
                 <div class="row">
                   <div class="col-sm-8">
-                    <span><%= ardoise.repository.full_name %>:</span>
+                    <a href="<%= ardoise.repository.html_url %>">
+                      <i class="fa fa-github" aria-hidden="true"></i>
+                      <span><%= ardoise.repository.full_name %>:</span>
+                    </a>
                     <span><%= ardoise.repository.description or ""%></span>
                   </div>
                   <div class="col-sm-2">

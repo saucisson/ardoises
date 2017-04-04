@@ -18,6 +18,12 @@ services:
       context: .
       dockerfile: docker/Dockerfile-noresty-quick
     entrypoint: ardoises-invitation
+  webhook:
+    env_file: .environment
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-noresty-quick
+    entrypoint: ardoises-webhook
   ardoises:
     env_file: .environment
     build:
