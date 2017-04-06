@@ -1,37 +1,30 @@
-## Welcome to GitHub Pages
+## What is Ardoises?
 
-You can use the [editor on GitHub](https://github.com/saucisson/ardoises/edit/gh-pages/index.md) to maintain and preview the content for your website in Markdown files.
+Ardoises is a platform dedicated to formal modeling and verification.
+In runs [as a service](https://ardoises.ovh),
+and is tightly coupled with [GitHub](https://github.com) users and repositories.
 
-Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
+Ardoises is an open source project, under the [MIT license](https://opensource.org/licenses/mit-license.php).
+It is hosted on [GitHub](https://github.com/saucisson/ardoises).
 
-### Markdown
+## Support or Contact
 
-Markdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for
+It is sometimes difficult to know if a question or a bug is related to the core software, a model, a formalism or a tool.
+You are always welcome to [create an issue](https://github.com/saucisson/ardoises/issues/new).
+We will do our best to answer your question, to fix your problem, or to add a new feature!
 
-```markdown
-Syntax highlighted code block
+## Ardoises for Modelers
 
-# Header 1
-## Header 2
-### Header 3
+## Ardoises for Tool Developers
 
-- Bulleted
-- List
+## Ardoises for Formalism Developers
 
-1. Numbered
-2. List
+## Ardoises for Platform Developers
 
-**Bold** and _Italic_ and `Code` text
+## Thanks
 
-[Link](url) and ![Image](src)
-```
+Ardoises could not exist without several people and organizations:
 
-For more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).
-
-### Jekyll Themes
-
-Your Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/saucisson/ardoises/settings). The name of this theme is saved in the Jekyll `_config.yml` configuration file.
-
-### Support or Contact
-
-Having trouble with Pages? Check out our [documentation](https://help.github.com/categories/github-pages-basics/) or [contact support](https://github.com/contact) and we’ll help you sort it out.
+* [University of Geneva](http://www.unige.ch)
+* [Centre Universitaire d'Informatique](http://cui.unige.ch)
+* ...
