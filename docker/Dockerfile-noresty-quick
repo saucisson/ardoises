@@ -1,8 +1,0 @@
-FROM ardoises-noresty
-
-ADD . /src/ardoises
-
-RUN cd /src/ardoises/  \
- && luarocks make rockspec/ardoises-master-1.rockspec \
- && rm -rf /src/ardoises \
- && true

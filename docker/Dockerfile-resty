@@ -51,7 +51,8 @@ RUN apk add --no-cache --virtual .build-deps \
  && luarocks install rockspec/lua-websockets-develop-0.rockspec \
  && luarocks install rockspec/lulpeg-develop-0.rockspec \
  && luarocks install rockspec/redis-lua-develop-0.rockspec \
- && luarocks make    rockspec/ardoises-master-1.rockspec \
+ && luarocks make    --only-deps \
+                     rockspec/ardoises-master-1.rockspec \
  && mkdir -p /etc/nginx \
  && cp src/ardoises/server/nginx.conf /etc/nginx/nginx.conf \
  && apk del .build-deps \

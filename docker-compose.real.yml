@@ -2,6 +2,8 @@ version: "2"
 services:
   redis:
     image: redis:alpine
+    volumes:
+      - ./data:/data
   docker:
     image: shipyard/docker-proxy
     volumes:
@@ -35,4 +37,5 @@ services:
       - "443:443"
     volumes:
       - ./static:/static
-      - /etc/letsencrypt:/etc/letsencrypt
+      - ./src/ardoises:/usr/share/lua/5.1/ardoises
+      - ./etc/letsencrypt:/etc/letsencrypt
