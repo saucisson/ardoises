@@ -1,6 +1,7 @@
 local Copas     = require "copas"
 local Et        = require "etlua"
-local Http      = require "ardoises.jsonhttp.copas"
+-- local Http      = require "ardoises.jsonhttp.copas" -- FIXME
+local Http      = require "ardoises.jsonhttp.socket"
 local Json      = require "rapidjson"
 local Layer     = require "layeredata"
 local Patterns  = require "ardoises.patterns"
@@ -25,6 +26,7 @@ Client.__index = Client
 
 function Mt.__call (_, options)
   local editor = setmetatable ({
+    ardoises_url = assert (options.ardoises),
     branch       = assert (options.branch),
     token        = assert (options.token),
     timeout      = assert (options.timeout),
@@ -356,70 +358,39 @@ Editor.handlers = {}
 
 function Editor.handlers.authenticate (editor, message)
   assert (getmetatable (editor) == Editor)
-  do
-    local user, status = Http {
-      url     = "https://api.github.com/user",
-      method  = "GET",
-      headers = {
-        ["Accept"       ] = "application/vnd.github.v3+json",
-        ["Authorization"] = "token " .. tostring (message.token),
-        ["User-Agent"   ] = editor.application,
-      },
-    }
-    if status ~= 200 then
-      return nil, "authentication failure: " .. tostring (status)
-    end
-    message.client.user  = user
-    message.client.token = message.token
+  local url = Url.build {
+    scheme = editor.ardoises_url.scheme,
+    host   = editor.ardoises_url.host,
+    port   = editor.ardoises_url.port,
+    path   = "/check-token",
+  }
+  local info, status
+  info, status = Http {
+    url     = url,
+    method  = "GET",
+    headers = {
+      ["Accept"       ] = "application/json",
+      ["Authorization"] = "token " .. tostring (message.token),
+      ["User-Agent"   ] = editor.application,
+    },
+  }
+  if status ~= 200 then
+    return nil, "authentication failure: " .. tostring (status)
   end
-  do
-    local emails, status = Http {
-      url     = "https://api.github.com/user/emails",
-      method  = "GET",
-      headers = {
-        ["Accept"       ] = "application/vnd.github.v3+json",
-        ["Authorization"] = "token " .. tostring (message.token),
-        ["User-Agent"   ] = editor.application,
-      },
-    }
-    if status ~= 200 then
-      return nil, "cannot obtain email address: " .. tostring (status)
-    end
-    message.client.user.emails = emails
-    for _, t in ipairs (emails) do
-      if t.primary then
-        message.client.user.email = t.email
-      end
-    end
-  end
-  do
-    local repo = Patterns.repository:match (editor.branch.full_name)
-    local result, status = Http {
-      url     = Et.render ("https://api.github.com/repos/<%- owner %>/<%- repository %>", repo),
-      method  = "GET",
-      headers = {
-        ["Accept"       ] = "application/vnd.github.v3+json",
-        ["Authorization"] = "token " .. tostring (message.token),
-        ["User-Agent"   ] = editor.application,
-      },
-    }
-    if status ~= 200 then
-      return nil, "cannot obtain repository: " .. tostring (status)
-    end
-    if not result.permissions.pull then
-      message.client.handlers.authenticate = nil
-      return nil, "pull permission denied"
-    end
-    message.client.permissions           = result.permissions
+  if not info.repository.permissions.pull then
     message.client.handlers.authenticate = nil
-    message.client.handlers.patch        = Editor.handlers.patch
-    message.client.handlers.require      = Editor.handlers.require
-    message.client.handlers.list         = Editor.handlers.list
-    message.client.handlers.create       = Editor.handlers.create
-    message.client.handlers.delete       = Editor.handlers.delete
-    message.client.handlers.patch        = Editor.handlers.patch
-    return result.permissions
+    return nil, "pull permission denied"
   end
+  message.client.user                  = info.user
+  message.client.permissions           = info.repository.permissions
+  message.client.handlers.authenticate = nil
+  message.client.handlers.patch        = Editor.handlers.patch
+  message.client.handlers.require      = Editor.handlers.require
+  message.client.handlers.list         = Editor.handlers.list
+  message.client.handlers.create       = Editor.handlers.create
+  message.client.handlers.delete       = Editor.handlers.delete
+  message.client.handlers.patch        = Editor.handlers.patch
+  return info.repository.permissions
 end
 
 function Editor.handlers.require (editor, message)

@@ -1,19 +1,35 @@
+local Copas    = require "copas"
+local tojs     = require "tojs"
 local Progress = require "progressbar"
 local progress = Progress {
   expected = 5, -- seconds
 }
 
-local Copas  = require "copas"
+Copas.addthread (function ()
+  local running = Copas.running
+  _G.window.requirejs:config (tojs {
+    paths = {
+      ace = { "//cdnjs.cloudflare.com/ajax/libs/ace/1.2.6/" },
+    },
+  })
+  _G.window:requirejs (tojs {
+    "ace/ace",
+    "ace/mode-lua",
+    "ace/theme-monokai",
+    "ace/worker-lua",
+  }, function (_, ace)
+    _G.window.ace = ace
+    Copas.wakeup (running)
+  end)
+  Copas.sleep (-math.huge)
+end)
+
 local Client = require "ardoises.client"
 local Et     = require "etlua"
 local Layer  = require "layeredata"
-local tojs   = require "tojs"
 local client = Client {
   server = "{{{server}}}",
-  tokens = {
-    ardoises = "{{{user.tokens.ardoises}}}",
-    github   = "{{{user.tokens.github}}}",
-  },
+  token  = "{{{user.tokens.ardoises}}}"
 }
 
 local ardoise

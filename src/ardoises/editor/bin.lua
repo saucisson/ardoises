@@ -16,6 +16,7 @@ local Arguments = require "argparse"
 local Copas     = require "copas"
 local Editor    = require "ardoises.editor"
 local Patterns  = require "ardoises.patterns"
+local Url       = require "net.url"
 
 local parser = Arguments () {
   name        = "ardoises-editor",
@@ -43,6 +44,15 @@ parser:option "--port" {
   description = "port",
   convert     = tonumber,
   default     = 8080,
+}
+parser:option "--ardoises" {
+  description = "URL of the ardoises server",
+  default     = os.getenv "ARDOISES_URL",
+  convert     = function (x)
+    local url = Url.parse (x)
+    assert (url and url.scheme and url.host)
+    return url
+  end,
 }
 
 local arguments = parser:parse ()

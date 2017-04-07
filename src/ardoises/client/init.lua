@@ -31,17 +31,15 @@ function Mt.__call (_, options)
   or not Url.parse (options.server).host then
     return nil, "argument.server must be a valid URL"
   end
-  if type (options.tokens) ~= "table"
-  or type (options.tokens.github  ) ~= "string"
-  or type (options.tokens.ardoises) ~= "string" then
-    return nil, "argument.token must be a table of tokens { ardoises, github }"
+  if type (options.token) ~= "string" then
+    return nil, "argument.token must be a string"
   end
+  local token   = options.token
   local server  = Url.parse (options.server)
-  local tokens  = options.tokens
   local headers = {
     ["Accept"       ] = "application/json",
     ["User-Agent"   ] = Client.user_agent,
-    ["Authorization"] = "token " .. options.tokens.ardoises,
+    ["Authorization"] = "token " .. token,
   }
   local user, status = Http {
     url      =  Url.build {
@@ -59,7 +57,7 @@ function Mt.__call (_, options)
   return setmetatable ({
     headers = headers,
     server  = server,
-    tokens  = tokens,
+    token   = token,
     user    = user,
   }, Client)
 end
@@ -153,7 +151,7 @@ function Ardoise.edit (ardoise)
   assert (websocket:send (Json.encode {
     id    = "authenticate",
     type  = "authenticate",
-    token = client.tokens.github,
+    token = info.token,
   }))
   local res = assert (websocket:receive ())
   res = Json.decode (res)

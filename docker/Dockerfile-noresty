@@ -5,7 +5,6 @@ ADD . /src/ardoises
 RUN apk add --no-cache --virtual .build-deps \
         build-base \
         cmake \
-        curl \
         make \
         openssl-dev \
         perl \
@@ -17,6 +16,7 @@ RUN apk add --no-cache --virtual .build-deps \
         dockerize \
  && apk add --no-cache \
         bash \
+        curl \
         git \
         libstdc++ \
         openssl \

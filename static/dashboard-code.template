@@ -8,10 +8,7 @@ local Client = require "ardoises.client"
 local Et     = require "etlua"
 local client = Client {
   server = "{{{server}}}",
-  tokens = {
-    ardoises = "{{{user.tokens.ardoises}}}",
-    github   = "{{{user.tokens.github}}}",
-  },
+  token  = "{{{user.tokens.ardoises}}}"
 }
 local ardoises = client:ardoises ()
 local output
