@@ -58,6 +58,7 @@ build = {
       ["ardoises-server"    ] = "src/ardoises/server/bin.lua",
       ["ardoises-clean"     ] = "src/ardoises/util/clean.lua",
       ["ardoises-invitation"] = "src/ardoises/util/invitation.lua",
+      ["ardoises-populate"  ] = "src/ardoises/util/populate.lua",
       ["ardoises-webhook"   ] = "src/ardoises/util/webhook.lua",
     },
   },

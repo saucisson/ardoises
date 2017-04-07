@@ -3,5 +3,6 @@
 etc/
 data/
 rockspec/*.src.rock
+docker-compose.yml
 ENVIRONMENT
 DEVELOPERS.md

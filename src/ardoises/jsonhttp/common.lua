@@ -1,6 +1,15 @@
 local Json = require "rapidjson"
 local Url  = require "net.url"
 
+-- http://25thandclement.com/~william/projects/luaossl.pdf
+local function tohex (b)
+  local x = ""
+  for i = 1, #b do
+    x = x .. string.format ("%.2x", string.byte (b, i))
+  end
+  return x
+end
+
 return function (what)
   return function (options)
     assert (type (options) == "table")
@@ -13,7 +22,7 @@ return function (what)
     request.timeout = options.timeout
     request.url     = tostring (url)
     request.method  = options.method or "GET"
-    request.body    = options.body   and Json.encode (options.body, {
+    request.body    = options.body and Json.encode (options.body, {
       sort_keys = true,
     })
     request.headers = {}
@@ -23,6 +32,12 @@ return function (what)
     request.headers ["Content-length"] = request.body and #request.body
     request.headers ["Content-type"  ] = request.body and "application/json"
     request.headers ["Accept"        ] = request.headers ["Accept"] or "application/json"
+    if options.signature then
+      local Config = require "ardoises.server.config"
+      local Hmac   = require "openssl.hmac"
+      local hmac   = Hmac.new (Config.application.secret)
+      request.headers [options.signature] = "sha1=" .. tohex (hmac:final (request.body))
+    end
     local cache = request.method == "GET"
                or options.cache
     repeat

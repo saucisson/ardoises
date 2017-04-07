@@ -20,6 +20,12 @@ services:
       context: .
       dockerfile: docker/Dockerfile-noresty
     entrypoint: ardoises-invitation
+  populate:
+    env_file: .environment
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-noresty
+    entrypoint: ardoises-populate
   webhook:
     env_file: .environment
     build:

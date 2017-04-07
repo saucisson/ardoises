@@ -12,29 +12,35 @@ services:
     env_file: .environment
     build:
       context: .
-      dockerfile: docker/Dockerfile-noresty-quick
+      dockerfile: docker/Dockerfile-noresty
     entrypoint: ardoises-clean
   invitation:
     env_file: .environment
     build:
       context: .
-      dockerfile: docker/Dockerfile-noresty-quick
+      dockerfile: docker/Dockerfile-noresty
     entrypoint: ardoises-invitation
+  populate:
+    env_file: .environment
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-noresty
+    entrypoint: ardoises-populate
   webhook:
     env_file: .environment
     build:
       context: .
-      dockerfile: docker/Dockerfile-noresty-quick
+      dockerfile: docker/Dockerfile-noresty
     entrypoint: ardoises-webhook
   ardoises:
     env_file: .environment
     build:
       context: .
-      dockerfile: docker/Dockerfile-resty-quick
+      dockerfile: docker/Dockerfile-resty
     entrypoint: ardoises-server
     ports:
-      - "8080:8080"
-      - "8081:8443"
+      - "8080:80"
+      - "8443:443"
     volumes:
       - ./static:/static
       - ./src/ardoises:/usr/share/lua/5.1/ardoises

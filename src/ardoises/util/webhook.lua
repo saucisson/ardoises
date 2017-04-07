@@ -23,6 +23,13 @@ parser:option "--delay" {
 }
 local arguments = parser:parse ()
 
+print "Waiting for services to run..."
+os.execute (Lustache:render ([[
+  dockerize -wait "{{{ardoises}}}"
+]], {
+  ardoises = Config.ardoises.url,
+}))
+
 while true do
   print "Setting webhooks..."
   local start = Gettime ()
@@ -58,6 +65,9 @@ while true do
           end
         end
         if not found then
+          print (Lustache:render ("  ...setting webhook for {{{repository}}}.", {
+            repository = repository.full_name,
+          }))
           _, status = Http {
             url     = repository.hooks_url,
             method  = "POST",
