@@ -14,24 +14,32 @@ services:
       context: .
       dockerfile: docker/Dockerfile-noresty
     entrypoint: ardoises-clean
+    volumes:
+      - ./src/ardoises:/usr/share/lua/5.1/ardoises
   invitation:
     env_file: .environment
     build:
       context: .
       dockerfile: docker/Dockerfile-noresty
     entrypoint: ardoises-invitation
+    volumes:
+      - ./src/ardoises:/usr/share/lua/5.1/ardoises
   populate:
     env_file: .environment
     build:
       context: .
       dockerfile: docker/Dockerfile-noresty
     entrypoint: ardoises-populate
+    volumes:
+      - ./src/ardoises:/usr/share/lua/5.1/ardoises
   webhook:
     env_file: .environment
     build:
       context: .
       dockerfile: docker/Dockerfile-noresty
     entrypoint: ardoises-webhook
+    volumes:
+      - ./src/ardoises:/usr/share/lua/5.1/ardoises
   ardoises:
     env_file: .environment
     build:
