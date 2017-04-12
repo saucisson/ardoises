@@ -47,9 +47,10 @@ build = {
     ["ardoises.jsonhttp.socket-redis"] = "src/ardoises/jsonhttp/socket-redis.lua",
     ["ardoises.patterns"             ] = "src/ardoises/patterns.lua",
     ["ardoises.client"               ] = "src/ardoises/client/init.lua",
+    ["ardoises.config"               ] = "src/ardoises/config.lua",
     ["ardoises.editor"               ] = "src/ardoises/editor/init.lua",
+    ["ardoises.sandbox"              ] = "src/ardoises/sandbox.lua",
     ["ardoises.server"               ] = "src/ardoises/server/init.lua",
-    ["ardoises.server.config"        ] = "src/ardoises/server/config.lua",
   },
   install = {
     bin = {

@@ -1,4 +1,4 @@
-local Config   = require "ardoises.server.config"
+local Config   = require "ardoises.config"
 local Common   = require "ardoises.jsonhttp.common"
 local Json     = require "rapidjson"
 local Http     = require "socket.http"

@@ -5,6 +5,7 @@ local Http      = require "ardoises.jsonhttp.socket"
 local Json      = require "rapidjson"
 local Layer     = require "layeredata"
 local Patterns  = require "ardoises.patterns"
+local Sandbox   = require "ardoises.sandbox"
 local Url       = require "socket.url"
 local Websocket = require "websocket"
 
@@ -17,76 +18,6 @@ local Websocket = require "websocket"
 -- { id = ..., type = "delete"      , module = "..." }
 -- { id = ..., type = "answer"      , success = true|false, reason = "..." }
 -- { id = ..., type = "execute"     }
-
--- http://lua-users.org/wiki/SandBoxes
-local sandbox = {
-  next      = next,
-  pairs     = pairs,
-  pcall     = pcall,
-  print     = print,
-  select    = select,
-  tonumber  = tonumber,
-  tostring  = tostring,
-  type      = type,
-  unpack    = unpack,
-  _VERSION  = _VERSION,
-  xpcall    = xpcall,
-  coroutine = coroutine,
-  string    = {
-    byte    = string.byte,
-    char    = string.char,
-    find    = string.find,
-    format  = string.format,
-    gmatch  = string.gmatch,
-    gsub    = string.gsub,
-    len     = string.len,
-    lower   = string.lower,
-    match   = string.match,
-    rep     = string.rep,
-    reverse = string.reverse,
-    sub     = string.sub,
-    upper   = string.upper,
-  },
-  table     = {
-    insert = table.insert,
-    maxn   = table.maxn,
-    remove = table.remove,
-    sort   = table.sort,
-  },
-  math      = {
-    abs   = math.abs,
-    acos  = math.acos,
-    asin  = math.asin,
-    atan  = math.atan,
-    atan2 = math.atan2,
-    ceil  = math.ceil,
-    cos   = math.cos,
-    cosh  = math.cosh,
-    deg   = math.deg,
-    exp   = math.exp,
-    floor = math.floor,
-    fmod  = math.fmod,
-    frexp = math.frexp,
-    huge  = math.huge,
-    ldexp = math.ldexp,
-    log   = math.log,
-    log10 = math.log10,
-    max   = math.max,
-    min   = math.min,
-    modf  = math.modf,
-    pi    = math.pi,
-    pow   = math.pow,
-    rad   = math.rad,
-    sin   = math.sin,
-    sinh  = math.sinh,
-    sqrt  = math.sqrt,
-    tan   = math.tan,
-    tanh  = math.tanh,
-  },
-  io    = {},
-  os    = {},
-  debug = {},
-}
 
 local Mt     = {}
 local Editor = setmetatable ({}, Mt)
@@ -392,7 +323,7 @@ function Editor.require (editor, x)
   end
   local code = file:read "*a"
   file:close ()
-  local loaded, err_loaded = _G.load (code, x, "t", sandbox)
+  local loaded, err_loaded = _G.load (code, x, "t", Sandbox)
   if not loaded then
     return nil, "invalid layer: " .. tostring (err_loaded)
   end
@@ -653,7 +584,7 @@ function Editor.handlers.patch (editor, message)
       if type (patch.code) ~= "string" then
         return nil, "patch code is not a string"
       end
-      local chunk, err_chunk = _G.load (patch.code, patch.module, "t", sandbox)
+      local chunk, err_chunk = _G.load (patch.code, patch.module, "t", Sandbox)
       if not chunk then
         return nil, "invalid layer: " .. tostring (err_chunk)
       end

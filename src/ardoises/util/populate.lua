@@ -7,7 +7,7 @@ _G.print = function (...)
 end
 
 local Arguments = require "argparse"
-local Config    = require "ardoises.server.config"
+local Config    = require "ardoises.config"
 local Http      = require "ardoises.jsonhttp.socket-redis"
 local Lustache  = require "lustache"
 local Url       = require "net.url"

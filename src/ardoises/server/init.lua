@@ -4,7 +4,7 @@ _G.print = function (...)
   io.stdout:flush ()
 end
 
-local Config   = require "ardoises.server.config"
+local Config   = require "ardoises.config"
 local Cookie   = require "resty.cookie"
 local Gettime  = require "socket".gettime
 local Http     = require "ardoises.jsonhttp.resty-redis"
@@ -497,8 +497,9 @@ Server.editor = wrap (function (context)
     assert (nstatus == ngx.HTTP_OK, nstatus)
     local container
     for id, v in pairs (ninfo.Containers) do
-      if v.Name == "clean" then
+      if v.Name:match "clean" then
         container = id
+        break
       end
     end
     local cinfo, cstatus = Http {
@@ -524,7 +525,7 @@ Server.editor = wrap (function (context)
           Lustache:render ("{{{owner}}}/{{{name}}}:{{{branch}}}", ngx.var),
           Config.application.token,
         },
-        Image        = cinfo [1].Image,
+        Image        = cinfo.Image,
         ExposedPorts = {
           ["8080/tcp"] = {},
         },

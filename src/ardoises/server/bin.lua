@@ -6,7 +6,7 @@ _G.print = function (...)
   io.stdout:flush ()
 end
 
-local Config   = require "ardoises.server.config"
+local Config   = require "ardoises.config"
 local Http     = require "ardoises.jsonhttp.socket"
 local Json     = require "rapidjson"
 local Jwt      = require "jwt"

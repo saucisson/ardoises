@@ -6,6 +6,7 @@ local Json      = require "rapidjson"
 local Layer     = require "layeredata"
 local Lustache  = require "lustache"
 local Patterns  = require "ardoises.patterns"
+local Sandbox   = require "ardoises.sandbox"
 local Url       = require "net.url"
 local Websocket = require "websocket"
 
@@ -276,7 +277,7 @@ function Editor.require (editor, name)
     return nil, request.errors
   end
   local code = request.answer.code
-  local loaded, err_loaded = _G.load (code, module.name, "t")
+  local loaded, err_loaded = _G.load (code, module.name, "t", Sandbox)
   if not loaded then
     return nil, "invalid layer: " .. tostring (err_loaded)
   end
@@ -412,7 +413,7 @@ function Editor.patch (editor, what)
       return nil, "unknown module: " .. tostring (name)
     end
     if type (code) == "string" then
-      local chunk, err_chunk = _G.load (code, name, "t")
+      local chunk, err_chunk = _G.load (code, name, "t", Sandbox)
       if not chunk then
         return nil, "invalid patch: " .. tostring (err_chunk)
       end
@@ -528,7 +529,7 @@ function Editor.answer (editor)
     for _, patch in ipairs (message.patches) do
       local module = editor.modules [patch.module]
       if module then
-        local chunk, err_chunk = _G.load (patch.code, module.name, "t")
+        local chunk, err_chunk = _G.load (patch.code, module.name, "t", Sandbox)
         if not chunk then
           return nil, "invalid patch: " .. tostring (err_chunk)
         end
