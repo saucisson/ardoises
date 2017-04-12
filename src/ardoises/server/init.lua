@@ -485,18 +485,31 @@ Server.editor = wrap (function (context)
       method = "GET",
     }
     assert (status == ngx.HTTP_OK, status)
-    Http {
-      url    = Lustache:render ("http://{{{host}}}:{{{port}}}/images/create", {
+    local _, network = next (info.NetworkSettings.Networks)
+    local ninfo, nstatus = Http {
+      url    = Lustache:render ("http://{{{host}}}:{{{port}}}/networks/{{{id}}}", {
         host = Config.docker.host,
         port = Config.docker.port,
+        id   = network.NetworkID,
       }),
-      method = "POST",
-      query  = {
-        fromImage = Config.image,
-        tag       = "latest",
-      },
-      timeout = 120,
+      method = "GET",
     }
+    assert (nstatus == ngx.HTTP_OK, nstatus)
+    local container
+    for id, v in pairs (ninfo.Containers) do
+      if v.Name == "clean" then
+        container = id
+      end
+    end
+    local cinfo, cstatus = Http {
+      url    = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}/json", {
+        host = Config.docker.host,
+        port = Config.docker.port,
+        id   = container,
+      }),
+      method = "GET",
+    }
+    assert (cstatus == ngx.HTTP_OK, cstatus)
     local service
     service, status = Http {
       url     = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/create", {
@@ -511,7 +524,7 @@ Server.editor = wrap (function (context)
           Lustache:render ("{{{owner}}}/{{{name}}}:{{{branch}}}", ngx.var),
           Config.application.token,
         },
-        Image        = Config.image,
+        Image        = cinfo [1].Image,
         ExposedPorts = {
           ["8080/tcp"] = {},
         },
@@ -555,7 +568,7 @@ Server.editor = wrap (function (context)
       }
       assert (status == ngx.HTTP_OK, status)
       if info.State.Running then
-        local _, network = next (info.NetworkSettings.Networks)
+        _, network = next (info.NetworkSettings.Networks)
         context.redis:set (key, Json.encode {
           repository = repository,
           docker_id  = service.Id,

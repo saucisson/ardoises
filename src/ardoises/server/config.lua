@@ -26,7 +26,6 @@ local result = {
     end,
   },
   docker_id   = assert (os.getenv "HOSTNAME"),
-  image       = assert (os.getenv "ARDOISES_IMAGE"),
   ardoises    = assert (Url.parse (os.getenv "ARDOISES_URL")),
   docker      = assert (Url.parse (os.getenv "DOCKER_URL"  )),
   redis       = assert (Url.parse (os.getenv "REDIS_URL"   )),

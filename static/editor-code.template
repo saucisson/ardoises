@@ -5,24 +5,24 @@ local progress = Progress {
   expected = 5, -- seconds
 }
 
-Copas.addthread (function ()
-  local running = Copas.running
-  _G.window.requirejs:config (tojs {
-    paths = {
-      ace = { "//cdnjs.cloudflare.com/ajax/libs/ace/1.2.6/" },
-    },
-  })
-  _G.window:requirejs (tojs {
-    "ace/ace",
-    "ace/mode-lua",
-    "ace/theme-monokai",
-    "ace/worker-lua",
-  }, function (_, ace)
-    _G.window.ace = ace
-    Copas.wakeup (running)
-  end)
-  Copas.sleep (-math.huge)
-end)
+-- Copas.addthread (function ()
+--   local running = Copas.running
+--   _G.window.requirejs:config (tojs {
+--     paths = {
+--       ace = { "//cdnjs.cloudflare.com/ajax/libs/ace/1.2.6/" },
+--     },
+--   })
+--   _G.window:requirejs (tojs {
+--     "ace/ace",
+--     "ace/mode-lua",
+--     "ace/theme-monokai",
+--     "ace/worker-lua",
+--   }, function (_, ace)
+--     _G.window.ace = ace
+--     Copas.wakeup (running)
+--   end)
+--   Copas.sleep (-math.huge)
+-- end)
 
 local Client = require "ardoises.client"
 local Et     = require "etlua"
@@ -34,7 +34,8 @@ local client = Client {
 
 local ardoise
 for _, a in ipairs (client:ardoises ()) do
-  if  a.repository.full_name == "{{{repository.full_name}}}"
+  if  a.repository.owner.login == "{{{repository.owner.login}}}"
+  and a.repository.name == "{{{repository.name}}}"
   and a.branch == "{{{branch}}}" then
     ardoise = a
     break
