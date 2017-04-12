@@ -36,3 +36,4 @@ RUN apk add --no-cache --virtual .build-deps \
  && true
 
 ENTRYPOINT ["/bin/bash"]
+CMD ["-c"]
