@@ -106,7 +106,7 @@ renderers.layers = Copas.addthread (function ()
       <div class="list-group-item" id="layer-get-<%- layer.id %>">
         <%= layer.name %>
         <span class="pull-right">
-          <button id="layer-delete-<%- layer.id %>" class="btn btn-md btn-warning">
+          <button id="layer-delete-<%- layer.id %>" class="btn btn-sm btn-warning">
             <i class="fa fa-trash" style="color: black;" aria-hidden="true"></i>
           </button>
         </span>
