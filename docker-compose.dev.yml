@@ -50,6 +50,7 @@ services:
       - "8080:80"
       - "8443:443"
     volumes:
+      - ./data:/data
       - ./static:/static
       - ./src/ardoises:/usr/share/lua/5.1/ardoises
       - ./etc/letsencrypt:/etc/letsencrypt

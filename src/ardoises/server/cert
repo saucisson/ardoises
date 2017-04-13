@@ -1,5 +1,9 @@
 #! /usr/bin/env bash
 
+mkdir -p /etc/nginx/ssl
+openssl rand 48 -out /etc/nginx/ssl/ticket.key
+openssl dhparam -out /etc/nginx/ssl/dhparam4.pem
+
 certbot \
   --non-interactive \
   --agree-tos \
