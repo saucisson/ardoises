@@ -70,7 +70,9 @@ do
     --event modify \
     --event delete \
     --event move \
-    /usr/share/lua/5.1/ardoises
+    /usr/share/lua/5.1/ardoises \
+    /etc/letsencrypt \
+    /static
   if $(nginx -t)
   then
     nginx -s reload
