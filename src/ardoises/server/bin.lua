@@ -59,6 +59,25 @@ do
   redis:setnx (key, Json.encode (user))
 end
 
+print "Starting reloader..."
+assert (os.execute [=[
+# https://miteshshah.github.io/linux/nginx/auto-reload-nginx/
+while true
+do
+  inotifywait \
+    --recursive \
+    --event create \
+    --event modify \
+    --event delete \
+    --event move \
+    /usr/share/lua/5.1/ardoises
+  if $(nginx -t)
+  then
+    nginx -s reload
+  fi
+done &
+]=])
+
 print "Starting server..."
 assert (os.execute [[
   nginx \

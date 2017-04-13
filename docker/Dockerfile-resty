@@ -24,6 +24,7 @@ RUN apk add --no-cache --virtual .build-deps \
         curl \
         diffutils \
         grep \
+        inotify-tools \
         libstdc++ \
         openssl \
         pcre \
@@ -54,12 +55,15 @@ RUN apk add --no-cache --virtual .build-deps \
  && luarocks make    --only-deps \
                      rockspec/ardoises-master-1.rockspec \
  && mkdir -p /etc/nginx \
- && cp src/ardoises/server/nginx.conf /etc/nginx/nginx.conf \
+ && ln -s /usr/share/lua/5.1/ardoises/server/nginx.conf \
+          /etc/nginx/nginx.conf \
  && apk del .build-deps \
  && rm -rf /src/ardoises \
  && rm -rf /tmp/* \
  && true
 
+ENTRYPOINT ["/bin/bash"]
+CMD ["-c"]
 ENV PATH /usr/local/openresty/bin/:/usr/local/openresty/nginx/sbin/:$PATH
 VOLUME ["/static", "/etc/letsencrypt"]
 EXPOSE 80 443

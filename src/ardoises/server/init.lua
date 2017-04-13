@@ -262,15 +262,6 @@ Server.overview = wrap (function (context)
   return { status = ngx.HTTP_OK }
 end)
 
-Server.legal = wrap (function ()
-  _G.ngx.header ["Content-type"] = "text/html"
-  ngx.say (Server.template ("index", {
-    server  = Url.build (Config.ardoises),
-    content = "{{{legal}}}"
-  }))
-  return { status = ngx.HTTP_OK }
-end)
-
 Server.view = wrap (function (context)
   local user, err = Server.authenticate (context)
   if not user then
@@ -520,7 +511,7 @@ Server.editor = wrap (function (context)
       method  = "POST",
       timeout = 120,
       body    = {
-        Entrypoint   = "ardoises-editor",
+        Entrypoint   = "lua -l ardoises.editor.bin",
         Cmd          = {
           Lustache:render ("{{{owner}}}/{{{name}}}:{{{branch}}}", ngx.var),
           Config.application.token,

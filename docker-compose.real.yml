@@ -13,31 +13,39 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile-noresty
-    entrypoint: ardoises-clean
+    entrypoint: lua -l ardoises.util.clean
+    volumes:
+      - ./src/ardoises:/usr/share/lua/5.1/ardoises
   invitation:
     env_file: .environment
     build:
       context: .
       dockerfile: docker/Dockerfile-noresty
-    entrypoint: ardoises-invitation
+    entrypoint: lua -l ardoises.util.invitation
+    volumes:
+      - ./src/ardoises:/usr/share/lua/5.1/ardoises
   populate:
     env_file: .environment
     build:
       context: .
       dockerfile: docker/Dockerfile-noresty
-    entrypoint: ardoises-populate
+    entrypoint: lua -l ardoises.util.populate
+    volumes:
+      - ./src/ardoises:/usr/share/lua/5.1/ardoises
   webhook:
     env_file: .environment
     build:
       context: .
       dockerfile: docker/Dockerfile-noresty
-    entrypoint: ardoises-webhook
+    entrypoint: lua -l ardoises.util.webhook
+    volumes:
+      - ./src/ardoises:/usr/share/lua/5.1/ardoises
   ardoises:
     env_file: .environment
     build:
       context: .
       dockerfile: docker/Dockerfile-resty
-    entrypoint: ardoises-server
+    entrypoint: lua -l ardoises.server.bin
     ports:
       - "80:80"
       - "443:443"
