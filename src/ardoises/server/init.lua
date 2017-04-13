@@ -511,21 +511,25 @@ Server.editor = wrap (function (context)
       method  = "POST",
       timeout = 120,
       body    = {
-        Entrypoint   = "lua -l ardoises.editor.bin",
+        Entrypoint   = "lua",
         Cmd          = {
-          Lustache:render ("{{{owner}}}/{{{name}}}:{{{branch}}}", ngx.var),
-          Config.application.token,
+          "-l",
+          "ardoises.editor.bin",
         },
         Image        = cinfo.Image,
         ExposedPorts = {
           ["8080/tcp"] = {},
         },
+        Volumes      = cinfo.Config.Volumes,
         HostConfig   = {
           PublishAllPorts = false,
           NetworkMode     = info.HostConfig.NetworkMode,
+          Binds           = cinfo.HostConfig.Binds,
         },
         Env = {
           "ARDOISES_URL=" .. Config.ardoises.url,
+          "ARDOISES_BRANCH=" .. Lustache:render ("{{{owner}}}/{{{name}}}:{{{branch}}}", ngx.var),
+          "ARDOISES_TOKEN=" .. Config.application.token,
         },
       },
     }

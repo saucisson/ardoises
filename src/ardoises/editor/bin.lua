@@ -22,14 +22,16 @@ local parser = Arguments () {
   name        = "ardoises-editor",
   description = "collaborative editor for ardoises",
 }
-parser:argument "branch" {
+parser:option "--branch" {
   description = "branch to edit (in 'user/repository:branch' format)",
+  default     = os.getenv "ARDOISES_BRANCH",
   convert     = function (x)
     return assert (Patterns.branch:match (x))
   end,
 }
-parser:argument "token" {
+parser:option "--token" {
   description = "access token",
+  default     = os.getenv "ARDOISES_TOKEN",
 }
 parser:option "--application" {
   description = "application name",
