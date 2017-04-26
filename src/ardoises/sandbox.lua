@@ -1,15 +1,17 @@
 -- http://lua-users.org/wiki/SandBoxes
 return {
+  _VERSION  = _VERSION,
+  assert    = assert,
   next      = next,
   pairs     = pairs,
   pcall     = pcall,
   print     = print,
+  require   = require,
   select    = select,
   tonumber  = tonumber,
   tostring  = tostring,
   type      = type,
   unpack    = unpack,
-  _VERSION  = _VERSION,
   xpcall    = xpcall,
   coroutine = coroutine,
   string    = {
