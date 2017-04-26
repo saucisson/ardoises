@@ -142,8 +142,8 @@ output = Copas.addthread (function ()
                     <div class="input-group input-group-sm">
                     <% for _, branch in ipairs (ardoise.repository.branches) do %>
                     <% if not branch.protected then %>
-                      <a href="/views/<%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>/<%- ardoise.branch %>"
-                        aria-label="Editor for <%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>:<%- ardoise.branch %>">
+                      <a href="/views/<%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>/<%- branch.name %>"
+                        aria-label="Editor for <%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>:<%- branch.name %>">
                         <span class="input-group-btn">
                           <button type="button" class="btn btn-primary">
                             <%= branch.name %>

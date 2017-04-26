@@ -7,6 +7,7 @@ end
 local Config   = require "ardoises.config"
 local Cookie   = require "resty.cookie"
 local Gettime  = require "socket".gettime
+local Hashids  = require "hashids"
 local Http     = require "ardoises.jsonhttp.resty-redis"
 local Hmac     = require "openssl.hmac"
 local Json     = require "rapidjson"
@@ -15,6 +16,8 @@ local Lustache = require "lustache"
 local Patterns = require "ardoises.patterns"
 local Redis    = require "resty.redis"
 local Url      = require "net.url"
+
+local hashids  = Hashids.new (Config.ardoises.url, 32)
 
 -- http://25thandclement.com/~william/projects/luaossl.pdf
 local function tohex (b)
@@ -422,6 +425,34 @@ Server.my_ardoises = wrap (function (context)
   return { status = ngx.HTTP_OK }
 end)
 
+Server.my_tools = wrap (function (context)
+  local user, err = Server.authenticate (context)
+  if not user then
+    return { status = err }
+  end
+  local result = {}
+  -- find tools in database:
+  local cursor = 0
+  repeat
+    local res = context.redis:scan (cursor,
+      "match", Config.patterns.tool (user, { id = "*" }),
+      "count", 100)
+    if res == ngx.null or not res then
+      break
+    end
+    cursor = res [1]
+    local keys = res [2]
+    for _, key in ipairs (keys) do
+      local entry = context.redis:get (key)
+      if entry ~= ngx.null and entry then
+        result [#result+1] = Json.decode (entry)
+      end
+    end
+  until cursor == "0"
+  ngx.say (Json.encode (result))
+  return { status = ngx.HTTP_OK }
+end)
+
 Server.editor = wrap (function (context)
   local user, err = Server.authenticate (context)
   if not user then
@@ -622,6 +653,148 @@ Server.editor = wrap (function (context)
     editor_url  = editor.editor_url,
   })
   return { status = ngx.HTTP_OK }
+end)
+
+Server.tool = wrap (function (context)
+  local user, err = Server.authenticate (context)
+  if not user then
+    return { status = err }
+  end
+  local method = ngx.req.get_method ()
+  if method == ngx.ngx.HTTP_POST then
+    ngx.req.read_body ()
+    local arguments = assert (ngx.req.get_post_args ())
+    local id        = context.redis:incr (Config.patterns.id "tool")
+    id = hashids:encode (id)
+    local key   = Config.patterns.tool (user, { id = id })
+    local token = Jwt:sign (Config.application.secret, {
+      header  = {
+        typ = "JWT",
+        alg = "HS256",
+      },
+      payload = {
+        login   = user.login,
+        ardoise = arguments.layer,
+      },
+    })
+    local service, status = Http {
+      url     = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/create", {
+        host = Config.docker.host,
+        port = Config.docker.port,
+      }),
+      method  = "POST",
+      timeout = 120,
+      body    = {
+        Image = arguments.image,
+        Env   = {
+          "ARDOISES_LAYER=" .. arguments.layer,
+          "ARDOISES_TOKEN=" .. token,
+        },
+      },
+    }
+    assert (status == ngx.HTTP_CREATED, status)
+    local created_at = Gettime ()
+    local _
+    _, status = Http {
+      method  = "POST",
+      timeout = 120,
+      url     = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}/start", {
+        host = Config.docker.host,
+        port = Config.docker.port,
+        id   = service.Id,
+      }),
+    }
+    assert (status == ngx.HTTP_NO_CONTENT, status)
+    local start = Gettime ()
+    local docker_url = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}", {
+      host = Config.docker.host,
+      port = Config.docker.port,
+      id   = service.Id,
+    })
+    local info
+    while Gettime () - start <= 120 do
+      info, status = Http {
+        method = "GET",
+        url    = docker_url .. "/json",
+      }
+      assert (status == ngx.HTTP_OK, status)
+      if info.State.Running then
+        context.redis:set (key, Json.encode {
+          id         = id,
+          docker_id  = service.Id,
+          created_at = created_at,
+          started_at = Gettime (),
+          layer      = arguments.layer,
+          image      = arguments.image,
+          token      = token,
+        })
+        break
+      elseif info.State.Dead then
+        assert (false)
+      else
+        _G.ngx.sleep (1)
+      end
+    end
+    ngx.say (Json.encode {
+      user  = user,
+      token = token,
+      tool  = {
+        id     = id,
+        status = info.State,
+      },
+    })
+    return { status = ngx.HTTP_OK }
+  elseif method == ngx.HTTP_DELETE then
+    local key  = Config.patterns.tool (user, { id = ngx.var.tool })
+    local tool = context.redis:get (key)
+    if tool == ngx.null or not tool then
+      return { status = ngx.HTTP_NOT_FOUND }
+    end
+    tool = assert (Json.decode (tool))
+    local docker_url = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}", {
+      host = Config.docker.host,
+      port = Config.docker.port,
+      id   = tool.docker_id,
+    })
+    local _, status = Http {
+      method = "DELETE",
+      url    = docker_url,
+      query  = {
+        v     = true,
+        force = true,
+        link  = true,
+      },
+    }
+    assert (status == ngx.HTTP_NO_CONTENT, status)
+    context.redis:del (key)
+    return { status = ngx.HTTP_NO_CONTENT }
+  else
+    local key  = Config.patterns.tool (user, { id = ngx.var.tool })
+    local tool = context.redis:get (key)
+    if tool == ngx.null or not tool then
+      return { status = ngx.HTTP_NOT_FOUND }
+    end
+    tool = assert (Json.decode (tool))
+    local docker_url = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}", {
+      host = Config.docker.host,
+      port = Config.docker.port,
+      id   = tool.docker_id,
+    })
+    local info, status = Http {
+      method = "GET",
+      url    = docker_url .. "/json",
+    }
+    assert (status == ngx.HTTP_OK, status)
+    ngx.say (Json.encode {
+      user  = user,
+      token = tool.token,
+      tool  = {
+        id     = tool.id,
+        status = info.State,
+      },
+    })
+    return { status = ngx.HTTP_OK }
+  end
 end)
 
 Server.check_token = wrap (function (context)

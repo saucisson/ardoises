@@ -84,8 +84,8 @@ function Client.ardoises (client)
     return nil, "unable to obtain repositories: " .. tostring (status)
   end
   local result = {}
-  for key, ardoise in pairs (ardoises) do
-    result [key] = setmetatable ({
+  for _, ardoise in pairs (ardoises) do
+    result [#result+1] = setmetatable ({
       client       = client,
       repository   = ardoise.repository,
       collaborator = ardoise.collaborator,

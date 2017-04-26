@@ -4,6 +4,16 @@ mkdir -p /etc/nginx/ssl
 openssl rand 48 -out /etc/nginx/ssl/ticket.key
 openssl dhparam -dsaparam -out /etc/nginx/ssl/dhparam4.pem
 
+certbot certonly \
+  --rsa-key-size 4096 \
+  --webroot \
+  --webroot-path ./data \
+  -d ardoises.ovh
+
+certbot renew \
+  --webroot \
+  --webroot-path ./data
+
 certbot \
   --non-interactive \
   --agree-tos \
@@ -12,5 +22,7 @@ certbot \
 certbot \
   certonly \
   --standalone \
-  -w "/" \
   -d "ardoises.ovh"
+
+
+  -w "/" \

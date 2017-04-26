@@ -20,10 +20,12 @@ local client = Client {
 local ardoise
 for _, a in ipairs (client:ardoises ()) do
   if  a.repository.owner.login == "{{{repository.owner.login}}}"
-  and a.repository.name == "{{{repository.name}}}"
-  and a.branch == "{{{branch}}}" then
-    ardoise = a
-    break
+  and a.repository.name == "{{{repository.name}}}" then
+    for _, branch in ipairs (a.repository.branches) do
+      if branch.name == "{{{branch}}}" then
+        ardoise = a:on_branch (branch.name)
+      end
+    end
   end
 end
 assert (ardoise)
@@ -196,6 +198,7 @@ end, false)
 local default_togui
 
 renderers.ardoise = Copas.addthread (function ()
+  local interaction = editor:require "interaction@ardoises/formalisms:dev".layer
   local renderer
   local current
   while true do
@@ -208,11 +211,8 @@ renderers.ardoise = Copas.addthread (function ()
     elseif edited and current ~= active.module then
       current = active.module
       Ardoise.innerHTML = ""
-      local gui    = edited.layer [Layer.key.meta]
-                 and edited.layer [Layer.key.meta].gui
       local togui  = edited.layer [Layer.key.meta]
-                 and edited.layer [Layer.key.meta] [gui]
-                 and edited.layer [Layer.key.meta] [gui].render
+                 and edited.layer [Layer.key.meta] [interaction.gui]
                   or default_togui
       local ok, r = pcall (togui, {
         editor = editor,

@@ -3,6 +3,9 @@ local Url      = require "net.url"
 
 local result = {
   patterns = {
+    id = function (what)
+      return Lustache:render ("ardoises:id:{{{what}}}", { what = what })
+    end,
     lock = function (what)
       return Lustache:render ("ardoises:lock:{{{what}}}", { what = what })
     end,
@@ -22,6 +25,12 @@ local result = {
       return Lustache:render ("ardoises:editor:{{{repository.owner.login}}}/{{{repository.name}}}/{{{branch}}}", {
         repository = repository,
         branch     = branch,
+      })
+    end,
+    tool = function (owner, tool)
+      return Lustache:render ("ardoises:tool:{{{owner.login}}}/{{{tool.id}}}", {
+        owner = owner,
+        tool  = tool,
       })
     end,
   },

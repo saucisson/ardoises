@@ -62,7 +62,7 @@ function Mt.__call (_, options)
   end
   editor.Layer.require = function (name)
     if not Patterns.require:match (name) then
-      name = tostring (name) .. "@" .. editor.current.full_name
+      name = tostring (name) .. "@" .. editor.current
     end
     local result, err = editor:require (name)
     if not result then

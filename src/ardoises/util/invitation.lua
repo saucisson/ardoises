@@ -13,6 +13,7 @@ local Http      = require "ardoises.jsonhttp.socket-redis"
 local Json      = require "rapidjson"
 local Lustache  = require "lustache"
 local Redis     = require "redis"
+local Url       = require "net.url"
 
 local parser = Arguments () {
   name        = "ardoises-clean",
@@ -48,9 +49,7 @@ while true do
         ["User-Agent"   ] = "Ardoises",
       },
     }
-    if status ~= 200 then
-      return nil
-    end
+    assert (status == 200, status)
     for _, invitation in ipairs (invitations) do
       print (Lustache:render ("  ...accepting invitation for {{{repository}}}.", {
         repository = invitation.repository.full_name,
@@ -83,7 +82,7 @@ while true do
             url          = Config.ardoises.url .. "/webhook",
             content_type = "json",
             secret       = Config.application.secret,
-            insecure_ssl = "1",
+            insecure_ssl = "0",
           },
           events = { "*" },
           active = true,
