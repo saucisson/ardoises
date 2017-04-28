@@ -10,9 +10,11 @@ local Sandbox   = require "ardoises.sandbox"
 local Url       = require "net.url"
 local Websocket = require "websocket"
 
-local Client  = {}
-local Ardoise = {}
-local Editor  = {}
+local Client   = {}
+local Ardoise  = {}
+local Ardoises = {}
+local Editor   = {}
+local Hidden   = setmetatable ({}, { __mode = "k" })
 
 Client .__index = Client
 Ardoise.__index = Ardoise
@@ -55,12 +57,21 @@ function Mt.__call (_, options)
   if status ~= 200 then
     return nil, "authentication failure: " .. tostring (status)
   end
-  return setmetatable ({
-    headers = headers,
-    server  = server,
-    token   = token,
-    user    = user,
+  local client = setmetatable ({
+    server   = server,
+    token    = token,
+    user     = user,
+    ardoises = setmetatable ({}, Ardoises),
   }, Client)
+  Hidden [client] = {
+    client  = client,
+    headers = headers,
+  }
+  Hidden [client.ardoises] = {
+    client = client,
+    data   = {},
+  }
+  return client
 end
 
 function Client.__tostring (client)
@@ -68,9 +79,10 @@ function Client.__tostring (client)
   return client.user.login .. "@" .. Url.build (client.server)
 end
 
-function Client.ardoises (client)
-  assert (getmetatable (client) == Client)
-  local ardoises, status = Http {
+function Ardoises.refresh (ardoises)
+  assert (getmetatable (ardoises) == Ardoises)
+  local client = Hidden [ardoises].client
+  local infos, status = Http {
     url     = Url.build {
       scheme = client.server.scheme,
       host   = client.server.host,
@@ -78,21 +90,50 @@ function Client.ardoises (client)
       path   = "/my/ardoises",
     },
     method  = "GET",
-    headers = client.headers,
+    headers = Hidden [client].headers,
   }
   if status ~= 200 then
     return nil, "unable to obtain repositories: " .. tostring (status)
   end
-  local result = {}
-  for _, ardoise in pairs (ardoises) do
-    result [#result+1] = setmetatable ({
-      client       = client,
-      repository   = ardoise.repository,
-      collaborator = ardoise.collaborator,
-      branch       = ardoise.repository.default_branch,
-    }, Ardoise)
+  local data = {}
+  for _, info in pairs (infos) do
+    for _, branch in ipairs (info.repository.branches) do
+      local key = Lustache:render ("{{{owner}}}/{{{repository}}}:{{{branch}}}", {
+        owner      = info.repository.owner.login,
+        repository = info.repository.name,
+        branch     = branch.name,
+      })
+      local t = Hidden [ardoises].data [key] or setmetatable ({}, Ardoise)
+      t.client       = client
+      t.repository   = info.repository
+      t.collaborator = info.collaborator
+      t.branch       = branch
+      data [key] = t
+    end
   end
-  return result
+  Hidden [ardoises].data = data
+end
+
+function Ardoises.__call (ardoises)
+  assert (getmetatable (ardoises) == Ardoises)
+  Ardoises.refresh (ardoises)
+  local coroutine = Coromake ()
+  return coroutine.wrap (function ()
+    for _, ardoise in pairs (Hidden [ardoises].data) do
+      coroutine.yield (ardoise)
+    end
+  end)
+end
+
+function Ardoises.__index (ardoises, key)
+  assert (getmetatable (ardoises) == Ardoises)
+  Ardoises.refresh (ardoises)
+  return Hidden [ardoises].data [key]
+end
+
+function Ardoises.__newindex (ardoises)
+  assert (getmetatable (ardoises) == Ardoises)
+  assert (false)
 end
 
 function Ardoise.__tostring (ardoise)
@@ -103,21 +144,8 @@ function Ardoise.__tostring (ardoise)
       .. Lustache:render ("{{{owner}}}/{{{repository}}}:{{{branch}}}", {
         owner      = ardoise.repository.owner.login,
         repository = ardoise.repository.name,
-        branch     = ardoise.branch,
+        branch     = ardoise.branch.name,
       })
-end
-
-function Ardoise.on_branch (ardoise, branch)
-  assert (getmetatable (ardoise) == Ardoise)
-  if type (branch) ~= "string" then
-    return nil, "argument branch must be a string"
-  end
-  return setmetatable ({
-    client       = ardoise.client,
-    repository   = ardoise.repository,
-    collaborator = ardoise.collaborator,
-    branch       = branch,
-  }, Ardoise)
 end
 
 function Ardoise.edit (ardoise)
@@ -131,7 +159,7 @@ function Ardoise.edit (ardoise)
     local status
     info, status = Http {
       method  = "GET",
-      headers = ardoise.client.headers,
+      headers = Hidden [client].headers,
       url     = Url.build {
         scheme = client.server.scheme,
         host   = client.server.host,
@@ -139,7 +167,7 @@ function Ardoise.edit (ardoise)
         path   = Lustache:render ("/editors/{{{owner}}}/{{{repository}}}/{{{branch}}}", {
           owner      = ardoise.repository.owner.login,
           repository = ardoise.repository.name,
-          branch     = ardoise.branch,
+          branch     = ardoise.branch.name,
         }),
       },
     }
@@ -175,18 +203,9 @@ function Ardoise.edit (ardoise)
     current     = Lustache:render ("{{{owner}}}/{{{repository}}}:{{{branch}}}", {
       owner      = ardoise.repository.owner.login,
       repository = ardoise.repository.name,
-      branch     = ardoise.branch,
+      branch     = ardoise.branch.name,
     }),
   }, Editor)
-  -- Copas.addthread (function ()
-  --   while editor.running do
-  --     editor:send {
-  --       id   = "ping",
-  --       type = "ping",
-  --     }
-  --     Copas.sleep (30)
-  --   end
-  -- end)
   editor.Layer.require = function (name)
     if not Patterns.require:match (name) then
       name = name .. "@" .. assert (editor.current)

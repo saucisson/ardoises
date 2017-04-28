@@ -10,7 +10,6 @@ local client = Client {
   server = "{{{server}}}",
   token  = "{{{user.tokens.ardoises}}}"
 }
-local ardoises = client:ardoises ()
 local output
 progress.finished = true
 
@@ -54,7 +53,6 @@ local Ardoises = _G.js.global.document:getElementById "ardoises"
 Copas.addthread (function ()
   while true do
     Copas.sleep (30) -- seconds
-    ardoises = client:ardoises ()
     Copas.wakeup (output)
   end
 end)
@@ -71,10 +69,14 @@ end)
 
 output = Copas.addthread (function ()
   while true do
+    local seen     = {}
     local filtered = {}
-    for _, ardoise in pairs (ardoises) do
-      if ardoise.repository.full_name:match (Input.value)
-      or (ardoise.repository.description or ""):match (Input.value) then
+    for ardoise in client:ardoises () do
+      ardoise.repository.description = ardoise.repository.description or ""
+      if not seen [ardoise.repository.full_name]
+      and (ardoise.repository.full_name  :match (Input.value)
+        or ardoise.repository.description:match (Input.value)) then
+        seen [ardoise.repository.full_name] = true
         filtered [#filtered+1] = ardoise
       end
     end

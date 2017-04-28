@@ -5,7 +5,7 @@ local progress = Progress {
   expected = 5, -- seconds
 }
 
-local script = _G.js.global.document:createElement('script')
+local script = _G.js.global.document:createElement "script"
 script:setAttribute ("src", "https://cdnjs.cloudflare.com/ajax/libs/ace/1.2.6/ace.js")
 _G.js.global.document.head:appendChild (script)
 
@@ -17,19 +17,8 @@ local client = Client {
   token  = "{{{user.tokens.ardoises}}}"
 }
 
-local ardoise
-for _, a in ipairs (client:ardoises ()) do
-  if  a.repository.owner.login == "{{{repository.owner.login}}}"
-  and a.repository.name == "{{{repository.name}}}" then
-    for _, branch in ipairs (a.repository.branches) do
-      if branch.name == "{{{branch}}}" then
-        ardoise = a:on_branch (branch.name)
-      end
-    end
-  end
-end
-assert (ardoise)
-local editor = ardoise:edit ()
+local ardoise = assert (client.ardoises ["{{{repository.owner.login}}}/{{{repository.name}}}:{{{branch}}}"])
+local editor  = ardoise:edit ()
 progress.finished = true
 
 local Content = _G.js.global.document:getElementById "content"
