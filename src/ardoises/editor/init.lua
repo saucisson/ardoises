@@ -43,17 +43,36 @@ function Mt.__call (_, options)
     repositories = {}, -- branch.full_name -> module_name -> { ... }
     Layer        = setmetatable ({}, { __index = Layer }),
   }, Editor)
-  local repository, status = Http {
-    url     = Et.render ("https://api.github.com/repos/<%- owner %>/<%- repository %>", editor.branch),
-    method  = "GET",
-    headers = {
-      ["Accept"       ] = "application/vnd.github.v3+json",
-      ["Authorization"] = "token " .. tostring (editor.token),
-      ["User-Agent"   ] = editor.application,
-    },
-  }
-  if status ~= 200 then
-    return nil, "unable to obtain repository information: " .. tostring (status)
+  local repository
+  if _G.TEST and editor.branch.full_name == "-/-:-" then
+    repository = {
+      owner          = { login = "-" },
+      name           = "-",
+      full_name      = "-/-",
+      default_branch = "-",
+      path           = ".",
+      modules        = {},
+      permissions    = {
+        admin = true,
+        push  = true,
+        pull  = true,
+      },
+    }
+    editor.repositories [editor.branch.full_name] = repository
+  else
+    local status
+    repository, status = Http {
+      url     = Et.render ("https://api.github.com/repos/<%- owner %>/<%- repository %>", editor.branch),
+      method  = "GET",
+      headers = {
+        ["Accept"       ] = "application/vnd.github.v3+json",
+        ["Authorization"] = "token " .. tostring (editor.token),
+        ["User-Agent"   ] = editor.application,
+      },
+    }
+    if status ~= 200 then
+      return nil, "unable to obtain repository information: " .. tostring (status)
+    end
   end
   editor.permissions = repository.permissions
   if not editor.permissions.pull then
@@ -102,7 +121,9 @@ function Editor.start (editor)
     default   = function () end,
     protocols = {
       ardoise = function (ws)
-        print "-> client"
+        if not _G.TEST then
+          print "-> client"
+        end
         editor.last  = os.time ()
         local client = setmetatable ({
           websocket   = ws,
@@ -120,7 +141,9 @@ function Editor.start (editor)
           editor:dispatch (client)
         end
         editor.clients [client] = nil
-        print "<- client"
+        if not _G.TEST then
+          print "<- client"
+        end
         ws:close ()
       end,
     },
@@ -148,8 +171,8 @@ end
 
 function Editor.stop (editor)
   assert (getmetatable (editor) == Editor)
-  editor.running = false
-  Copas.addthread (function ()
+  if editor.running then
+    editor.running = false
     if  not editor.nopush
     and editor.permissions.push then
       editor:push ()
@@ -158,7 +181,7 @@ function Editor.stop (editor)
     for _, task in pairs (editor.tasks) do
       Copas.wakeup (task)
     end
-  end)
+  end
   return true
 end
 
@@ -358,28 +381,36 @@ Editor.handlers = {}
 
 function Editor.handlers.authenticate (editor, message)
   assert (getmetatable (editor) == Editor)
-  local url = Url.build {
-    scheme = editor.ardoises_url.scheme,
-    host   = editor.ardoises_url.host,
-    port   = editor.ardoises_url.port,
-    path   = "/check-token",
-  }
-  local info, status
-  info, status = Http {
-    url     = url,
-    method  = "GET",
-    headers = {
-      ["Accept"       ] = "application/json",
-      ["Authorization"] = "token " .. tostring (message.token),
-      ["User-Agent"   ] = editor.application,
-    },
-  }
-  if status ~= 200 then
-    return nil, "authentication failure: " .. tostring (status)
-  end
-  if not info.repository.permissions.pull then
-    message.client.handlers.authenticate = nil
-    return nil, "pull permission denied"
+  local info
+  if _G.TEST then
+    info = {
+      user       = { login = "-" },
+      repository = editor.repositories [editor.branch.full_name],
+    }
+  else
+    local url = Url.build {
+      scheme = editor.ardoises_url.scheme,
+      host   = editor.ardoises_url.host,
+      port   = editor.ardoises_url.port,
+      path   = "/check-token",
+    }
+    local status
+    info, status = Http {
+      url     = url,
+      method  = "GET",
+      headers = {
+        ["Accept"       ] = "application/json",
+        ["Authorization"] = "token " .. tostring (message.token),
+        ["User-Agent"   ] = editor.application,
+      },
+    }
+    if status ~= 200 then
+      return nil, "authentication failure: " .. tostring (status)
+    end
+    if not info.repository.permissions.pull then
+      message.client.handlers.authenticate = nil
+      return nil, "pull permission denied"
+    end
   end
   message.client.user                  = info.user
   message.client.permissions           = info.repository.permissions
