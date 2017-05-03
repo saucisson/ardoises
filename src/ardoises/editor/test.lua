@@ -71,8 +71,10 @@ Copas.addthread (function ()
   repeat
     Copas.sleep (1)
   until editor.port ~= 0
-  local filename = os.tmpname ()
-  local domain   = Basexx.to_crockford ("ardoises-" .. client.user.login):lower ()
+  local filename   = os.tmpname ()
+  local identifier = "ardoises-" .. client.user.login .. "-" .. tostring (editor.port)
+  local domain     = Basexx.to_base32 (identifier):lower ():match "([^=]+)"
+  assert (#domain < 64)
   os.execute (Lustache:render ([[
     lt --subdomain "{{{domain}}}" --port "{{{port}}}" > "{{{filename}}}" &
   ]], {
