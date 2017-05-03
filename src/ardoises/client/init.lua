@@ -135,25 +135,6 @@ function Ardoises.refresh (ardoises)
       data [key] = t
     end
   end
-  if _G.TEST then
-    data ["-/-:-"] = setmetatable ({
-      client       = client,
-      repository   = {
-        owner          = { login = "-" },
-        name           = "-",
-        full_name      = "-/-",
-        default_branch = "-",
-        path           = "./src",
-        permissions    = {
-          admin = true,
-          push  = true,
-          pull  = true,
-        },
-      },
-      collaborator = {},
-      branch       = { name = "-" },
-    }, Ardoise)
-  end
   Hidden [ardoises].data = data
 end
 
@@ -171,6 +152,25 @@ end
 function Ardoises.__index (ardoises, key)
   assert (getmetatable (ardoises) == Ardoises)
   Ardoises.refresh (ardoises)
+  local t = assert (Patterns.branch:match (key))
+  if  t.owner == "-" and not Hidden [ardoises].data [key] then
+    Hidden [ardoises].data [key] = setmetatable ({
+      client       = Hidden [ardoises].client,
+      collaborator = {},
+      branch       = { name = t.branch },
+      repository   = {
+        owner          = { login = t.owner },
+        name           = t.repository,
+        full_name      = t.full_name,
+        default_branch = t.branch,
+        permissions    = {
+          admin = true,
+          push  = true,
+          pull  = true,
+        },
+      },
+    }, Ardoise)
+  end
   return Hidden [ardoises].data [key]
 end
 
@@ -197,61 +197,31 @@ function Ardoise.edit (ardoise)
   local websocket = Websocket.client.copas {}
   local start     = Gettime ()
   local info
-  if _G.TEST and ardoise.repository.full_name == "-/-" then
-    Copas.addthread (function ()
-      local Server = require "ardoises.editor"
-      client.test_editor = Server {
-        ardoises     = "https://ardoises.ovh",
-        branch       = Patterns.branch:match "-/-:-",
-        timeout      = 1,
-        token        = _G.GITHUB_TOKEN,
-        port         = 0,
-        application  = "Ardoises",
-        nopush       = true,
-      }
-      client.test_editor:start ()
-    end)
-    repeat
-      Copas.sleep (1)
-    until client.test_editor.port ~= 0
-    info = {
-      token      = ardoise.client.token,
-      editor_url = Lustache:render ("ws://{{{host}}}:{{{port}}}", {
-        host = client.test_editor.host,
-        port = client.test_editor.port,
-      }),
+  repeat
+    assert (Gettime () - start <= 60)
+    local status
+    info, status = Http {
+      method  = "GET",
+      headers = Hidden [client].headers,
+      url     = Url.build {
+        scheme = client.server.scheme,
+        host   = client.server.host,
+        port   = client.server.port,
+        path   = Lustache:render ("/editors/{{{owner}}}/{{{repository}}}/{{{branch}}}", {
+          owner      = ardoise.repository.owner.login,
+          repository = ardoise.repository.name,
+          branch     = ardoise.branch.name,
+        }),
+      },
     }
-    repeat
-      local connected = websocket:connect (info.editor_url, "ardoise")
-      if not connected then
-        Copas.sleep (1)
-      end
-    until connected
-  else
-    repeat
-      assert (Gettime () - start <= 60)
-      local status
-      info, status = Http {
-        method  = "GET",
-        headers = Hidden [client].headers,
-        url     = Url.build {
-          scheme = client.server.scheme,
-          host   = client.server.host,
-          port   = client.server.port,
-          path   = Lustache:render ("/editors/{{{owner}}}/{{{repository}}}/{{{branch}}}", {
-            owner      = ardoise.repository.owner.login,
-            repository = ardoise.repository.name,
-            branch     = ardoise.branch.name,
-          }),
-        },
-      }
-      assert (status == 200)
-      local connected = websocket:connect (info.editor_url, "ardoise")
-      if not connected then
-        Copas.sleep (1)
-      end
-    until connected
-  end
+    assert (status == 200)
+  until info.editor_url
+  repeat
+    local connected = websocket:connect (info.editor_url, "ardoise")
+    if not connected then
+      Copas.sleep (1)
+    end
+  until connected
   assert (websocket:send (Json.encode {
     id    = "authenticate",
     type  = "authenticate",

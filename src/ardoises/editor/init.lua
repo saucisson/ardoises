@@ -44,12 +44,12 @@ function Mt.__call (_, options)
     Layer        = setmetatable ({}, { __index = Layer }),
   }, Editor)
   local repository
-  if _G.TEST and editor.branch.full_name == "-/-:-" then
+  if editor.branch.owner == "-" then
     repository = {
       owner          = { login = "-" },
-      name           = "-",
-      full_name      = "-/-",
-      default_branch = "-",
+      name           = editor.branch.repository,
+      full_name      = "-/" .. editor.branch.repository,
+      default_branch = editor.branch.branch,
       path           = ".",
       modules        = {},
       permissions    = {
@@ -58,6 +58,7 @@ function Mt.__call (_, options)
         pull  = true,
       },
     }
+    editor.port = tonumber (editor.branch.branch)
     editor.repositories [editor.branch.full_name] = repository
   else
     local status
@@ -121,9 +122,7 @@ function Editor.start (editor)
     default   = function () end,
     protocols = {
       ardoise = function (ws)
-        if not _G.TEST then
-          print "-> client"
-        end
+        print "-> client"
         editor.last  = os.time ()
         local client = setmetatable ({
           websocket   = ws,
@@ -141,9 +140,7 @@ function Editor.start (editor)
           editor:dispatch (client)
         end
         editor.clients [client] = nil
-        if not _G.TEST then
-          print "<- client"
-        end
+        print "<- client"
         ws:close ()
       end,
     },
@@ -382,35 +379,28 @@ Editor.handlers = {}
 function Editor.handlers.authenticate (editor, message)
   assert (getmetatable (editor) == Editor)
   local info
-  if _G.TEST then
-    info = {
-      user       = { login = "-" },
-      repository = editor.repositories [editor.branch.full_name],
-    }
-  else
-    local url = Url.build {
-      scheme = editor.ardoises_url.scheme,
-      host   = editor.ardoises_url.host,
-      port   = editor.ardoises_url.port,
-      path   = "/check-token",
-    }
-    local status
-    info, status = Http {
-      url     = url,
-      method  = "GET",
-      headers = {
-        ["Accept"       ] = "application/json",
-        ["Authorization"] = "token " .. tostring (message.token),
-        ["User-Agent"   ] = editor.application,
-      },
-    }
-    if status ~= 200 then
-      return nil, "authentication failure: " .. tostring (status)
-    end
-    if not info.repository.permissions.pull then
-      message.client.handlers.authenticate = nil
-      return nil, "pull permission denied"
-    end
+  local url = Url.build {
+    scheme = editor.ardoises_url.scheme,
+    host   = editor.ardoises_url.host,
+    port   = editor.ardoises_url.port,
+    path   = "/check-token",
+  }
+  local status
+  info, status = Http {
+    url     = url,
+    method  = "GET",
+    headers = {
+      ["Accept"       ] = "application/json",
+      ["Authorization"] = "token " .. tostring (message.token),
+      ["User-Agent"   ] = editor.application,
+    },
+  }
+  if status ~= 200 then
+    return nil, "authentication failure: " .. tostring (status)
+  end
+  if not info.repository.permissions.pull then
+    message.client.handlers.authenticate = nil
+    return nil, "pull permission denied"
   end
   message.client.user                  = info.user
   message.client.permissions           = info.repository.permissions

@@ -16,6 +16,7 @@ description = {
 dependencies = {
   "lua >= 5.1",
   "argparse",
+  "basexx",
   "copas",
   "coronest",
   "dkjson",
@@ -51,6 +52,7 @@ build = {
     ["ardoises.config"               ] = "src/ardoises/config.lua",
     ["ardoises.editor"               ] = "src/ardoises/editor/init.lua",
     ["ardoises.editor.bin"           ] = "src/ardoises/editor/bin.lua",
+    ["ardoises.editor.test"          ] = "src/ardoises/editor/test.lua",
     ["ardoises.sandbox"              ] = "src/ardoises/sandbox.lua",
     ["ardoises.server"               ] = "src/ardoises/server/init.lua",
     ["ardoises.server.bin"           ] = "src/ardoises/server/bin.lua",
@@ -58,5 +60,10 @@ build = {
     ["ardoises.util.invitation"      ] = "src/ardoises/util/invitation.lua",
     ["ardoises.util.populate"        ] = "src/ardoises/util/populate.lua",
     ["ardoises.util.webhook"         ] = "src/ardoises/util/webhook.lua",
+  },
+  install = {
+    bin = {
+      ["ardoises-test"] = "src/ardoises/editor/test.lua",
+    },
   },
 }

@@ -13,7 +13,6 @@ local Http      = require "ardoises.jsonhttp.socket-redis"
 local Json      = require "rapidjson"
 local Lustache  = require "lustache"
 local Redis     = require "redis"
-local Url       = require "net.url"
 
 local parser = Arguments () {
   name        = "ardoises-clean",
@@ -21,7 +20,7 @@ local parser = Arguments () {
 }
 parser:option "--delay" {
   description = "Delay between iterations (in seconds)",
-  default     = "60",
+  default     = tostring (60),
   convert     = tonumber,
 }
 local arguments = parser:parse ()

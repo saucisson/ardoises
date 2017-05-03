@@ -40,12 +40,12 @@ parser:option "--application" {
 parser:option "--timeout" {
   description = "timeout (in second)",
   convert     = tonumber,
-  default     = 60, -- seconds
+  default     = tostring (60), -- seconds
 }
 parser:option "--port" {
   description = "port",
   convert     = tonumber,
-  default     = 8080,
+  default     = tostring (8080),
 }
 parser:option "--ardoises" {
   description = "URL of the ardoises server",
