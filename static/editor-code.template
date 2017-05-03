@@ -187,9 +187,9 @@ end, false)
 local default_togui
 
 renderers.ardoise = Copas.addthread (function ()
-  local interaction = editor:require "interaction@ardoises/formalisms:dev".layer
   local renderer
   local current
+  local interaction = editor:require "interaction@ardoises/formalisms:dev".layer
   while true do
     local edited
     if active then

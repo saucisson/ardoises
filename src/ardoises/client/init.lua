@@ -336,7 +336,9 @@ function Editor.require (editor, name)
     Copas.wakeup (co)
   end
   assert (editor:send (request))
-  Copas.sleep (-math.huge)
+  repeat
+    Copas.sleep (-math.huge)
+  until request.success ~= nil
   if not request.success then
     return nil, request.error
   end
