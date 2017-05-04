@@ -87,24 +87,29 @@ renderers.layers = Copas.addthread (function ()
     end
     table.sort (layers, function (l, r) return l.name < r.name end)
     Layers.innerHTML = Et.render ([[
+      <% if editable then %>
       <div class="list-group-item">
         <div class="input-group">
           <input id="layer-name" type="text" class="form-control" placeholder="New module" />
           <span id="layer-create" class="input-group-addon"><i class="fa fa-plus fa-inverse" aria-hidden="true"></i></span>
         </div>
       </div>
+      <% end %>
       <% for _, layer in ipairs (layers) do %>
       <div class="list-group-item" id="layer-get-<%- layer.id %>">
         <%= layer.name %>
+        <% if editable then %>
         <span class="pull-right">
           <button id="layer-delete-<%- layer.id %>" class="btn btn-sm btn-warning">
             <i class="fa fa-trash" style="color: black;" aria-hidden="true"></i>
           </button>
         </span>
+        <% end %>
       </div>
       <% end %>
     ]], {
-      layers = layers,
+      layers   = layers,
+      editable = editor.permissions.push,
     })
     do
       local link = _G.js.global.document:getElementById "layer-create"
