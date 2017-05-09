@@ -46,4 +46,4 @@ Content.innerHTML = Et.render ([[
     </div>
   </div>
   <% end %>
-]], _G.js.configuration)
+]], _G.configuration)
