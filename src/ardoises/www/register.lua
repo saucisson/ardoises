@@ -20,11 +20,10 @@ local Http  = require "ardoises.jsonhttp.copas"
 local Json  = require "cjson"
 local Url   = require "net.url"
 local tojs  = require "tojs"
-
 Copas.addthread (function ()
   local data, status = Http {
     url    = "/register",
-    query  = Json.decode [[{{{query}}}]],
+    query  = Json.decode (_G.configuration.query),
     method = "GET",
   }
   if status ~= 200 then

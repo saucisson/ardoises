@@ -13,23 +13,28 @@ local Client = require "ardoises.client"
 local Et     = require "etlua"
 local Layer  = require "layeredata"
 local client = Client {
-  server = "{{{server}}}",
-  token  = "{{{user.tokens.ardoises}}}"
+  server = _G.configuration.server,
+  token  = _G.configuration.user.tokens.ardoises,
 }
 
-local ardoise = assert (client.ardoises ["{{{repository.owner.login}}}/{{{repository.name}}}:{{{branch}}}"])
+local branch  = Et.render ("<%- owner %>/<%- repository %>:<%- branch %>", {
+  owner      = _G.configuration.repository.owner.login,
+  repository = _G.configuration.repository.name,
+  branch     = _G.configuration.branch,
+})
+local ardoise = assert (client.ardoises [branch])
 local editor  = ardoise:edit ()
 progress.finished = true
 
 local Content = _G.js.global.document:getElementById "content"
-Content.innerHTML = [[
+Content.innerHTML = Et.render ([[
   <section>
     <div class="container-fluid">
       <div class="row" style="height: 90vh; min-height: 90vh;">
         <div class="col-sm-4 col-md-3">
           <div class="list-group">
             <div class="list-group-item text-center">
-              {{repository.owner.login}}/{{repository.name}}:{{branch}}
+              <%= branch %>
             </div>
             <div id="layers"></div>
           </div>
@@ -39,7 +44,9 @@ Content.innerHTML = [[
       </div>
     </div>
   </section>
-]]
+]], {
+  branch = branch,
+})
 
 Copas.addthread (function ()
   while true do

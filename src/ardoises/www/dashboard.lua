@@ -7,8 +7,8 @@ local Copas  = require "copas"
 local Client = require "ardoises.client"
 local Et     = require "etlua"
 local client = Client {
-  server = "{{{server}}}",
-  token  = "{{{user.tokens.ardoises}}}"
+  server = _G.configuration.server,
+  token  = _G.configuration.user.tokens.ardoises,
 }
 local output
 progress.finished = true
@@ -165,7 +165,7 @@ output = Copas.addthread (function ()
       </div>
     ]], {
       ardoises = filtered,
-      user     = "{{{user.login}}}",
+      user     = _G.configuration.user.login,
     })
     Copas.sleep (-math.huge)
   end

@@ -13,6 +13,8 @@ local Websocket = require "websocket"
 local Client   = {}
 local Ardoise  = {}
 local Ardoises = {}
+local Tool     = {}
+local Tools    = {}
 local Editor   = {}
 local Hidden   = setmetatable ({}, { __mode = "k" })
 
@@ -62,12 +64,17 @@ function Mt.__call (_, options)
     token    = token,
     user     = user,
     ardoises = setmetatable ({}, Ardoises),
+    tools    = setmetatable ({}, Tools),
   }, Client)
   Hidden [client] = {
     client  = client,
     headers = headers,
   }
   Hidden [client.ardoises] = {
+    client = client,
+    data   = {},
+  }
+  Hidden [client.tools] = {
     client = client,
     data   = {},
   }
@@ -177,6 +184,105 @@ end
 function Ardoises.__newindex (ardoises)
   assert (getmetatable (ardoises) == Ardoises)
   assert (false)
+end
+
+function Tools.refresh (tools)
+  assert (getmetatable (tools) == Tools)
+  local client = Hidden [tools].client
+  local infos, status = Http {
+    url     = Url.build {
+      scheme = client.server.scheme,
+      host   = client.server.host,
+      port   = client.server.port,
+      path   = "/my/tools",
+    },
+    method  = "GET",
+    headers = Hidden [client].headers,
+  }
+  if status ~= 200 then
+    return nil, "unable to obtain tools: " .. tostring (status)
+  end
+  local data = {}
+  for _, info in pairs (infos) do
+    local t = Hidden [tools].data [info.id] or setmetatable ({}, Tool)
+    t.client = client
+    t.id     = info.id
+    t.layer  = info.layer
+    t.image  = info.image
+    t.token  = info.token
+    data [info.id] = t
+  end
+  Hidden [tools].data = data
+end
+
+function Tools.__call (tools)
+  assert (getmetatable (tools) == Tools)
+  Ardoises.refresh (tools)
+  local coroutine = Coromake ()
+  return coroutine.wrap (function ()
+    for _, tool in pairs (Hidden [tools].data) do
+      coroutine.yield (tool)
+    end
+  end)
+end
+
+function Tools.__index (tools, key)
+  assert (getmetatable (tools) == Tools)
+  Ardoises.refresh (tools)
+  return Hidden [tools].data [key]
+end
+
+function Tools.launch (tools, value)
+  assert (getmetatable (tools) == Tools)
+  local client = Hidden [tools].client
+  local info, status = Http {
+    url     = Url.build {
+      scheme = client.server.scheme,
+      host   = client.server.host,
+      port   = client.server.port,
+      path   = "/tools/",
+    },
+    body    = {
+      layer = value.layer,
+      image = value.image,
+    },
+    method  = "POST",
+    headers = Hidden [client].headers,
+  }
+  if status ~= 201 then
+    return nil, "unable to create tool: " .. tostring (status)
+  end
+  return client.tools [info.tool.id]
+end
+
+function Tool.delete (tool)
+  assert (getmetatable (tool) == Tool)
+  local client = tool.client
+  local _, status = Http {
+    url     = Url.build {
+      scheme = client.server.scheme,
+      host   = client.server.host,
+      port   = client.server.port,
+      path   = "/tools/" .. tostring (tool.id),
+    },
+    method  = "DELETE",
+    headers = Hidden [client].headers,
+  }
+  if status ~= 204 then
+    return nil, "unable to delete tool: " .. tostring (status)
+  end
+  return true
+end
+
+function Tool.__tostring (tool)
+  assert (getmetatable (tool) == Tool)
+  return tool.client.user.login
+      .. "@" .. Url.build (tool.client.server)
+      .. ": "
+      .. Lustache:render ("{{{image}}} on {{{layer}}}", {
+        image = tool.image,
+        layer = tool.layer,
+      })
 end
 
 function Ardoise.__tostring (ardoise)

@@ -113,15 +113,36 @@
     </div>
 
     <section id="content">
-      {{#content}}
-      {{{content}}}
-      {{/content}}
     </section>
     <script type="text/lua"
             lang="Lua">
-    do
-      {{{loader}}}
-    end
+    -- Taken from https://github.com/daurnimator/lua.vm.js/blob/master/src/js.lua:
+    local xhr = _G.js.new (_G.window.XMLHttpRequest)
+    xhr:open ("GET", "/lua/ardoises.www.loader", false)
+    assert (pcall (xhr.send, xhr))
+    assert (xhr.status == 200)
+    load (xhr.responseText, "ardoises.www.loader") ()
+    -- Run module:
+    local co = coroutine.create (function ()
+      xpcall (function ()
+        Copas = require "copas"
+        Copas.addthread (function ()
+          local Json = require "cjson"
+          _G.configuration = Json.decode [[{{{configuration}}}]]
+          require (_G.configuration.code)
+        end)
+        Copas.addthread (function ()
+          while true do
+            Copas.sleep (60)
+          end
+        end)
+        Copas.loop ()
+      end, function (err)
+        print ("error:", err)
+        print (debug.traceback ())
+      end)
+    end)
+    coroutine.resume (co)
     </script>
 
     <div id="bottom-bar" class="navbar navbar-fixed-bottom">

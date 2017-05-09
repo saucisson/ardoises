@@ -65,26 +65,12 @@ end
 local Server = {}
 
 function Server.template (what, data)
-  data = data or {}
-  setmetatable (data, {
-    __index = function (_, key)
-      local file = io.open ("/static/" .. key .. ".template", "r")
-      if not file then
-        return nil
-      end
-      local template = assert (file:read "*a")
-      assert (file:close ())
-      return template
-    end,
-  })
+  data           = data or {}
   local file     = assert (io.open ("/static/" .. what .. ".template", "r"))
   local template = assert (file:read "*a")
   assert (file:close ())
-  repeat
-    local previous = template
-    template = Lustache:render (template, data)
-  until previous == template
-  return template
+  data.configuration = Json.encode (data)
+  return Lustache:render (template, data)
 end
 
 local function register ()
@@ -93,7 +79,7 @@ local function register ()
     _G.ngx.header ["Content-type"] = "text/html"
     ngx.say (Server.template ("index", {
       server = Url.build (Config.ardoises),
-      code   = "{{{register}}}",
+      code   = "ardoises.www.register",
       query  = Json.encode (query),
     }))
     ngx.exit (ngx.HTTP_OK)
@@ -254,7 +240,7 @@ Server.dashboard = wrap (function (context)
   ngx.say (Server.template ("index", {
     server  = Url.build (Config.ardoises),
     user    = user,
-    code    = "{{{dashboard-code}}}",
+    code    = "ardoises.www.dashboard",
   }))
   return { status = ngx.HTTP_OK }
 end)
@@ -265,9 +251,9 @@ Server.overview = wrap (function (context)
   })
   _G.ngx.header ["Content-type"] = "text/html"
   ngx.say (Server.template ("index", {
-    server  = Url.build (Config.ardoises),
-    user    = user,
-    content = "{{{overview}}}"
+    server = Url.build (Config.ardoises),
+    user   = user,
+    code   = "ardoises.www.overview",
   }))
   return { status = ngx.HTTP_OK }
 end)
@@ -313,7 +299,7 @@ Server.view = wrap (function (context)
     user       = user,
     repository = repository,
     branch     = ngx.var.branch,
-    code       = "{{{editor-code}}}",
+    code       = "ardoises.www.editor",
   }))
   return { status = ngx.HTTP_OK }
 end)
@@ -484,12 +470,10 @@ Server.editor = wrap (function (context)
     })
     local repo = localrepo (ngx.var)
     ngx.say (Json.encode {
-      user        = user,
-      token       = token,
-      permissions = repo.permissions,
-      repository  = repo,
-      branch      = ngx.var.branch,
-      editor_url  = Lustache:render ("wss://{{{domain}}}.localtunnel.me", {
+      token      = token,
+      repository = repo,
+      branch     = ngx.var.branch,
+      editor_url = Lustache:render ("wss://{{{domain}}}.localtunnel.me", {
         domain = ngx.var.branch,
       }),
     })
@@ -679,15 +663,14 @@ Server.editor = wrap (function (context)
       ardoise = Lustache:render ("{{{owner}}}/{{{name}}}:{{{branch}}}", ngx.var),
     },
   })
+  repository.permissions = collaboration
+                       and collaboration.collaborator.permissions
+                        or repository.permissions
   ngx.say (Json.encode {
-    user        = user,
-    token       = token,
-    permissions = collaboration
-              and collaboration.collaborator.permissions
-               or repository.permissions,
-    repository  = repository,
-    branch      = ngx.var.branch,
-    editor_url  = editor.editor_url,
+    token      = token,
+    repository = repository,
+    branch     = ngx.var.branch,
+    editor_url = editor.editor_url,
   })
   return { status = ngx.HTTP_OK }
 end)
@@ -773,14 +756,15 @@ Server.tool = wrap (function (context)
       end
     end
     ngx.say (Json.encode {
-      user  = user,
       token = token,
       tool  = {
         id     = id,
         status = info.State,
+        layer  = arguments.layer,
+        image  = arguments.image,
       },
     })
-    return { status = ngx.HTTP_OK }
+    return { status = ngx.HTTP_CREATED }
   elseif method == ngx.HTTP_DELETE then
     local key  = Config.patterns.tool (user, { id = ngx.var.tool })
     local tool = context.redis:get (key)
@@ -823,11 +807,12 @@ Server.tool = wrap (function (context)
     }
     assert (status == ngx.HTTP_OK, status)
     ngx.say (Json.encode {
-      user  = user,
       token = tool.token,
       tool  = {
         id     = tool.id,
         status = info.State,
+        layer  = tool.layer,
+        image  = tool.image,
       },
     })
     return { status = ngx.HTTP_OK }

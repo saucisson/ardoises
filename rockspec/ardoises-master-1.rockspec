@@ -60,6 +60,11 @@ build = {
     ["ardoises.util.invitation"      ] = "src/ardoises/util/invitation.lua",
     ["ardoises.util.populate"        ] = "src/ardoises/util/populate.lua",
     ["ardoises.util.webhook"         ] = "src/ardoises/util/webhook.lua",
+    ["ardoises.www.loader"           ] = "src/ardoises/www/loader.lua",
+    ["ardoises.www.dashboard"        ] = "src/ardoises/www/dashboard.lua",
+    ["ardoises.www.editor"           ] = "src/ardoises/www/editor.lua",
+    ["ardoises.www.overview"         ] = "src/ardoises/www/overview.lua",
+    ["ardoises.www.register"         ] = "src/ardoises/www/register.lua",
   },
   install = {
     bin = {
