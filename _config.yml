@@ -1,3 +1,5 @@
 theme: jekyll-theme-midnight
 title: Ardoises -- Collaborative (Meta) Modeling Platform
 description: Ardoises is a platform dedicated to formal modeling and verification.
+site:
+  url: https://saucisson.github.io/ardoises
