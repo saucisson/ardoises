@@ -48,7 +48,7 @@ Ardoises could not exist without the following institutions:
 | [<img src="{{ site.url }}/ardoises/assets/paris-nord.png" height="128">](https://www.univ-paris13.fr)   | [<img src="{{ site.url }}/ardoises/assets/lipn.png" height="128">](https://lipn.univ-paris13.fr)   |
 | [<img src="{{ site.url }}/ardoises/assets/cnrs.png" height="128">](http://www.cnrs.fr)                  | [<img src="{{ site.url }}/ardoises/assets/inria.png" height="128">](https://www.inria.fr)           |
 
-It has been developed with <i class="fa fa-heart fa-inverse" aria-hidden="true"></i> by the following people:
+Ardoises has been developed with <i class="fa fa-heart fa-inverse" aria-hidden="true"></i> by the following people:
 
 * [Alban Linard](https://github.com/saucisson): lead developer
 * [Clément Démoulins](https://github.com/cdemoulins): model/formalism language
