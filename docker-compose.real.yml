@@ -24,6 +24,14 @@ services:
     entrypoint: lua -l ardoises.util.invitation
     volumes:
       - ./src/ardoises:/usr/share/lua/5.1/ardoises
+  limits:
+    env_file: .environment
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-noresty
+    entrypoint: lua -l ardoises.util.limits
+    volumes:
+      - ./src/ardoises:/usr/share/lua/5.1/ardoises
   populate:
     env_file: .environment
     build:

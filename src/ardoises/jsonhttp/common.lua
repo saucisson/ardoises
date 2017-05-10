@@ -22,16 +22,19 @@ return function (what)
     request.timeout = options.timeout
     request.url     = tostring (url)
     request.method  = options.method or "GET"
-    request.body    = options.body and Json.encode (options.body, {
-      sort_keys = true,
-    })
     request.headers = {}
     for name, header in pairs (options.headers or  {}) do
       request.headers [name] = header
     end
+    request.headers ["Content-type"  ] = request.headers ["Content-type"] or "application/json"
+    request.headers ["Accept"        ] = request.headers ["Accept"      ] or "application/json"
+    request.body = options.body
+    if request.headers ["Content-type"]:match "json" then
+      request.body = Json.encode (request.body, {
+        sort_keys = true,
+      })
+    end
     request.headers ["Content-length"] = request.body and #request.body
-    request.headers ["Content-type"  ] = request.body and "application/json"
-    request.headers ["Accept"        ] = request.headers ["Accept"] or "application/json"
     if options.signature then
       local Config = require "ardoises.config"
       local Hmac   = require "openssl.hmac"

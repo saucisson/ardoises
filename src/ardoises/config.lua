@@ -43,6 +43,15 @@ local result = {
     secret = assert (os.getenv "APPLICATION_SECRET"),
     token  = assert (os.getenv "APPLICATION_TOKEN"),
   },
+  twilio = {
+    username = assert (os.getenv "TWILIO_USERNAME"),
+    password = assert (os.getenv "TWILIO_PASSWORD"),
+    phone    = assert (os.getenv "TWILIO_PHONE"),
+  },
+  administrator = {
+    phone = assert (os.getenv "ADMIN_PHONE"),
+    email = assert (os.getenv "ADMIN_EMAIL"),
+  },
   locks = {
     timeout = 5, -- seconds
   }
