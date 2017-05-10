@@ -36,8 +36,8 @@ local result = {
   },
   docker_id   = assert (os.getenv "HOSTNAME"),
   ardoises    = assert (Url.parse (os.getenv "ARDOISES_URL")),
-  docker      = assert (Url.parse (os.getenv "DOCKER_URL"  )),
-  redis       = assert (Url.parse (os.getenv "REDIS_URL"   )),
+  docker      = assert (Url.parse (os.getenv "DOCKER_URL")),
+  redis       = assert (Url.parse (os.getenv "REDIS_URL")),
   application = {
     id     = assert (os.getenv "APPLICATION_ID"),
     secret = assert (os.getenv "APPLICATION_SECRET"),

@@ -30,7 +30,7 @@ return function (what)
     request.headers ["Accept"        ] = request.headers ["Accept"      ] or "application/json"
     request.body = options.body
     if request.headers ["Content-type"]:match "json" then
-      request.body = Json.encode (request.body, {
+      request.body = request.body and Json.encode (request.body, {
         sort_keys = true,
       })
     end

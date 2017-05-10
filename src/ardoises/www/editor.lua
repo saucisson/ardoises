@@ -9,10 +9,11 @@ local script = _G.js.global.document:createElement "script"
 script:setAttribute ("src", "https://cdnjs.cloudflare.com/ajax/libs/ace/1.2.6/ace.js")
 _G.js.global.document.head:appendChild (script)
 
-local Client = require "ardoises.client"
-local Et     = require "etlua"
-local Layer  = require "layeredata"
-local client = Client {
+local Coromake = require "coroutine.make"
+local Client   = require "ardoises.client"
+local Et       = require "etlua"
+local Layer    = require "layeredata"
+local client   = Client {
   server = _G.configuration.server,
   token  = _G.configuration.user.tokens.ardoises,
 }
@@ -210,27 +211,29 @@ renderers.ardoise = Copas.addthread (function ()
     if edited and current == active.module then
       local _ = true -- do nothing
     elseif edited and current ~= active.module then
-      current = active.module
       Ardoise.innerHTML = ""
       local togui  = edited.layer [Layer.key.meta]
                  and edited.layer [Layer.key.meta] [interaction.gui]
                   or default_togui
-      local ok, r = pcall (togui, {
-        editor = editor,
-        module = active.module,
-        target = Ardoise,
+      local coroutine = Coromake ()
+      local co        = coroutine.create (togui)
+      local ok, err   = coroutine.resume (co, {
+        editor    = editor,
+        module    = active.module,
+        target    = Ardoise,
+        coroutine = coroutine,
       })
       if ok then
-        renderer = r
+        renderer = co
       else
-        print (r)
+        print (err)
         Ardoise.innerHTML = [[
           <section>
             <div class="container-fluid">
               <div class="row">
                 <div class="col-sm-12">
                   <div class="alert alert-danger">
-                    <strong>Renderering problem!</strong>
+                    <strong>Rendering problem!</strong>
                   </div>
                 </div>
               </div>
@@ -240,24 +243,25 @@ renderers.ardoise = Copas.addthread (function ()
       end
     else
       if renderer then
-        renderer:close ()
+        coroutine.resume (renderer)
         renderer = nil
       end
       Ardoise.innerHTML = ""
     end
+    current = active and active.module
     Copas.sleep (-math.huge)
   end
 end)
 
 default_togui = function (parameters)
   assert (type (parameters) == "table")
-  local renderer = {}
-  renderer.editor  = assert (parameters.editor)
-  renderer.module  = assert (parameters.module)
-  renderer.target  = assert (parameters.target)
-  renderer.edited  = editor:require (renderer.module)
-  renderer.running = true
-  renderer.default_patch = [[
+  -- local editor        = assert (parameters.editor)
+  local module        = assert (parameters.module)
+  local target        = assert (parameters.target)
+  local coroutine     = assert (parameters.coroutine)
+  local edited        = editor:require (module)
+  local running       = true
+  local default_patch = [[
 return function (Layer, layer, ref)
   -- Write your patch here...
   ...
@@ -267,7 +271,7 @@ end
   local bottom = _G.js.global.document:getElementById "bottom-bar"
   local size   = (bottom.offsetTop - bottom.scrollTop + bottom.clientTop - 50)
                - (top.offsetTop - top.scrollTop + top.clientTop + 50)
-  renderer.target.innerHTML = Et.render ([[
+  target.innerHTML = Et.render ([[
     <div class="container-fluid">
       <div class="row">
         <div class="col-sm-12">
@@ -302,102 +306,102 @@ end
     model_height = editor.permissions.push and 0.7 * size  or size,
     patch_height = editor.permissions.push and 0.25 * size or 0,
   })
-  renderer.source = _G.window.ace:edit "editor-model"
-  renderer.source:setReadOnly (true)
-  renderer.source ["$blockScrolling"] = true
-  renderer.source:setTheme "ace/theme/monokai"
-  renderer.source:getSession ():setMode "ace/mode/lua"
-  renderer.patch = _G.window.ace:edit "editor-patch"
-  renderer.patch:setReadOnly (false)
-  renderer.patch ["$blockScrolling"] = true
-  renderer.patch:setTheme "ace/theme/monokai"
-  renderer.patch:getSession ():setMode "ace/mode/lua"
-  local changed = 0
-  local submit  = _G.js.global.document:getElementById "patch-submit"
-  renderer.patch:on ("change", function ()
-    changed = os.clock ()
-  end)
-  renderer.observe = Copas.addthread (function ()
+  local source = _G.window.ace:edit "editor-model"
+  source:setReadOnly (true)
+  source ["$blockScrolling"] = true
+  source:setTheme "ace/theme/monokai"
+  source:getSession ():setMode "ace/mode/lua"
+  Copas.addthread (function ()
     for data in editor:events {} do
-      if not renderer.running then
+      if not running then
         return
       end
       if data.type == "update" or data.type == "patch" or data.type == "require" then
-        renderer.source:setValue (renderer.edited.code)
+        source:setValue (edited.code)
       end
     end
   end)
-  renderer.check = Copas.addthread (function ()
-    local last = -math.huge
-    while renderer.running do
-      if os.clock () - changed > 1 and changed ~= last then
-        last = changed
-        local code = renderer.patch:getValue ()
-        local ok, err = load (code, "patch", "t")
-        renderer.patch:getSession ():clearAnnotations ()
+  local keydown
+  local resize = _G.window:addEventListener ("resize", function () end, false)
+  if editor.permissions.push then
+    local changed = 0
+    local patch = _G.window.ace:edit "editor-patch"
+    patch:setReadOnly (false)
+    patch ["$blockScrolling"] = true
+    patch:setTheme "ace/theme/monokai"
+    patch:getSession ():setMode "ace/mode/lua"
+    patch:setValue (default_patch)
+    patch:focus ()
+    patch:gotoLine (3, 5, true)
+    local submit  = _G.js.global.document:getElementById "patch-submit"
+    patch:on ("change", function ()
+      changed = os.clock ()
+    end)
+    Copas.addthread (function ()
+      local last = -math.huge
+      while running do
+        if os.clock () - changed > 1 and changed ~= last then
+          last = changed
+          local code = patch:getValue ()
+          local ok, err = load (code, "patch", "t")
+          patch:getSession ():clearAnnotations ()
+          if ok then
+            submit.disabled = false
+            submit.classList:remove "btn-danger"
+            submit.classList:add    "btn-success"
+          else
+            local pattern = [[%[string "patch"%]:(%d+):%s+(.*)]]
+            local line, problem = err:match (pattern)
+            submit.classList:remove "btn-success"
+            submit.classList:add    "btn-danger"
+            submit.disabled = true
+            patch:getSession ():setAnnotations (tojs {
+              { row    = line-1,
+                column = 0,
+                text   = problem,
+                type   = "error",
+              },
+            })
+          end
+        end
+        Copas.sleep (1)
+      end
+    end)
+    local save = Copas.addthread (function ()
+      while running do
+        Copas.sleep (-math.huge)
+        local ok, err = editor:patch {
+          [module] = patch:getValue (),
+        }
         if ok then
-          submit.disabled = false
-          submit.classList:remove "btn-danger"
-          submit.classList:add    "btn-success"
+          patch:setValue (default_patch)
+          patch:gotoLine (3, 5, true)
+          patch:focus ()
         else
-          local pattern = [[%[string "patch"%]:(%d+):%s+(.*)]]
-          local line, problem = err:match (pattern)
-          submit.classList:remove "btn-success"
-          submit.classList:add    "btn-danger"
-          submit.disabled = true
-          renderer.patch:getSession ():setAnnotations (tojs {
-            { row    = line-1,
+          patch:getSession ():setAnnotations (tojs {
+            { row    = 0,
               column = 0,
-              text   = problem,
+              text   = tostring (err),
               type   = "error",
             },
           })
         end
       end
-      Copas.sleep (1)
-    end
-  end)
-  renderer.save = Copas.addthread (function ()
-    while renderer.running do
-      Copas.sleep (-math.huge)
-      local ok, err = editor:patch {
-        [renderer.module] = renderer.patch:getValue (),
-      }
-      if ok then
-        renderer.patch:setValue (renderer.default_patch)
-        renderer.patch:gotoLine (3, 5, true)
-        renderer.patch:focus ()
-      else
-        renderer.patch:getSession ():setAnnotations (tojs {
-          { row    = 0,
-            column = 0,
-            text   = tostring (err),
-            type   = "error",
-          },
-        })
+    end)
+    keydown = _G.js.global.document:addEventListener ("keydown", function (_, e)
+      if e.keyCode == 83 and (e.metaKey or e.ctrlKey) and not submit.disabled then
+        Copas.wakeup (save)
+        return false
       end
-    end
-  end)
-  renderer.source:setValue (renderer.edited.code)
-  renderer.patch :setValue (renderer.default_patch)
-  renderer.patch :gotoLine (3, 5, true)
-  renderer.patch :focus ()
-  renderer.keydown = _G.js.global.document:addEventListener ("keydown", function (_, e)
-    if e.keyCode == 83 and (e.metaKey or e.ctrlKey) and not submit.disabled then
-      Copas.wakeup (renderer.save)
+    end, false)
+    submit.onclick = function ()
+      Copas.wakeup (save)
       return false
     end
-  end, false)
-  renderer.resize = _G.window:addEventListener ("resize", function ()
-  end, false)
-  submit.onclick = function ()
-    Copas.wakeup (renderer.save)
-    return false
   end
-  function renderer.close ()
-    renderer.running = false
-    _G.js.global.document:removeEventListener ("keydown", renderer.keydown, false)
-    _G.js.global.document:removeEventListener ("resize" , renderer.resize , false)
-  end
-  return renderer
+  source:setValue (edited.code)
+  coroutine.yield ()
+  running = false
+  _G.js.global.document:removeEventListener ("keydown", keydown, false)
+  _G.js.global.document:removeEventListener ("resize" , resize , false)
 end

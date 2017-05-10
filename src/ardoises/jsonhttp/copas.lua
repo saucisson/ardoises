@@ -10,6 +10,7 @@ return Common (function (request)
   request.protocol = "tlsv1_2"
   request.verify   = { "none" } -- FIXME
   local _, status, headers = Http.request (request)
+  print (status, headers)
   return {
     status  = status,
     headers = headers,

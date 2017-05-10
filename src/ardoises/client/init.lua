@@ -10,13 +10,22 @@ local Sandbox   = require "ardoises.sandbox"
 local Url       = require "net.url"
 local Websocket = require "websocket"
 
+if Copas.receive then
+  -- FIXME: need to patch copas.receive to make some calls non-blocking.
+  -- I do not know why.
+  local receive = Copas.receive
+  function Copas.receive (client, ...)
+    client:settimeout (0)
+    return receive (client, ...)
+  end
+end
+
 local Client   = {}
 local Ardoise  = {}
 local Ardoises = {}
 local Tool     = {}
 local Tools    = {}
 local Editor   = {}
-local Hidden   = setmetatable ({}, { __mode = "k" })
 
 Client .__index = Client
 Ardoise.__index = Ardoise
@@ -63,21 +72,18 @@ function Mt.__call (_, options)
     server   = server,
     token    = token,
     user     = user,
-    ardoises = setmetatable ({}, Ardoises),
-    tools    = setmetatable ({}, Tools),
+    headers  = headers,
+    -- ardoises = setmetatable ({}, Ardoises),
+    -- tools    = setmetatable ({}, Tools),
   }, Client)
-  Hidden [client] = {
-    client  = client,
-    headers = headers,
-  }
-  Hidden [client.ardoises] = {
+  client.ardoises = setmetatable ({
     client = client,
     data   = {},
-  }
-  Hidden [client.tools] = {
+  }, Ardoises)
+  client.tools    = setmetatable ({
     client = client,
     data   = {},
-  }
+  }, Tools)
   return client
 end
 
@@ -112,7 +118,7 @@ end
 
 function Ardoises.refresh (ardoises)
   assert (getmetatable (ardoises) == Ardoises)
-  local client = Hidden [ardoises].client
+  local client = ardoises.client
   local infos, status = Http {
     url     = Url.build {
       scheme = client.server.scheme,
@@ -121,7 +127,7 @@ function Ardoises.refresh (ardoises)
       path   = "/my/ardoises",
     },
     method  = "GET",
-    headers = Hidden [client].headers,
+    headers = client.headers,
   }
   if status ~= 200 then
     return nil, "unable to obtain repositories: " .. tostring (status)
@@ -134,15 +140,17 @@ function Ardoises.refresh (ardoises)
         repository = info.repository.name,
         branch     = branch.name,
       })
-      local t = Hidden [ardoises].data [key] or setmetatable ({}, Ardoise)
-      t.client       = client
-      t.repository   = info.repository
-      t.collaborator = info.collaborator
-      t.branch       = branch
-      data [key] = t
+      local ardoise = ardoises.data
+                  and ardoises.data [key]
+                   or setmetatable ({}, Ardoise)
+      ardoise.client       = client
+      ardoise.repository   = info.repository
+      ardoise.collaborator = info.collaborator
+      ardoise.branch       = branch
+      data [key] = ardoise
     end
   end
-  Hidden [ardoises].data = data
+  ardoises.data = data
 end
 
 function Ardoises.__call (ardoises)
@@ -150,7 +158,7 @@ function Ardoises.__call (ardoises)
   Ardoises.refresh (ardoises)
   local coroutine = Coromake ()
   return coroutine.wrap (function ()
-    for _, ardoise in pairs (Hidden [ardoises].data) do
+    for _, ardoise in pairs (ardoises.data) do
       coroutine.yield (ardoise)
     end
   end)
@@ -158,11 +166,12 @@ end
 
 function Ardoises.__index (ardoises, key)
   assert (getmetatable (ardoises) == Ardoises)
+  local t = assert (Patterns.branch:match (key) or Patterns.require:match (key))
   Ardoises.refresh (ardoises)
-  local t = assert (Patterns.branch:match (key))
-  if  t.owner == "-" and not Hidden [ardoises].data [key] then
-    Hidden [ardoises].data [key] = setmetatable ({
-      client       = Hidden [ardoises].client,
+  key = t.full_name
+  if t.owner == "-" and not ardoises.data [key] then
+    ardoises.data [key] = setmetatable ({
+      client       = ardoises.client,
       collaborator = {},
       branch       = { name = t.branch },
       repository   = {
@@ -178,7 +187,7 @@ function Ardoises.__index (ardoises, key)
       },
     }, Ardoise)
   end
-  return Hidden [ardoises].data [key]
+  return ardoises.data [key]
 end
 
 function Ardoises.__newindex (ardoises)
@@ -188,7 +197,7 @@ end
 
 function Tools.refresh (tools)
   assert (getmetatable (tools) == Tools)
-  local client = Hidden [tools].client
+  local client = tools.client
   local infos, status = Http {
     url     = Url.build {
       scheme = client.server.scheme,
@@ -197,22 +206,24 @@ function Tools.refresh (tools)
       path   = "/my/tools",
     },
     method  = "GET",
-    headers = Hidden [client].headers,
+    headers = client.headers,
   }
   if status ~= 200 then
     return nil, "unable to obtain tools: " .. tostring (status)
   end
   local data = {}
   for _, info in pairs (infos) do
-    local t = Hidden [tools].data [info.id] or setmetatable ({}, Tool)
-    t.client = client
-    t.id     = info.id
-    t.layer  = info.layer
-    t.image  = info.image
-    t.token  = info.token
-    data [info.id] = t
+    local tool = tools.data
+             and tools.data [info.id]
+              or setmetatable ({}, Tool)
+    tool.client = client
+    tool.id     = info.id
+    tool.layer  = info.layer
+    tool.image  = info.image
+    tool.token  = info.token
+    data [info.id] = tool
   end
-  Hidden [tools].data = data
+  tools.data = data
 end
 
 function Tools.__call (tools)
@@ -220,7 +231,7 @@ function Tools.__call (tools)
   Ardoises.refresh (tools)
   local coroutine = Coromake ()
   return coroutine.wrap (function ()
-    for _, tool in pairs (Hidden [tools].data) do
+    for _, tool in pairs (tools.data) do
       coroutine.yield (tool)
     end
   end)
@@ -229,12 +240,12 @@ end
 function Tools.__index (tools, key)
   assert (getmetatable (tools) == Tools)
   Ardoises.refresh (tools)
-  return Hidden [tools].data [key]
+  return tools.data [key]
 end
 
 function Tools.launch (tools, value)
   assert (getmetatable (tools) == Tools)
-  local client = Hidden [tools].client
+  local client = tools.client
   local info, status = Http {
     url     = Url.build {
       scheme = client.server.scheme,
@@ -247,7 +258,7 @@ function Tools.launch (tools, value)
       image = value.image,
     },
     method  = "POST",
-    headers = Hidden [client].headers,
+    headers = client.headers,
   }
   if status ~= 201 then
     return nil, "unable to create tool: " .. tostring (status)
@@ -266,7 +277,7 @@ function Tool.delete (tool)
       path   = "/tools/" .. tostring (tool.id),
     },
     method  = "DELETE",
-    headers = Hidden [client].headers,
+    headers = client.headers,
   }
   if status ~= 204 then
     return nil, "unable to delete tool: " .. tostring (status)
@@ -279,10 +290,7 @@ function Tool.__tostring (tool)
   return tool.client.user.login
       .. "@" .. Url.build (tool.client.server)
       .. ": "
-      .. Lustache:render ("{{{image}}} on {{{layer}}}", {
-        image = tool.image,
-        layer = tool.layer,
-      })
+      .. Lustache:render ("{{{id}}}={{{image}}}*{{{layer}}}", tool)
 end
 
 function Ardoise.__tostring (ardoise)
@@ -308,7 +316,7 @@ function Ardoise.edit (ardoise)
     local status
     info, status = Http {
       method  = "GET",
-      headers = Hidden [client].headers,
+      headers = client.headers,
       url     = Url.build {
         scheme = client.server.scheme,
         host   = client.server.host,
@@ -323,7 +331,11 @@ function Ardoise.edit (ardoise)
     assert (status == 200)
   until info.editor_url
   repeat
-    local connected = websocket:connect (info.editor_url, "ardoise")
+    local connected = websocket:connect (info.editor_url, "ardoise", {
+      mode        = "client",
+      protocol    = "tlsv1_2",
+      verify      = "none",
+    })
     if not connected then
       Copas.sleep (1)
     end
@@ -357,6 +369,11 @@ function Ardoise.edit (ardoise)
       branch     = ardoise.branch.name,
     }),
   }, Editor)
+  editor.receiver = Copas.addthread (function ()
+    while editor.running do
+      pcall (Editor.answer, editor)
+    end
+  end)
   editor.Layer.require = function (name)
     if not Patterns.require:match (name) then
       name = name .. "@" .. assert (editor.current)
@@ -367,11 +384,6 @@ function Ardoise.edit (ardoise)
     end
     return result.layer, result.ref
   end
-  editor.receiver = Copas.addthread (function ()
-    while editor.running do
-      pcall (Editor.answer, editor)
-    end
-  end)
   return editor
 end
 

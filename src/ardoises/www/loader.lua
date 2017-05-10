@@ -108,7 +108,7 @@ end
 package.preload ["ardoises.jsonhttp.copas"] = function ()
   local Common = require "ardoises.jsonhttp.common"
   local Copas  = require "copas"
-  local Json   = require "dkjson"
+  local Json   = require "cjson"
   return Common (function (request)
     assert (type (request) == "table")
     local running = {
@@ -142,6 +142,7 @@ package.preload ["ardoises.jsonhttp.copas"] = function ()
     end)
     r2:catch (function (_, e)
       err = e
+      print (e)
       if running.copas then
         Copas.wakeup (running.copas)
       else

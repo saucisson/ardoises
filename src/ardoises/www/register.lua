@@ -20,6 +20,7 @@ local Http  = require "ardoises.jsonhttp.copas"
 local Json  = require "cjson"
 local Url   = require "net.url"
 local tojs  = require "tojs"
+
 Copas.addthread (function ()
   local data, status = Http {
     url    = "/register",
