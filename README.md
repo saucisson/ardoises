@@ -42,11 +42,11 @@ fix your problem, or add a new feature!
 Ardoises could not exist without the following institutions:
 
 | ---: | :--- |
-| [<img src="{{ site.url }}/assets/unige.jpeg" height="128">](http://www.unige.ch)               | [<img src="{{ site.url }}/assets/cui.png" height="128">](http://cui.unige.ch)            |
-| [<img src="{{ site.url }}/assets/upmc.jpeg" height="128">](http://www.upmc.fr)                 | [<img src="{{ site.url }}/assets/lip6.png" height="128">](https://www.lip6.fr)           |
-| [<img src="{{ site.url }}/assets/ens-cachan.png" height="128">](http://www.ens-cachan.fr)      | [<img src="{{ site.url }}/assets/lsv.jpeg" height="128">](http://www.lsv.fr)             |
-| [<img src="{{ site.url }}/assets/paris-nord.jpeg" height="128">](https://www.univ-paris13.fr)  | [<img src="{{ site.url }}/assets/lipn.jpeg" height="128">](https://lipn.univ-paris13.fr) |
-| [<img src="{{ site.url }}/assets/cnrs.png" height="128">](http://www.cnrs.fr)                  | [<img src="{{ site.url }}/assets/inria.jpeg" height="128">](https://www.inria.fr)        |
+| [<img src="{{ site.url }}/assets/unige.png" height="128">](http://www.unige.ch)                | [<img src="{{ site.url }}/assets/cui.png" height="128">](http://cui.unige.ch)            |
+| [<img src="{{ site.url }}/assets/upmc.png" height="128">](http://www.upmc.fr)                  | [<img src="{{ site.url }}/assets/lip6.png" height="128">](https://www.lip6.fr)            |
+| [<img src="{{ site.url }}/assets/ens-cachan.png" height="128">](http://www.ens-cachan.fr)      | [<img src="{{ site.url }}/assets/lsv.png" height="128">](http://www.lsv.fr)              |
+| [<img src="{{ site.url }}/assets/paris-nord.png" height="128">](https://www.univ-paris13.fr)   | [<img src="{{ site.url }}/assets/lipn.png" height="128">](https://lipn.univ-paris13.fr)   |
+| [<img src="{{ site.url }}/assets/cnrs.png" height="128">](http://www.cnrs.fr)                  | [<img src="{{ site.url }}/assets/inria.png" height="128">](https://www.inria.fr)           |
 
 It has been developed with <i class="fa fa-heart fa-inverse" aria-hidden="true"></i> by the following people:
 
