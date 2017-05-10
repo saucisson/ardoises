@@ -41,12 +41,12 @@ fix your problem, or add a new feature!
 
 Ardoises could not exist without the following institutions:
 
-| ------------------------------------------------------------------------------: | :------------------------------------------------------------------------ |
-| [<img src="images/unige.jpeg" height="128">](http://www.unige.ch)               | [<img src="images/cui.png" height="128">](http://cui.unige.ch)            |
-| [<img src="images/upmc.jpeg" height="128">](http://www.upmc.fr)                 | [<img src="images/lip6.png" height="128">](https://www.lip6.fr)           |
-| [<img src="images/ens-cachan.png" height="128">](http://www.ens-cachan.fr)      | [<img src="images/lsv.jpeg" height="128">](http://www.lsv.fr)             |
-| [<img src="images/paris-nord.jpeg" height="128">](https://www.univ-paris13.fr)  | [<img src="images/lipn.jpeg" height="128">](https://lipn.univ-paris13.fr) |
-| [<img src="images/cnrs.png" height="128">](http://www.cnrs.fr)                  | [<img src="images/inria.jpeg" height="128">](https://www.inria.fr)        |
+| -------------------------------------------------------------------------------: | :------------------------------------------------------------------------- |
+| [<img src="/images/unige.jpeg" height="128">](http://www.unige.ch)               | [<img src="/images/cui.png" height="128">](http://cui.unige.ch)            |
+| [<img src="/images/upmc.jpeg" height="128">](http://www.upmc.fr)                 | [<img src="/images/lip6.png" height="128">](https://www.lip6.fr)           |
+| [<img src="/images/ens-cachan.png" height="128">](http://www.ens-cachan.fr)      | [<img src="/images/lsv.jpeg" height="128">](http://www.lsv.fr)             |
+| [<img src="/images/paris-nord.jpeg" height="128">](https://www.univ-paris13.fr)  | [<img src="/images/lipn.jpeg" height="128">](https://lipn.univ-paris13.fr) |
+| [<img src="/images/cnrs.png" height="128">](http://www.cnrs.fr)                  | [<img src="/images/inria.jpeg" height="128">](https://www.inria.fr)        |
 
 It has been developed with <i class="fa fa-heart fa-inverse" aria-hidden="true"></i> by the following people:
 
