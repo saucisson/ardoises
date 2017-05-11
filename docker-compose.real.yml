@@ -9,7 +9,6 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
   clean:
-    env_file: .environment
     build:
       context: .
       dockerfile: docker/Dockerfile-noresty
@@ -17,7 +16,6 @@ services:
     volumes:
       - ./src/ardoises:/usr/share/lua/5.1/ardoises
   invitation:
-    env_file: .environment
     build:
       context: .
       dockerfile: docker/Dockerfile-noresty
@@ -25,7 +23,6 @@ services:
     volumes:
       - ./src/ardoises:/usr/share/lua/5.1/ardoises
   limits:
-    env_file: .environment
     build:
       context: .
       dockerfile: docker/Dockerfile-noresty
@@ -33,7 +30,6 @@ services:
     volumes:
       - ./src/ardoises:/usr/share/lua/5.1/ardoises
   populate:
-    env_file: .environment
     build:
       context: .
       dockerfile: docker/Dockerfile-noresty
@@ -41,7 +37,6 @@ services:
     volumes:
       - ./src/ardoises:/usr/share/lua/5.1/ardoises
   webhook:
-    env_file: .environment
     build:
       context: .
       dockerfile: docker/Dockerfile-noresty
@@ -49,7 +44,6 @@ services:
     volumes:
       - ./src/ardoises:/usr/share/lua/5.1/ardoises
   ardoises:
-    env_file: .environment
     build:
       context: .
       dockerfile: docker/Dockerfile-resty
