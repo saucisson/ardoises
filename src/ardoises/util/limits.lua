@@ -26,29 +26,29 @@ parser:option "--delay" {
 local arguments = parser:parse ()
 local last_sms  = 0
 
--- do
---   print "Testing twilio connectivity..."
---   for _, phone in ipairs (Config.administrator.phone) do
---     local url = Url.parse (Lustache:render ("https://api.twilio.com/2010-04-01/Accounts/{{{username}}}/Messages", Config.twilio))
---     url.query.To   = phone
---     url.query.From = Config.twilio.phone
---     url.query.Body = "Ardoises: Twilio works correctly."
---     local _, status = Http {
---       method  = "POST",
---       url     = Lustache:render ("https://api.twilio.com/2010-04-01/Accounts/{{{username}}}/Messages.json", Config.twilio),
---       headers = {
---         ["Content-type" ] = "application/x-www-form-urlencoded",
---         ["Authorization"] = "Basic " .. Mime.b64 (Config.twilio.username .. ":" .. Config.twilio.password),
---         ["User-Agent"   ] = "Ardoises",
---       },
---       body = tostring (url):match "%?(.*)$",
---     }
---     assert (status == 201, status)
---   end
---   for _ in ipairs (Config.administrator.email) do
---     assert "smtp is not implemented yet"
---   end
--- end
+do
+  print "Testing twilio connectivity..."
+  for _, phone in ipairs (Config.administrator.phone) do
+    local url = Url.parse (Lustache:render ("https://api.twilio.com/2010-04-01/Accounts/{{{username}}}/Messages", Config.twilio))
+    url.query.To   = phone
+    url.query.From = Config.twilio.phone
+    url.query.Body = "Ardoises: Twilio works correctly."
+    local _, status = Http {
+      method  = "POST",
+      url     = Lustache:render ("https://api.twilio.com/2010-04-01/Accounts/{{{username}}}/Messages.json", Config.twilio),
+      headers = {
+        ["Content-type" ] = "application/x-www-form-urlencoded",
+        ["Authorization"] = "Basic " .. Mime.b64 (Config.twilio.username .. ":" .. Config.twilio.password),
+        ["User-Agent"   ] = "Ardoises",
+      },
+      body = tostring (url):match "%?(.*)$",
+    }
+    assert (status == 201, status)
+  end
+  for _ in ipairs (Config.administrator.email) do
+    assert "smtp is not implemented yet"
+  end
+end
 
 while true do
   print "Obtaining GitHub rate limits..."
