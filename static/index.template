@@ -95,6 +95,9 @@
           <div class="col-sm-6">
             <ul class="lead nav navbar-nav navbar-right">
               <li class="">
+                <a href="https://saucisson.github.io/ardoises"><i class="fa fa-inverse fa-book"></i></a>
+              </li>
+              <li class="">
                 <a href="https://twitter.com/ArdoiseModeling"><i class="fa fa-inverse fa-twitter"></i></a>
               </li>
               <li class="">
