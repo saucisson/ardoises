@@ -38,7 +38,7 @@ return function (what)
     if options.signature then
       local Config = require "ardoises.config"
       local Hmac   = require "openssl.hmac"
-      local hmac   = Hmac.new (Config.application.secret)
+      local hmac   = Hmac.new (Config.github.secret)
       request.headers [options.signature] = "sha1=" .. tohex (hmac:final (request.body))
     end
     local cache = request.method == "GET"

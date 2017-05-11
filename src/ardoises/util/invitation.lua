@@ -13,6 +13,7 @@ local Http      = require "ardoises.jsonhttp.socket-redis"
 local Json      = require "rapidjson"
 local Lustache  = require "lustache"
 local Redis     = require "redis"
+local Url       = require "net.url"
 
 local parser = Arguments () {
   name        = "ardoises-clean",
@@ -30,10 +31,10 @@ os.execute (Lustache:render ([[
   dockerize -wait "{{{redis}}}" \
             -wait "{{{docker}}}"
 ]], {
-  redis  = Config.redis.url,
-  docker = Config.docker.url,
+  redis  = Url.build (Config.redis.url),
+  docker = Url.build (Config.docker.url),
 }))
-local redis = assert (Redis.connect (Config.redis.host, Config.redis.port))
+local redis = assert (Redis.connect (Config.redis.url.host, Config.redis.url.port))
 
 while true do
   print "Answering to invitations..."
@@ -44,7 +45,7 @@ while true do
       method  = "GET",
       headers = {
         ["Accept"       ] = "application/vnd.github.swamp-thing-preview+json",
-        ["Authorization"] = "token " .. Config.application.token,
+        ["Authorization"] = "token " .. Config.github.token,
         ["User-Agent"   ] = "Ardoises",
       },
     }
@@ -58,7 +59,7 @@ while true do
         method  = "PATCH",
         headers = {
           ["Accept"       ] = "application/vnd.github.swamp-thing-preview+json",
-          ["Authorization"] = "token " .. Config.application.token,
+          ["Authorization"] = "token " .. Config.github.token,
           ["User-Agent"   ] = "Ardoises",
         },
       }
@@ -78,9 +79,9 @@ while true do
         body    = {
           name   = "web",
           config = {
-            url          = Config.ardoises.url .. "/webhook",
+            url          = Url.build (Config.ardoises.url) .. "/webhook",
             content_type = "json",
-            secret       = Config.application.secret,
+            secret       = Config.github.secret,
             insecure_ssl = "0",
           },
           events = { "*" },

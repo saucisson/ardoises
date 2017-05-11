@@ -13,6 +13,7 @@ local Http      = require "ardoises.jsonhttp.socket-redis"
 local Json      = require "rapidjson"
 local Lustache  = require "lustache"
 local Redis     = require "redis"
+local Url       = require "net.url"
 
 local parser = Arguments () {
   name        = "ardoises-clean",
@@ -30,11 +31,11 @@ os.execute (Lustache:render ([[
   dockerize -wait "{{{redis}}}" \
             -wait "{{{docker}}}"
 ]], {
-  redis  = Config.redis.url,
-  docker = Config.docker.url,
+  redis  = Url.build (Config.redis.url),
+  docker = Url.build (Config.docker.url),
 }))
 
-local redis  = assert (Redis.connect (Config.redis.host, Config.redis.port))
+local redis  = assert (Redis.connect (Config.redis.url.host, Config.redis.url.port))
 local cursor = "0"
 local keys
 
@@ -69,8 +70,8 @@ while true do
         or not editor.created_at
         or Gettime () - editor.created_at > 120) then
         local docker_url = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}", {
-          host = Config.docker.host,
-          port = Config.docker.port,
+          host = Config.docker.url.host,
+          port = Config.docker.url.port,
           id   = editor.docker_id,
         })
         local info, status = Http {

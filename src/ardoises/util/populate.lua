@@ -22,7 +22,7 @@ print "Waiting for services to run..."
 os.execute (Lustache:render ([[
   dockerize -wait "{{{ardoises}}}"
 ]], {
-  ardoises = Config.ardoises.url,
+  ardoises = Url.build (Config.ardoises.url),
 }))
 
 print "Populating data..."
@@ -32,7 +32,7 @@ xpcall (function ()
     method  = "GET",
     headers = {
       ["Accept"       ] = "application/vnd.github.v3+json",
-      ["Authorization"] = "token " .. Config.application.token,
+      ["Authorization"] = "token " .. Config.github.token,
       ["User-Agent"   ] = "Ardoises",
     },
   }
@@ -44,15 +44,15 @@ xpcall (function ()
     _, status = Http {
       url = Url.build {
         scheme = "https",
-        host   = Config.ardoises.host,
-        port   = Config.ardoises.port,
+        host   = Config.ardoises.url.host,
+        port   = Config.ardoises.url.port,
         path   = "/webhook",
       },
       method    = "POST",
       signature = "X-Hub-Signature",
       headers   = {
         ["Accept"       ] = "application/vnd.github.v3+json",
-        ["Authorization"] = "token " .. Config.application.token,
+        ["Authorization"] = "token " .. Config.github.token,
         ["User-Agent"   ] = "Ardoises",
       },
       body = {

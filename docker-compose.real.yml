@@ -62,3 +62,4 @@ services:
       - ./static:/static
       - ./src/ardoises:/usr/share/lua/5.1/ardoises
       - /etc/letsencrypt:/etc/letsencrypt
+      - /etc/ardoises:/etc/ardoises

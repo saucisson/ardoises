@@ -9,19 +9,12 @@ end
 local Arguments = require "argparse"
 local Basexx    = require "basexx"
 local Client    = require "ardoises.client"
+local Config    = require "ardoises.config"
 local Copas     = require "copas"
 local Editor    = require "ardoises.editor"
 local Lustache  = require "lustache"
 local Patterns  = require "ardoises.patterns"
-local Setenv    = require "posix.stdlib".setenv
 local Url       = require "net.url"
-
-for line in io.lines ".environment" do
-  local key, value = line:match "^([%w_]+)=(.*)$"
-  if key and value then
-    Setenv (key, value)
-  end
-end
 
 local parser = Arguments () {
   name        = "ardoises-instance",
@@ -29,7 +22,7 @@ local parser = Arguments () {
 }
 parser:option "--token" {
   description = "access token",
-  default     = os.getenv "USER_TOKEN",
+  default     = Config.test.user.token,
 }
 parser:option "--timeout" {
   description = "timeout (in second)",
@@ -43,7 +36,7 @@ parser:option "--port" {
 }
 parser:option "--ardoises" {
   description = "URL of the ardoises server",
-  default     = os.getenv "ARDOISES_URL",
+  default     = Url.build (Config.ardoises.url),
   convert     = function (x)
     local url = Url.parse (x)
     assert (url and url.scheme and url.host)

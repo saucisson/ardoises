@@ -11,7 +11,7 @@ local Patterns = require "ardoises.patterns"
 local Redis    = require "resty.redis"
 local Url      = require "net.url"
 
-local hashids   = Hashids.new (Config.ardoises.url, 32)
+local hashids   = Hashids.new (tostring (Config.ardoises.url), 32)
 local function localrepo (var)
   return {
     owner          = { login = var.owner },
@@ -38,7 +38,7 @@ end
 local function wrap (f)
   return function ()
     local redis = Redis:new ()
-    if not redis:connect (Config.redis.host, Config.redis.port) then
+    if not redis:connect (Config.redis.url.host, Config.redis.url.port) then
       return ngx.exit (ngx.HTTP_INTERNAL_SERVER_ERROR)
     end
     local ok, result = xpcall (function ()
@@ -78,7 +78,7 @@ local function register ()
   if query.code and query.state then
     _G.ngx.header ["Content-type"] = "text/html"
     ngx.say (Server.template ("index", {
-      server = Url.build (Config.ardoises),
+      server = Url.build (Config.ardoises.url),
       code   = "ardoises.www.register",
       query  = Json.encode (query),
     }))
@@ -92,7 +92,7 @@ Server.register = wrap (function (context)
   if not query.code and not query.state then
     return { status = ngx.HTTP_BAD_REQUEST }
   end
-  local token = Jwt:verify (Config.application.secret, query.state)
+  local token = Jwt:verify (Config.github.secret, query.state)
   if not token
   or not token.payload
   or not token.payload.csrf then
@@ -116,8 +116,8 @@ Server.register = wrap (function (context)
       ["User-Agent"] = "Ardoises",
     },
     body    = {
-      client_id     = Config.application.id,
-      client_secret = Config.application.secret,
+      client_id     = Config.github.id,
+      client_secret = Config.github.secret,
       state         = query.state,
       code          = query.code,
     },
@@ -141,7 +141,7 @@ Server.register = wrap (function (context)
   local key = Config.patterns.user (user)
   user.tokens = {
     github   = result.access_token,
-    ardoises = Jwt:sign (Config.application.secret, {
+    ardoises = Jwt:sign (Config.github.secret, {
       header  = {
         typ = "JWT",
         alg = "HS256",
@@ -196,7 +196,7 @@ function Server.authenticate (context, options)
     if not token then
       return nil, ngx.HTTP_UNAUTHORIZED
     end
-    local jwt = Jwt:verify (Config.application.secret, token)
+    local jwt = Jwt:verify (Config.github.secret, token)
     if not jwt then
       return nil, ngx.HTTP_UNAUTHORIZED
     end
@@ -211,7 +211,7 @@ function Server.authenticate (context, options)
     return info
   end) ()
   if not user and not (options or {}).optional then
-    local url = Url.parse (Url.build (Config.ardoises))
+    local url = Url.parse (Url.build (Config.ardoises.url))
     url.path               = "/login"
     url.query.redirect_uri = ngx.var.request_uri
     context.redis:close ()
@@ -238,7 +238,7 @@ Server.dashboard = wrap (function (context)
   end
   _G.ngx.header ["Content-type"] = "text/html"
   ngx.say (Server.template ("index", {
-    server  = Url.build (Config.ardoises),
+    server  = Url.build (Config.ardoises.url),
     user    = user,
     code    = "ardoises.www.dashboard",
   }))
@@ -251,7 +251,7 @@ Server.overview = wrap (function (context)
   })
   _G.ngx.header ["Content-type"] = "text/html"
   ngx.say (Server.template ("index", {
-    server = Url.build (Config.ardoises),
+    server = Url.build (Config.ardoises.url),
     user   = user,
     code   = "ardoises.www.overview",
   }))
@@ -295,7 +295,7 @@ Server.view = wrap (function (context)
   -- answer:
   _G.ngx.header ["Content-type"] = "text/html"
   ngx.say (Server.template ("index", {
-    server     = Url.build (Config.ardoises),
+    server     = Url.build (Config.ardoises.url),
     user       = user,
     repository = repository,
     branch     = ngx.var.branch,
@@ -307,12 +307,12 @@ end)
 Server.login = wrap (function ()
   local query            = ngx.req.get_uri_args ()
   local url              = Url.parse "https://github.com/login/oauth/authorize"
-  local redirect         = Url.parse (Url.build (Config.ardoises))
+  local redirect         = Url.parse (Url.build (Config.ardoises.url))
   redirect.path          = query.redirect_uri or "/"
   url.query.redirect_uri = Url.build (redirect)
-  url.query.client_id    = Config.application.id
+  url.query.client_id    = Config.github.id
   url.query.scope        = "user:email admin:repo_hook"
-  url.query.state        = Jwt:sign (Config.application.secret, {
+  url.query.state        = Jwt:sign (Config.github.secret, {
     header  = {
       typ = "JWT",
       alg = "HS256",
@@ -458,7 +458,7 @@ Server.editor = wrap (function (context)
     return { status = err }
   end
   if ngx.var.owner == "-" then
-    local token = Jwt:sign (Config.application.secret, {
+    local token = Jwt:sign (Config.github.secret, {
       header  = {
         typ = "JWT",
         alg = "HS256",
@@ -521,9 +521,9 @@ Server.editor = wrap (function (context)
   if editor == ngx.null or not editor then
     local info, status = Http {
       url    = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}/json", {
-        host = Config.docker.host,
-        port = Config.docker.port,
-        id   = Config.docker_id,
+        host = Config.docker.url.host,
+        port = Config.docker.url.port,
+        id   = Config.docker.container,
       }),
       method = "GET",
     }
@@ -531,8 +531,8 @@ Server.editor = wrap (function (context)
     local _, network = next (info.NetworkSettings.Networks)
     local ninfo, nstatus = Http {
       url    = Lustache:render ("http://{{{host}}}:{{{port}}}/networks/{{{id}}}", {
-        host = Config.docker.host,
-        port = Config.docker.port,
+        host = Config.docker.url.host,
+        port = Config.docker.url.port,
         id   = network.NetworkID,
       }),
       method = "GET",
@@ -547,8 +547,8 @@ Server.editor = wrap (function (context)
     end
     local cinfo, cstatus = Http {
       url    = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}/json", {
-        host = Config.docker.host,
-        port = Config.docker.port,
+        host = Config.docker.url.host,
+        port = Config.docker.url.port,
         id   = container,
       }),
       method = "GET",
@@ -557,8 +557,8 @@ Server.editor = wrap (function (context)
     local service
     service, status = Http {
       url     = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/create", {
-        host = Config.docker.host,
-        port = Config.docker.port,
+        host = Config.docker.url.host,
+        port = Config.docker.url.port,
       }),
       method  = "POST",
       timeout = 120,
@@ -579,9 +579,9 @@ Server.editor = wrap (function (context)
           Binds           = cinfo.HostConfig.Binds,
         },
         Env = {
-          "ARDOISES_URL=" .. Config.ardoises.url,
+          "ARDOISES_URL="    .. Url.build (Config.ardoises.url),
           "ARDOISES_BRANCH=" .. Lustache:render ("{{{owner}}}/{{{name}}}:{{{branch}}}", ngx.var),
-          "ARDOISES_TOKEN=" .. Config.application.token,
+          "ARDOISES_TOKEN="  .. Config.github.token,
         },
       },
     }
@@ -592,16 +592,16 @@ Server.editor = wrap (function (context)
       method  = "POST",
       timeout = 120,
       url     = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}/start", {
-        host = Config.docker.host,
-        port = Config.docker.port,
+        host = Config.docker.url.host,
+        port = Config.docker.url.port,
         id   = service.Id,
       }),
     }
     assert (status == ngx.HTTP_NO_CONTENT, status)
     local start = Gettime ()
     local docker_url = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}", {
-      host = Config.docker.host,
-      port = Config.docker.port,
+      host = Config.docker.url.host,
+      port = Config.docker.url.port,
       id   = service.Id,
     })
     context.redis:set (key, Json.encode {
@@ -627,8 +627,8 @@ Server.editor = wrap (function (context)
           }),
           editor_url = Url.build {
             scheme = "wss",
-            host   = Config.ardoises.host,
-            port   = Config.ardoises.port,
+            host   = Config.ardoises.url.host,
+            port   = Config.ardoises.url.port,
             path   = Lustache:render ("/websockets/{{{owner}}}/{{{name}}}/{{{branch}}}", {
               owner  = ngx.var.owner,
               name   = ngx.var.name,
@@ -653,7 +653,7 @@ Server.editor = wrap (function (context)
   if not editor.target_url or not editor.editor_url then
     return { status = ngx.HTTP_NOT_FOUND }
   end
-  local token = Jwt:sign (Config.application.secret, {
+  local token = Jwt:sign (Config.github.secret, {
     header  = {
       typ = "JWT",
       alg = "HS256",
@@ -687,7 +687,7 @@ Server.tool = wrap (function (context)
     local id        = context.redis:incr (Config.patterns.id "tool")
     id = hashids:encode (id)
     local key   = Config.patterns.tool (user, { id = id })
-    local token = Jwt:sign (Config.application.secret, {
+    local token = Jwt:sign (Config.github.secret, {
       header  = {
         typ = "JWT",
         alg = "HS256",
@@ -699,8 +699,8 @@ Server.tool = wrap (function (context)
     })
     local service, status = Http {
       url     = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/create", {
-        host = Config.docker.host,
-        port = Config.docker.port,
+        host = Config.docker.url.host,
+        port = Config.docker.url.port,
       }),
       method  = "POST",
       timeout = 120,
@@ -719,16 +719,16 @@ Server.tool = wrap (function (context)
       method  = "POST",
       timeout = 120,
       url     = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}/start", {
-        host = Config.docker.host,
-        port = Config.docker.port,
+        host = Config.docker.url.host,
+        port = Config.docker.url.port,
         id   = service.Id,
       }),
     }
     assert (status == ngx.HTTP_NO_CONTENT, status)
     local start = Gettime ()
     local docker_url = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}", {
-      host = Config.docker.host,
-      port = Config.docker.port,
+      host = Config.docker.url.host,
+      port = Config.docker.url.port,
       id   = service.Id,
     })
     local info
@@ -773,8 +773,8 @@ Server.tool = wrap (function (context)
     end
     tool = assert (Json.decode (tool))
     local docker_url = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}", {
-      host = Config.docker.host,
-      port = Config.docker.port,
+      host = Config.docker.url.host,
+      port = Config.docker.url.port,
       id   = tool.docker_id,
     })
     local _, status = Http {
@@ -797,8 +797,8 @@ Server.tool = wrap (function (context)
     end
     tool = assert (Json.decode (tool))
     local docker_url = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}", {
-      host = Config.docker.host,
-      port = Config.docker.port,
+      host = Config.docker.url.host,
+      port = Config.docker.url.port,
       id   = tool.docker_id,
     })
     local info, status = Http {
@@ -829,7 +829,7 @@ Server.check_token = wrap (function (context)
   if not token then
     return { status = ngx.HTTP_UNAUTHORIZED }
   end
-  token = Jwt:verify (Config.application.secret, token)
+  token = Jwt:verify (Config.github.secret, token)
   if not token
   or not token.payload then
     return { status = ngx.HTTP_UNAUTHORIZED }
@@ -915,7 +915,7 @@ Server.webhook = wrap (function (context)
   ngx.req.read_body ()
   local data    = ngx.req.get_body_data ()
   local headers = ngx.req.get_headers ()
-  local hmac    = Hmac.new (Config.application.secret)
+  local hmac    = Hmac.new (Config.github.secret)
   if not data then
     return { status = ngx.HTTP_BAD_REQUEST }
   end
@@ -956,7 +956,7 @@ Server.webhook = wrap (function (context)
     method  = "GET",
     headers = {
       ["Accept"       ] = "application/vnd.github.v3+json",
-      ["Authorization"] = "token " .. Config.application.token,
+      ["Authorization"] = "token " .. Config.github.token,
       ["User-Agent"   ] = "Ardoises",
     },
   }
@@ -986,7 +986,7 @@ Server.webhook = wrap (function (context)
         return
       end
       for _, hook in ipairs (webhooks) do
-        if hook.config.url:find (Config.ardoises.url, 1, true) then
+        if hook.config.url:find (Url.build (Config.ardoises.url), 1, true) then
           Http {
             url     = hook.url,
             method  = "DELETE",
@@ -1008,7 +1008,7 @@ Server.webhook = wrap (function (context)
       method  = "GET",
       headers = {
         ["Accept"       ] = "application/vnd.github.loki-preview+json",
-        ["Authorization"] = "token " .. Config.application.token,
+        ["Authorization"] = "token " .. Config.github.token,
         ["User-Agent"   ] = "Ardoises",
       },
     }

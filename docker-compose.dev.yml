@@ -16,6 +16,7 @@ services:
     entrypoint: lua -l ardoises.util.clean
     volumes:
       - ./src/ardoises:/usr/share/lua/5.1/ardoises
+      - ./etc/ardoises:/etc/ardoises
   invitation:
     env_file: .environment
     build:
@@ -24,6 +25,7 @@ services:
     entrypoint: lua -l ardoises.util.invitation
     volumes:
       - ./src/ardoises:/usr/share/lua/5.1/ardoises
+      - ./etc/ardoises:/etc/ardoises
   limits:
     env_file: .environment
     build:
@@ -32,6 +34,7 @@ services:
     entrypoint: lua -l ardoises.util.limits
     volumes:
       - ./src/ardoises:/usr/share/lua/5.1/ardoises
+      - ./etc/ardoises:/etc/ardoises
   populate:
     env_file: .environment
     build:
@@ -40,6 +43,7 @@ services:
     entrypoint: lua -l ardoises.util.populate
     volumes:
       - ./src/ardoises:/usr/share/lua/5.1/ardoises
+      - ./etc/ardoises:/etc/ardoises
   webhook:
     env_file: .environment
     build:
@@ -48,6 +52,7 @@ services:
     entrypoint: lua -l ardoises.util.webhook
     volumes:
       - ./src/ardoises:/usr/share/lua/5.1/ardoises
+      - ./etc/ardoises:/etc/ardoises
   ardoises:
     env_file: .environment
     build:
@@ -62,3 +67,4 @@ services:
       - ./static:/static
       - ./src/ardoises:/usr/share/lua/5.1/ardoises
       - ./etc/letsencrypt:/etc/letsencrypt
+      - ./etc/ardoises:/etc/ardoises

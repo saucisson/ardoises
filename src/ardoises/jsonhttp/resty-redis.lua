@@ -12,7 +12,7 @@ return Common (function (request, cache)
   assert (type (request) == "table")
   local json  = {}
   local redis = Redis:new ()
-  assert (redis:connect (Config.redis.host, Config.redis.port))
+  assert (redis:connect (Config.redis.url.host, Config.redis.url.port))
   request.ssl_verify = false
   if cache then
     json.request = Json.encode (request, {

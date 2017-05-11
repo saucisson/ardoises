@@ -13,7 +13,7 @@ local delay  = 1 * 24 * 60 * 60 -- 1 day
 return Common (function (request, cache)
   assert (type (request) == "table")
   local json  = {}
-  local redis = assert (Redis.connect (Config.redis.host, Config.redis.port))
+  local redis = assert (Redis.connect (Config.redis.url.host, Config.redis.url.port))
   if cache then
     json.request = Json.encode (request, {
       sort_keys = true,
