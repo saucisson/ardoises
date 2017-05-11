@@ -11,6 +11,7 @@ local Config    = require "ardoises.config"
 local Gettime   = require "socket".gettime
 local Http      = require "ardoises.jsonhttp.socket-redis"
 local Json      = require "rapidjson"
+local Keys      = require 'ardoises.server.keys'
 local Lustache  = require "lustache"
 local Redis     = require "redis"
 local Url       = require "net.url"
@@ -64,7 +65,7 @@ while true do
         },
       }
       assert (status == 204, status)
-      local user = redis:get (Config.patterns.user (invitation.repository.owner))
+      local user = redis:get (Keys.user (invitation.repository.owner))
       assert (user)
       user = Json.decode (user)
       assert (user)

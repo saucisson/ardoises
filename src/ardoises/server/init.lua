@@ -6,6 +6,7 @@ local Http     = require "ardoises.jsonhttp.resty-redis"
 local Hmac     = require "openssl.hmac"
 local Json     = require "rapidjson"
 local Jwt      = require "resty.jwt"
+local Keys     = require "ardoises.server.keys"
 local Lustache = require "lustache"
 local Patterns = require "ardoises.patterns"
 local Redis    = require "resty.redis"
@@ -98,7 +99,7 @@ Server.register = wrap (function (context)
   or not token.payload.csrf then
     return { status = ngx.HTTP_UNAUTHORIZED }
   end
-  local lock = Config.patterns.lock "register"
+  local lock = Keys.lock "register"
   while true do
     if context.redis:setnx (lock, "locked") == 1 then
       context.redis:expire (lock, Config.locks.timeout)
@@ -122,7 +123,7 @@ Server.register = wrap (function (context)
       code          = query.code,
     },
   }
-  context.redis:del (Config.patterns.lock "register")
+  context.redis:del (Keys.lock "register")
   if status ~= ngx.HTTP_OK or not result.access_token then
     return { status = ngx.HTTP_INTERNAL_SERVER_ERROR }
   end
@@ -138,7 +139,7 @@ Server.register = wrap (function (context)
   if status ~= ngx.HTTP_OK then
     return { status = ngx.HTTP_INTERNAL_SERVER_ERROR }
   end
-  local key = Config.patterns.user (user)
+  local key = Keys.user (user)
   user.tokens = {
     github   = result.access_token,
     ardoises = Jwt:sign (Config.github.secret, {
@@ -200,7 +201,7 @@ function Server.authenticate (context, options)
     if not jwt then
       return nil, ngx.HTTP_UNAUTHORIZED
     end
-    local info = context.redis:get (Config.patterns.user (jwt.payload))
+    local info = context.redis:get (Keys.user (jwt.payload))
     if info == ngx.null or not info then
       return nil, ngx.HTTP_INTERNAL_SERVER_ERROR
     end
@@ -268,7 +269,7 @@ Server.view = wrap (function (context)
     repository = localrepo (ngx.var)
   else
     -- get repository:
-    local rkey = Config.patterns.repository {
+    local rkey = Keys.repository {
       owner = { login = ngx.var.owner },
       name  = ngx.var.name,
     }
@@ -278,7 +279,7 @@ Server.view = wrap (function (context)
     end
     repository = assert (Json.decode (repository))
     -- check collaborator:
-    local ckey = Config.patterns.collaborator ({
+    local ckey = Keys.collaborator ({
       owner = { login = ngx.var.owner },
       name  = ngx.var.name,
     }, user)
@@ -365,7 +366,7 @@ Server.my_ardoises = wrap (function (context)
   local cursor = 0
   repeat
     local res = context.redis:scan (cursor,
-      "match", Config.patterns.collaborator ({
+      "match", Keys.collaborator ({
         owner = { login = "*" },
         name  = "*",
       }, user),
@@ -379,7 +380,7 @@ Server.my_ardoises = wrap (function (context)
       local entry = context.redis:get (key)
       if entry ~= ngx.null and entry then
         entry = Json.decode (entry)
-        local repository = context.redis:get (Config.patterns.repository (entry.repository))
+        local repository = context.redis:get (Keys.repository (entry.repository))
         entry.repository = Json.decode (repository)
         result [#result+1] = entry
         seen   [entry.repository.full_name] = true
@@ -390,7 +391,7 @@ Server.my_ardoises = wrap (function (context)
   cursor = 0
   repeat
     local res = context.redis:scan (cursor,
-      "match", Config.patterns.repository {
+      "match", Keys.repository {
         owner = { login = "*" },
         name  = "*",
       },
@@ -434,7 +435,7 @@ Server.my_tools = wrap (function (context)
   local cursor = 0
   repeat
     local res = context.redis:scan (cursor,
-      "match", Config.patterns.tool (user, { id = "*" }),
+      "match", Keys.tool (user, { id = "*" }),
       "count", 100)
     if res == ngx.null or not res then
       break
@@ -480,7 +481,7 @@ Server.editor = wrap (function (context)
     return { status = ngx.HTTP_OK }
   end
   -- get repository:
-  local rkey = Config.patterns.repository {
+  local rkey = Keys.repository {
     owner = { login = ngx.var.owner },
     name  = ngx.var.name,
   }
@@ -490,7 +491,7 @@ Server.editor = wrap (function (context)
   end
   repository = assert (Json.decode (repository))
   -- check collaborator:
-  local ckey = Config.patterns.collaborator ({
+  local ckey = Keys.collaborator ({
     owner = { login = ngx.var.owner },
     name  = ngx.var.name,
   }, user)
@@ -505,7 +506,7 @@ Server.editor = wrap (function (context)
     repository    = collaboration.repository
   end
   -- get editor:
-  local lock = Config.patterns.lock (Lustache:render ("editor:{{{owner}}}/{{{name}}}/{{{branch}}}", ngx.var))
+  local lock = Keys.lock (Lustache:render ("editor:{{{owner}}}/{{{name}}}/{{{branch}}}", ngx.var))
   while true do
     if context.redis:setnx (lock, "locked") == 1 then
       context.redis:expire (lock, Config.locks.timeout)
@@ -513,7 +514,7 @@ Server.editor = wrap (function (context)
     end
     ngx.sleep (0.1)
   end
-  local key = Config.patterns.editor ({
+  local key = Keys.editor ({
     owner = { login = ngx.var.owner },
     name  = ngx.var.name,
   }, ngx.var.branch)
@@ -684,9 +685,9 @@ Server.tool = wrap (function (context)
   if method == ngx.ngx.HTTP_POST then
     ngx.req.read_body ()
     local arguments = assert (ngx.req.get_post_args ())
-    local id        = context.redis:incr (Config.patterns.id "tool")
+    local id        = context.redis:incr (Keys.id "tool")
     id = hashids:encode (id)
-    local key   = Config.patterns.tool (user, { id = id })
+    local key   = Keys.tool (user, { id = id })
     local token = Jwt:sign (Config.github.secret, {
       header  = {
         typ = "JWT",
@@ -766,7 +767,7 @@ Server.tool = wrap (function (context)
     })
     return { status = ngx.HTTP_CREATED }
   elseif method == ngx.HTTP_DELETE then
-    local key  = Config.patterns.tool (user, { id = ngx.var.tool })
+    local key  = Keys.tool (user, { id = ngx.var.tool })
     local tool = context.redis:get (key)
     if tool == ngx.null or not tool then
       return { status = ngx.HTTP_NOT_FOUND }
@@ -790,7 +791,7 @@ Server.tool = wrap (function (context)
     context.redis:del (key)
     return { status = ngx.HTTP_NO_CONTENT }
   else
-    local key  = Config.patterns.tool (user, { id = ngx.var.tool })
+    local key  = Keys.tool (user, { id = ngx.var.tool })
     local tool = context.redis:get (key)
     if tool == ngx.null or not tool then
       return { status = ngx.HTTP_NOT_FOUND }
@@ -846,7 +847,7 @@ Server.check_token = wrap (function (context)
     })
     return { status = ngx.HTTP_OK }
   end
-  local user = context.redis:get (Config.patterns.user (token.payload))
+  local user = context.redis:get (Keys.user (token.payload))
   if user == ngx.null or not user then
     return { status = ngx.HTTP_UNAUTHORIZED }
   end
@@ -896,7 +897,7 @@ Server.check_token = wrap (function (context)
 end)
 
 Server.websocket = wrap (function (context)
-  local key = Config.patterns.editor ({
+  local key = Keys.editor ({
     owner = { login = ngx.var.owner },
     name  = ngx.var.name,
   }, ngx.var.branch)
@@ -927,7 +928,7 @@ Server.webhook = wrap (function (context)
   if not repository then
     return { status = ngx.HTTP_OK }
   end
-  local lock = Config.patterns.lock (repository.full_name)
+  local lock = Keys.lock (repository.full_name)
   while true do
     if context.redis:setnx (lock, "locked") == 1 then
       context.redis:expire (lock, Config.locks.timeout)
@@ -939,7 +940,7 @@ Server.webhook = wrap (function (context)
   local cursor = 0
   repeat
     local res = context.redis:scan (cursor,
-      "match", Config.patterns.collaborator (repository, { login = "*" }),
+      "match", Keys.collaborator (repository, { login = "*" }),
       "count", 100)
     if res == ngx.null or not res then
       break
@@ -962,10 +963,10 @@ Server.webhook = wrap (function (context)
   }
   if status >= 400 and status < 500 then
     -- delete repository:
-    context.redis:del (Config.patterns.repository (repository))
+    context.redis:del (Keys.repository (repository))
     -- delete webhook(s):
     local function create ()
-      local user = context.redis:get (Config.patterns.user (repository.owner))
+      local user = context.redis:get (Keys.user (repository.owner))
       if user == ngx.null or not user then
         return
       end
@@ -1015,10 +1016,10 @@ Server.webhook = wrap (function (context)
     assert (status == ngx.HTTP_OK, status)
     repository.branches = branches
     -- update repository:
-    context.redis:set (Config.patterns.repository (repository), Json.encode (repository))
+    context.redis:set (Keys.repository (repository), Json.encode (repository))
     -- update collaborators:
     for _, collaborator in ipairs (collaborators) do
-      local key = Config.patterns.collaborator (repository, collaborator)
+      local key = Keys.collaborator (repository, collaborator)
       context.redis:set (key, Json.encode {
         repository   = {
           owner = { login = repository.owner.login },
@@ -1028,7 +1029,7 @@ Server.webhook = wrap (function (context)
       })
     end
   end
-  context.redis:del (Config.patterns.lock (repository.full_name))
+  context.redis:del (Keys.lock (repository.full_name))
   return { status = ngx.HTTP_OK }
 end)
 

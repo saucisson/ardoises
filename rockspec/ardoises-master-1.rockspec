@@ -55,6 +55,7 @@ build = {
     ["ardoises.editor.test"          ] = "src/ardoises/editor/test.lua",
     ["ardoises.sandbox"              ] = "src/ardoises/sandbox.lua",
     ["ardoises.server"               ] = "src/ardoises/server/init.lua",
+    ["ardoises.server.keys"          ] = "src/ardoises/server/keys.lua",
     ["ardoises.server.bin"           ] = "src/ardoises/server/bin.lua",
     ["ardoises.util.clean"           ] = "src/ardoises/util/clean.lua",
     ["ardoises.util.invitation"      ] = "src/ardoises/util/invitation.lua",

@@ -10,6 +10,7 @@ local Config   = require "ardoises.config"
 local Http     = require "ardoises.jsonhttp.socket"
 local Json     = require "rapidjson"
 local Jwt      = require "jwt"
+local Keys     = require 'ardoises.server.keys'
 local Lustache = require "lustache"
 local Redis    = require "redis"
 local Url      = require "net.url"
@@ -36,7 +37,7 @@ do
     },
   }
   assert (status == 200, status)
-  local key = Config.patterns.user (user)
+  local key = Keys.user (user)
   user.tokens = {
     github   = Config.github.token,
     ardoises = Jwt.encode ({

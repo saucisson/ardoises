@@ -11,6 +11,7 @@ local Config    = require "ardoises.config"
 local Gettime   = require "socket".gettime
 local Http      = require "ardoises.jsonhttp.socket-redis"
 local Json      = require "rapidjson"
+local Keys      = require 'ardoises.server.keys'
 local Lustache  = require "lustache"
 local Redis     = require "redis"
 local Url       = require "net.url"
@@ -56,7 +57,7 @@ while true do
   local start = Gettime ()
   xpcall (function ()
     cursor, keys = unpack (redis:scan (cursor, {
-        match = Config.patterns.editor ({
+        match = Keys.editor ({
           owner = { login = "*" },
           name  = "*",
         }, "*"),
