@@ -914,9 +914,17 @@ end)
 
 Server.webhook = wrap (function (context)
   ngx.req.read_body ()
-  local data    = ngx.req.get_body_data ()
-  local headers = ngx.req.get_headers ()
   local hmac    = Hmac.new (Config.github.secret)
+  local headers = ngx.req.get_headers ()
+  local data    = ngx.req.get_body_data ()
+  if not data then
+    local filename = ngx.req.get_body_file ()
+    if filename then
+      local file = io.open (filename, "r")
+      data = assert (file:read "*a")
+      assert (file:close ())
+    end
+  end
   if not data then
     return { status = ngx.HTTP_BAD_REQUEST }
   end
@@ -961,7 +969,7 @@ Server.webhook = wrap (function (context)
       ["User-Agent"   ] = "Ardoises",
     },
   }
-  if status >= 400 and status < 500 then
+  if status >= 300 and status < 500 then
     -- delete repository:
     context.redis:del (Keys.repository (repository))
     -- delete webhook(s):
@@ -1002,6 +1010,19 @@ Server.webhook = wrap (function (context)
     end
     create ()
   elseif status == 200 then
+    -- update readme:
+    local readme
+    readme, status = Http {
+      url     = repository.url .. "/readme",
+      method  = "GET",
+      headers = {
+        ["Accept"       ] = "application/vnd.github.3.html",
+        ["Authorization"] = "token " .. Config.github.token,
+        ["User-Agent"   ] = "Ardoises",
+      },
+    }
+    assert (status == ngx.HTTP_OK, status)
+    repository.readme = readme
     -- get branches:
     local branches
     branches, status = Http {
@@ -1015,6 +1036,21 @@ Server.webhook = wrap (function (context)
     }
     assert (status == ngx.HTTP_OK, status)
     repository.branches = branches
+    for _, branch in ipairs (branches) do
+      -- update readme:
+      readme, status = Http {
+        url     = repository.url .. "/readme",
+        query   = { ref = branch.name },
+        method  = "GET",
+        headers = {
+          ["Accept"       ] = "application/vnd.github.3.html",
+          ["Authorization"] = "token " .. Config.github.token,
+          ["User-Agent"   ] = "Ardoises",
+        },
+      }
+      assert (status == ngx.HTTP_OK, status)
+      branch.readme = readme
+    end
     -- update repository:
     context.redis:set (Keys.repository (repository), Json.encode (repository))
     -- update collaborators:

@@ -106,13 +106,16 @@ renderers.layers = Copas.addthread (function ()
       <% for _, layer in ipairs (layers) do %>
       <div class="list-group-item" id="layer-get-<%- layer.id %>">
         <%= layer.name %>
-        <% if editable then %>
         <span class="pull-right">
-          <button id="layer-delete-<%- layer.id %>" class="btn btn-sm btn-warning">
-            <i class="fa fa-trash" style="color: black;" aria-hidden="true"></i>
+          <button id="layer-close-<%- layer.id %>" class="btn btn-sm btn-warning hidden">
+            <i class="fa fa-times" aria-hidden="true"></i>
           </button>
+          <% if editable then %>
+          <button id="layer-delete-<%- layer.id %>" class="btn btn-sm btn-warning">
+            <i class="fa fa-trash" aria-hidden="true"></i>
+          </button>
+          <% end %>
         </span>
-        <% end %>
       </div>
       <% end %>
     ]], {
@@ -121,7 +124,9 @@ renderers.layers = Copas.addthread (function ()
     })
     do
       local link = _G.js.global.document:getElementById "layer-create"
-      link.onclick = function ()
+      link.onclick = function (_, event)
+        event:preventDefault  ()
+        event:stopPropagation ()
         local name = _G.js.global.document:getElementById "layer-name".value
         Copas.addthread (function ()
           active = {
@@ -134,7 +139,9 @@ renderers.layers = Copas.addthread (function ()
     end
     for _, layer in ipairs (layers) do
       local link = _G.js.global.document:getElementById ("layer-get-" .. tostring (layer.id))
-      link.onclick = function ()
+      link.onclick = function (_, event)
+        event:preventDefault  ()
+        event:stopPropagation ()
         Copas.addthread (function ()
           active = {
             module = layer.module,
@@ -146,8 +153,24 @@ renderers.layers = Copas.addthread (function ()
       end
     end
     for _, layer in ipairs (layers) do
+      local link = _G.js.global.document:getElementById ("layer-close-" .. tostring (layer.id))
+      link.onclick = function (_, event)
+        event:preventDefault  ()
+        event:stopPropagation ()
+        Copas.addthread (function ()
+          active = nil
+          Copas.wakeup (renderers.layers)
+          Copas.wakeup (renderers.ardoise)
+          Copas.wakeup (renderers.active)
+        end)
+        return false
+      end
+    end
+    for _, layer in ipairs (layers) do
       local link = _G.js.global.document:getElementById ("layer-delete-" .. tostring (layer.id))
-      link.onclick = function ()
+      link.onclick = function (_, event)
+        event:preventDefault  ()
+        event:stopPropagation ()
         _G.window:swal (tojs {
           title = Et.render ("Do you really want to delete <%- name %>?", layer),
           text  = "You will not be able to recover this layer!",
@@ -156,11 +179,13 @@ renderers.layers = Copas.addthread (function ()
           confirmButtonText = "Confirm",
           closeOnConfirm    = true,
         }, function ()
-          if active and active.module == layer.module then
-            active = nil
-          end
-          editor:delete (layer.module)
-          Copas.wakeup (renderers.ardoise)
+          Copas.addthread (function ()
+            if active and active.module == layer.module then
+              active = nil
+            end
+            editor:delete (layer.module)
+            Copas.wakeup (renderers.ardoise)
+          end)
         end)
         return false
       end
@@ -181,11 +206,14 @@ end)
 renderers.active = Copas.addthread (function ()
   while true do
     for _, layer in ipairs (layers) do
-      local link = _G.js.global.document:getElementById ("layer-get-" .. tostring (layer.id))
+      local link  = _G.js.global.document:getElementById ("layer-get-"   .. tostring (layer.id))
+      local close = _G.js.global.document:getElementById ("layer-close-" .. tostring (layer.id))
       if active and active.module == layer.module then
-        link.classList:add "active"
+        link.classList :add    "active"
+        close.classList:remove "hidden"
       else
-        link.classList:remove "active"
+        link.classList :remove "active"
+        close.classList:add    "hidden"
       end
     end
     Copas.sleep (-math.huge)
@@ -246,7 +274,7 @@ renderers.ardoise = Copas.addthread (function ()
         coroutine.resume (renderer)
         renderer = nil
       end
-      Ardoise.innerHTML = ""
+      Ardoise.innerHTML = ardoise.branch.readme
     end
     current = active and active.module
     Copas.sleep (-math.huge)

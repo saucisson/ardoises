@@ -10,7 +10,11 @@ return Common (function (request)
   request.protocol = "tlsv1_2"
   request.verify   = { "none" } -- FIXME
   local _, status, headers = Http.request (request)
-  print (status, headers)
+  local hs = {}
+  for key, value in pairs (headers) do
+    hs [key:lower ()] = value
+  end
+  headers = hs
   return {
     status  = status,
     headers = headers,

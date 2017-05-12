@@ -39,6 +39,11 @@ return Common (function (request, cache)
     url    = request.url,
   }))
   result = table.concat (result)
+  local hs = {}
+  for key, value in pairs (headers) do
+    hs [key:lower ()] = value
+  end
+  headers = hs
   if status == 304 then
     redis:expire (prefix .. json.request, delay)
     return json.answer

@@ -45,7 +45,13 @@ return function (what)
                or options.cache
     repeat
       local result = what (request, cache)
-      if result.body then
+      assert (result)
+      if result.body
+      and not result.headers ["content-type"] then
+        result.headers ["content-type"] = request.headers ["Accept"] or request.headers ["accept"]
+      end
+      if  result.body
+      and result.headers ["content-type"]:match "json" then
         local ok, json = pcall (Json.decode, result.body)
         if ok then
           result.body = json
@@ -54,7 +60,7 @@ return function (what)
       answer.status  = answer.status  or result.status
       answer.headers = answer.headers or result.headers
       if not answer.body then
-        answer.body  = result.body
+        answer.body = result.body
       else
         for _, entry in ipairs (result.body) do
           answer.body [#answer.body+1] = entry

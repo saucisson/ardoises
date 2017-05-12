@@ -23,9 +23,7 @@ return Common (function (request, cache)
       json.answer         = Json.decode (answer)
       json.answer.headers = json.answer.headers or {}
       request.headers ["If-None-Match"    ] = json.answer.headers ["etag"         ]
-                                           or json.answer.headers ["ETag"         ]
       request.headers ["If-Modified-Since"] = json.answer.headers ["last-modified"]
-                                           or json.answer.headers ["Last-Modified"]
     end
   end
   local client = Http.new ()
@@ -36,6 +34,11 @@ return Common (function (request, cache)
     status = result.status,
     url    = request.url,
   }))
+  local headers = {}
+  for key, value in pairs (result.headers) do
+    headers [key:lower ()] = value
+  end
+  result.headers = headers
   if result.status == 304 then
     redis:expire (prefix .. json.request, delay)
     return json.answer

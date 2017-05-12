@@ -101,60 +101,74 @@ output = Copas.addthread (function ()
             <div class="list-group-item">
               <div class="container-fluid">
                 <div class="row">
-                  <div class="col-sm-8">
-                    <a href="<%= ardoise.repository.html_url %>">
-                      <i class="fa fa-github" aria-hidden="true"></i>
-                      <span><%= ardoise.repository.full_name %>:</span>
-                    </a>
-                    <span><%= ardoise.repository.description or ""%></span>
-                  </div>
-                  <div class="col-sm-2">
-                    <% if ardoise.repository.owner.login == user then %>
-                      <a href="https://github.com/<%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>/settings/collaboration">
+                  <div class="col-sm-11">
+                    <div class="row">
+                      <div class="col-sm-8">
+                        <a href="<%= ardoise.repository.html_url %>">
+                          <i class="fa fa-github" aria-hidden="true"></i>
+                          <span><%= ardoise.repository.full_name %>:</span>
+                        </a>
+                        <span><%= ardoise.repository.description or ""%></span>
+                      </div>
+                      <div class="col-sm-2">
+                        <% if ardoise.repository.owner.login == user then %>
+                          <a href="https://github.com/<%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>/settings/collaboration">
+                            <div class="input-group input-group-sm">
+                              <span class="input-group-addon">
+                                <i class="fa fa-users"></i>
+                              </span>
+                              <span class="input-group-btn">
+                                <button type="button" class="btn btn-primary">
+                                  Share!
+                                </button>
+                              </span>
+                            </div>
+                          </a>
+                        <% end %>
+                      </div>
+                      <div class="col-sm-2">
                         <div class="input-group input-group-sm">
                           <span class="input-group-addon">
-                            <i class="fa fa-users"></i>
+                            <i class="fa fa-pencil"></i>
                           </span>
-                          <span class="input-group-btn">
-                            <button type="button" class="btn btn-primary">
-                              Share!
-                            </button>
+                          <span class="input-group-addon">
+                            <% if ardoise.collaborator.permissions.push then %>
+                            <i class="fa fa-check text-success"></i>
+                            <% else %>
+                            <i class="fa fa-ban text-warning"></i>
+                            <% end %>
                           </span>
                         </div>
-                      </a>
-                    <% end %>
-                  </div>
-                  <div class="col-sm-2">
-                    <div class="input-group input-group-sm">
-                      <span class="input-group-addon">
-                        <i class="fa fa-pencil"></i>
-                      </span>
-                      <span class="input-group-addon">
-                        <% if ardoise.collaborator.permissions.push then %>
-                        <i class="fa fa-check text-success"></i>
-                        <% else %>
-                        <i class="fa fa-ban text-warning"></i>
-                        <% end %>
-                      </span>
+                      </div>
+                      <div class="row">
+                        <div class="col-sm-12">
+                          <div class="input-group input-group-sm">
+                          <% for _, branch in ipairs (ardoise.repository.branches) do %>
+                          <% if not branch.protected then %>
+                            <a href="/views/<%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>/<%- branch.name %>"
+                              aria-label="Editor for <%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>:<%- branch.name %>">
+                              <span class="input-group-btn">
+                                <button type="button" class="btn btn-primary">
+                                  <%= branch.name %>
+                                </button>
+                              </span>
+                            </a>
+                          <% end %>
+                          <% end %>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="row">
+                        <div class="col-sm-12 hidden" id="ardoise-readme-<%- ardoise.repository.id %>">
+                          <%- ardoise.repository.readme %>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div class="row">
-                  <div class="col-sm-12">
-                    <div class="input-group input-group-sm">
-                    <% for _, branch in ipairs (ardoise.repository.branches) do %>
-                    <% if not branch.protected then %>
-                      <a href="/views/<%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>/<%- branch.name %>"
-                        aria-label="Editor for <%- ardoise.repository.owner.login %>/<%- ardoise.repository.name %>:<%- branch.name %>">
-                        <span class="input-group-btn">
-                          <button type="button" class="btn btn-primary">
-                            <%= branch.name %>
-                          </button>
-                        </span>
-                      </a>
-                    <% end %>
-                    <% end %>
-                    </div>
+                  <div class="col-sm-1">
+                    <button id="ardoise-more-<%- ardoise.repository.id %>" class="btn btn-sm btn-warning">
+                      <i class="fa fa-chevron-left rotate" aria-hidden="true" ></i>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -167,6 +181,23 @@ output = Copas.addthread (function ()
       ardoises = filtered,
       user     = _G.configuration.user.login,
     })
+    for _, ardoise in ipairs (filtered) do
+      local more    = _G.js.global.document:getElementById ("ardoise-more-"   .. tostring (ardoise.repository.id))
+      local readme  = _G.js.global.document:getElementById ("ardoise-readme-" .. tostring (ardoise.repository.id))
+      local chevron = more:getElementsByClassName "fa-chevron-left" [0]
+      more.onclick = function ()
+        if ardoise.detailed then
+          chevron.classList:remove "down"
+          readme .classList:add    "hidden"
+          ardoise.detailed = false
+        else
+          chevron.classList:add    "down"
+          readme .classList:remove "hidden"
+          ardoise.detailed = true
+        end
+        return false
+      end
+    end
     Copas.sleep (-math.huge)
   end
 end)

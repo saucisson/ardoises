@@ -75,3 +75,16 @@ a:active {
   color: DarkOrange;
   text-decoration: none;
 }
+
+/* http://stackoverflow.com/questions/26173376/rotate-font-awesome-icon-on-click */
+.rotate {
+  -moz-transition: all .2s linear;
+  -webkit-transition: all .2s linear;
+  transition: all .2s linear;
+}
+.rotate.down {
+  -ms-transform:rotate(-90deg);
+  -moz-transform:rotate(-90deg);
+  -webkit-transform:rotate(-90deg);
+  transform:rotate(-90deg);
+}

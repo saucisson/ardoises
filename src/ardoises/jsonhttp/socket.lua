@@ -17,6 +17,11 @@ return Common (function (request)
     url    = request.url,
   }))
   result = table.concat (result)
+  local hs = {}
+  for key, value in pairs (headers) do
+    hs [key:lower ()] = value
+  end
+  headers = hs
   return {
     status  = status,
     headers = headers,
