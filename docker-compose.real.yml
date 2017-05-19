@@ -15,6 +15,7 @@ services:
     entrypoint: lua -l ardoises.util.clean
     volumes:
       - ./src/ardoises:/usr/share/lua/5.1/ardoises
+      - /etc/ardoises:/etc/ardoises
   invitation:
     build:
       context: .
@@ -22,6 +23,7 @@ services:
     entrypoint: lua -l ardoises.util.invitation
     volumes:
       - ./src/ardoises:/usr/share/lua/5.1/ardoises
+      - /etc/ardoises:/etc/ardoises
   limits:
     build:
       context: .
@@ -29,6 +31,7 @@ services:
     entrypoint: lua -l ardoises.util.limits
     volumes:
       - ./src/ardoises:/usr/share/lua/5.1/ardoises
+      - /etc/ardoises:/etc/ardoises
   populate:
     build:
       context: .
@@ -36,6 +39,7 @@ services:
     entrypoint: lua -l ardoises.util.populate
     volumes:
       - ./src/ardoises:/usr/share/lua/5.1/ardoises
+      - /etc/ardoises:/etc/ardoises
   webhook:
     build:
       context: .
@@ -43,6 +47,7 @@ services:
     entrypoint: lua -l ardoises.util.webhook
     volumes:
       - ./src/ardoises:/usr/share/lua/5.1/ardoises
+      - /etc/ardoises:/etc/ardoises
   ardoises:
     build:
       context: .
