@@ -1021,8 +1021,9 @@ Server.webhook = wrap (function (context)
         ["User-Agent"   ] = "Ardoises",
       },
     }
-    assert (status == ngx.HTTP_OK, status)
-    repository.readme = readme
+    if status == ngx.HTTP_OK then
+      repository.readme = readme
+    end
     -- get branches:
     local branches
     branches, status = Http {
@@ -1048,8 +1049,9 @@ Server.webhook = wrap (function (context)
           ["User-Agent"   ] = "Ardoises",
         },
       }
-      assert (status == ngx.HTTP_OK, status)
-      branch.readme = readme
+      if status == ngx.HTTP_OK then
+        branch.readme = readme
+      end
     end
     -- update repository:
     context.redis:set (Keys.repository (repository), Json.encode (repository))
