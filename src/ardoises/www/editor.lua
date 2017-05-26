@@ -13,20 +13,12 @@ local Coromake = require "coroutine.make"
 local Client   = require "ardoises.client"
 local Et       = require "etlua"
 local Layer    = require "layeredata"
-local client   = Client {
-  server = _G.configuration.server,
-  token  = _G.configuration.user.tokens.ardoises,
-}
 
-local branch  = Et.render ("<%- owner %>/<%- repository %>:<%- branch %>", {
+local branch = Et.render ("<%- owner %>/<%- repository %>:<%- branch %>", {
   owner      = _G.configuration.repository.owner.login,
   repository = _G.configuration.repository.name,
   branch     = _G.configuration.branch,
 })
-local ardoise = assert (client.ardoises [branch])
-local editor  = ardoise:edit ()
-progress.finished = true
-
 local Content = _G.js.global.document:getElementById "content"
 Content.innerHTML = Et.render ([[
   <section>
@@ -48,6 +40,19 @@ Content.innerHTML = Et.render ([[
 ]], {
   branch = branch,
 })
+
+local Layers  = _G.js.global.document:getElementById "layers"
+local Ardoise = _G.js.global.document:getElementById "ardoise"
+local active  = nil
+local layers  = {}
+local client  = Client {
+  server = _G.configuration.server,
+  token  = _G.configuration.user.tokens.ardoises,
+}
+local ardoise     = assert (client.ardoises [branch])
+Ardoise.innerHTML = ardoise.branch.readme
+local editor      = ardoise:edit ()
+progress.finished = true
 
 Copas.addthread (function ()
   while true do
@@ -71,11 +76,6 @@ Copas.addthread (function ()
     end
   end
 end)
-
-local Layers  = _G.js.global.document:getElementById "layers"
-local Ardoise = _G.js.global.document:getElementById "ardoise"
-local active  = nil
-local layers  = {}
 
 local renderers = {
   layers  = nil,
