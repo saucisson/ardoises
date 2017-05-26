@@ -14,40 +14,40 @@ services:
       dockerfile: docker/Dockerfile-noresty
     entrypoint: lua -l ardoises.util.clean
     volumes:
-      - ./src/ardoises:/usr/share/lua/5.1/ardoises
-      - /etc/ardoises:/etc/ardoises
+      - ./src:/usr/share/lua/5.1/ardoises
+      - ./etc/ardoises:/etc/ardoises
   invitation:
     build:
       context: .
       dockerfile: docker/Dockerfile-noresty
     entrypoint: lua -l ardoises.util.invitation
     volumes:
-      - ./src/ardoises:/usr/share/lua/5.1/ardoises
-      - /etc/ardoises:/etc/ardoises
+      - ./src:/usr/share/lua/5.1/ardoises
+      - ./etc/ardoises:/etc/ardoises
   limits:
     build:
       context: .
       dockerfile: docker/Dockerfile-noresty
     entrypoint: lua -l ardoises.util.limits
     volumes:
-      - ./src/ardoises:/usr/share/lua/5.1/ardoises
-      - /etc/ardoises:/etc/ardoises
+      - ./src:/usr/share/lua/5.1/ardoises
+      - ./etc/ardoises:/etc/ardoises
   populate:
     build:
       context: .
       dockerfile: docker/Dockerfile-noresty
     entrypoint: lua -l ardoises.util.populate
     volumes:
-      - ./src/ardoises:/usr/share/lua/5.1/ardoises
-      - /etc/ardoises:/etc/ardoises
+      - ./src:/usr/share/lua/5.1/ardoises
+      - ./etc/ardoises:/etc/ardoises
   webhook:
     build:
       context: .
       dockerfile: docker/Dockerfile-noresty
     entrypoint: lua -l ardoises.util.webhook
     volumes:
-      - ./src/ardoises:/usr/share/lua/5.1/ardoises
-      - /etc/ardoises:/etc/ardoises
+      - ./src:/usr/share/lua/5.1/ardoises
+      - ./etc/ardoises:/etc/ardoises
   ardoises:
     build:
       context: .
@@ -59,6 +59,6 @@ services:
     volumes:
       - ./data:/data
       - ./static:/static
-      - ./src/ardoises:/usr/share/lua/5.1/ardoises
-      - /etc/letsencrypt:/etc/letsencrypt
-      - /etc/ardoises:/etc/ardoises
+      - ./src:/usr/share/lua/5.1/ardoises
+      - ./etc/letsencrypt:/etc/letsencrypt
+      - ./etc/ardoises:/etc/ardoises
