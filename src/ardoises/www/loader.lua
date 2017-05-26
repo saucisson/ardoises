@@ -100,6 +100,34 @@ package.preload ["progressbar"] = function ()
       Copas.sleep (0.5)
       Content.innerHTML = ""
     end)
+    Copas.addthread (function ()
+      Copas.sleep (2 * progress.expected)
+      if progress.finished then
+        Content.innerHTML = ""
+        return
+      end
+      Content.innerHTML = [[
+        <section>
+          <div class="container-fluid">
+            <div class="row">
+              <div class="col-sm-12 col-md-8 col-md-offset-2">
+                <div class="alert alert-danger">
+                  <p><strong>It takes too long...</strong></p>
+                  <p>We will try to reload this page.
+                  If the problem persists, <a href="https://gitter.im/ardoises/Lobby">please contact us</a>.
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      ]]
+      Copas.sleep (5)
+      if progress.finished then
+        Content.innerHTML = ""
+        return
+      end
+      _G.js.global.location:reload ()
+    end)
     return progress
   end
   return Progress
