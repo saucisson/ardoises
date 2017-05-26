@@ -417,8 +417,9 @@ function Editor.list (editor)
     Copas.wakeup (co)
   end
   assert (editor:send (request))
-  Copas.sleep (-math.huge)
-  assert (request.answer)
+  repeat
+    Copas.sleep (-math.huge)
+  until request.answer
   local coroutine = Coromake ()
   return coroutine.wrap (function ()
     for name, module in pairs (request.answer) do
