@@ -160,7 +160,7 @@ output = Copas.addthread (function ()
                       </div>
                       <div class="row">
                         <div class="col-sm-12 hidden" id="ardoise-readme-<%- ardoise.repository.id %>">
-                          <%- ardoise.repository.readme %>
+                          <%- ardoise.repository.readme or "" %>
                         </div>
                       </div>
                     </div>

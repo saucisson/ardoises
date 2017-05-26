@@ -99,7 +99,9 @@ renderers.layers = Copas.addthread (function ()
       <div class="list-group-item">
         <div class="input-group">
           <input id="layer-name" type="text" class="form-control" placeholder="New module" />
-          <span id="layer-create" class="input-group-addon"><i class="fa fa-plus fa-inverse" aria-hidden="true"></i></span>
+          <span id="layer-create" class="input-group-addon">
+            <i class="fa fa-plus fa-inverse" aria-hidden="true"></i>
+          </span>
         </div>
       </div>
       <% end %>
