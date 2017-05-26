@@ -111,7 +111,7 @@ output = Copas.addthread (function ()
             <div class="list-group-item">
               <div class="container-fluid">
                 <div class="row">
-                  <div class="col-sm-11">
+                  <div class="col-sm-12">
                     <div class="row">
                       <div class="col-sm-8">
                         <a href="<%= ardoise.repository.html_url %>">
@@ -168,22 +168,8 @@ output = Copas.addthread (function ()
                           </div>
                         </div>
                       </div>
-                      <% if ardoise.repository.readme then %>
-                      <div class="row">
-                        <div class="col-sm-12 <% if not detailed [ardoise.repository.id] then %>hidden<% end %>" id="ardoise-readme-<%- ardoise.repository.id %>">
-                          <%- ardoise.repository.readme or "" %>
-                        </div>
-                      </div>
-                      <% end %>
                     </div>
                   </div>
-                  <% if ardoise.repository.readme then %>
-                  <div class="col-sm-1">
-                    <button id="ardoise-more-<%- ardoise.repository.id %>" class="btn btn-sm btn-warning">
-                      <i class="fa <% if detailed [ardoise.repository.id] then %>fa-chevron-down<% else %>fa-chevron-left <% end %> rotate" aria-hidden="true" ></i>
-                    </button>
-                  </div>
-                  <% end %>
                 </div>
               </div>
             </div>
@@ -196,25 +182,6 @@ output = Copas.addthread (function ()
       user     = _G.configuration.user.login,
       detailed = detailed,
     })
-    for _, ardoise in ipairs (filtered) do
-      local more    = _G.js.global.document:getElementById ("ardoise-more-"   .. tostring (ardoise.repository.id))
-      local readme  = _G.js.global.document:getElementById ("ardoise-readme-" .. tostring (ardoise.repository.id))
-      if more and readme then
-        local chevron = more:getElementsByClassName "fa-chevron-left" [0]
-        more.onclick = function ()
-          if detailed [ardoise.repository.id] then
-            chevron.classList:remove "down"
-            readme .classList:add    "hidden"
-            detailed [ardoise.repository.id] = nil
-          else
-            chevron.classList:add    "down"
-            readme .classList:remove "hidden"
-            detailed [ardoise.repository.id] = true
-          end
-          return false
-        end
-      end
-    end
     Copas.sleep (-math.huge)
   end
 end)
