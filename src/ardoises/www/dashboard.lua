@@ -49,10 +49,15 @@ Content.innerHTML = [[
 
 local Input    = _G.js.global.document:getElementById "search"
 local Ardoises = _G.js.global.document:getElementById "ardoises"
+local ardoises
 
 Copas.addthread (function ()
   while true do
     Copas.sleep (30) -- seconds
+    ardoises = {}
+    for ardoise in client:ardoises () do
+      ardoises [#ardoises+1] = ardoise
+    end
     Copas.wakeup (output)
   end
 end)
@@ -67,12 +72,16 @@ Copas.addthread (function ()
   end
 end)
 
+ardoises = {}
+for ardoise in client:ardoises () do
+  ardoises [#ardoises+1] = ardoise
+end
 output = Copas.addthread (function ()
   local detailed = {}
   while true do
     local seen     = {}
     local filtered = {}
-    for ardoise in client:ardoises () do
+    for _, ardoise in ipairs (ardoises) do
       ardoise.repository.description = ardoise.repository.description or ""
       if not seen [ardoise.repository.full_name]
       and (ardoise.repository.full_name  :match (Input.value)
