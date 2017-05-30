@@ -65,5 +65,4 @@ RUN apk add --no-cache --virtual .build-deps \
 ENTRYPOINT ["/bin/bash"]
 CMD ["-c"]
 ENV PATH /usr/local/openresty/bin/:/usr/local/openresty/nginx/sbin/:$PATH
-VOLUME ["/static", "/etc/letsencrypt"]
 EXPOSE 80 443
