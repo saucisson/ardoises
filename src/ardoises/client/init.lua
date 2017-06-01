@@ -73,8 +73,6 @@ function Mt.__call (_, options)
     token    = token,
     user     = user,
     headers  = headers,
-    -- ardoises = setmetatable ({}, Ardoises),
-    -- tools    = setmetatable ({}, Tools),
   }, Client)
   client.ardoises = setmetatable ({
     client = client,
