@@ -47,11 +47,12 @@ Data.tag = setmetatable ({
   computing = setmetatable ({ name = "computing" }, Key),
 }, Read_Only)
 
-Data.coroutine  = Coromake ()
-Data.hidden     = setmetatable ({}, IgnoreKeys  )
-Data.loaded     = setmetatable ({}, IgnoreValues)
-Data.children   = setmetatable ({}, IgnoreKeys  )
-Data.references = setmetatable ({}, IgnoreKeys  )
+Data.coroutine    = Coromake ()
+Data.hidden       = setmetatable ({}, IgnoreKeys  )
+Data.loaded       = setmetatable ({}, IgnoreValues)
+Data.children     = setmetatable ({}, IgnoreKeys  )
+Data.references   = setmetatable ({}, IgnoreKeys  )
+Data.replacements = setmetatable ({}, { __mode = "k" })
 
 function Data.new (t)
   assert (t == nil or type (t) == "table")
@@ -62,10 +63,9 @@ function Data.new (t)
   Data.hidden [layer] = {
     name         = t.name      or Uuid (),
     above        = t.above     or nil,
-    data         = t.data      or {},
     write_to     = t.write_to  or nil,
+    data         = Data.convert (t.data or {}),
     observers    = {},
-    replacements = setmetatable ({}, { __mode = "k" }),
   }
   local hidden = Data.hidden [layer]
   local ref
@@ -132,8 +132,7 @@ end
 function Data.replace (proxy, with)
   assert (getmetatable (proxy) == Proxy)
   assert (getmetatable (with ) == Proxy or with == nil)
-  local layer = Data.hidden [proxy].layer
-  Data.hidden [layer].replacements [proxy] = with
+  Data.replacements [proxy] = with
 end
 
 function Data.ref (proxy)
@@ -378,6 +377,29 @@ function Data.merge (source, target)
   iterate (Data.hidden [source].data, target)
 end
 
+function Data.convert (x)
+  if getmetatable (x) == Proxy then
+    return Data.replacements [x] or x
+  elseif getmetatable (x) == Reference then
+    return x
+  elseif x == Data.key.checks
+      or x == Data.key.defaults
+      or x == Data.key.deleted
+      or x == Data.key.labels
+      or x == Data.key.meta
+      or x == Data.key.refines then
+    return x
+  elseif type (x) == "table" then
+    local result = {}
+    for k, v in pairs (x) do
+      result [Data.convert (k)] = Data.convert (v)
+    end
+    return result
+  else
+    return x
+  end
+end
+
 -- ----------------------------------------------------------------------
 -- ## Observers
 -- ----------------------------------------------------------------------
@@ -448,8 +470,7 @@ end
 function Proxy.child (proxy, key)
   assert (getmetatable (proxy) == Proxy)
   assert (key ~= nil)
-  local layer = Data.hidden [proxy].layer
-  key         = Data.hidden [layer].replacements [key] or key
+  key         = Data.convert (key)
   local found = Data.children [proxy]
             and Data.children [proxy] [key]
   if found then
@@ -589,10 +610,11 @@ function Proxy.__newindex (proxy, key, value)
         or getmetatable (key) == Proxy
         or getmetatable (key) == Reference
         or getmetatable (key) == Key)
+  key             = Data.convert (key)
+  value           = Data.convert (value)
   local layer     = Data.hidden [proxy].layer
   local info      = Data.hidden [layer]
   local keys      = Data.hidden [proxy].keys
-  key             = Data.hidden [layer].replacements [key] or key
   local coroutine = Coromake ()
   local observers = {}
   for observer in pairs (info.observers) do

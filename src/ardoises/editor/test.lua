@@ -94,7 +94,9 @@ Copas.addthread (function ()
   if arguments.require then
     io.write ("Loading " .. arguments.require .. "...")
     io.flush ()
-    local ok, err = editor:require (arguments.require .. "@-/-:" .. arguments.port)
+    local ardoise = client.ardoises ["-/-:" .. domain]
+    local ceditor = ardoise:edit ()
+    local ok, err = ceditor:require (arguments.require .. "@-/-:" .. arguments.port)
     if ok then
       print (" success.")
     else
