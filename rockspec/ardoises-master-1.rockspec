@@ -17,6 +17,7 @@ dependencies = {
   "lua >= 5.1",
   "argparse",
   "basexx",
+  "c3",
   "copas",
   "coronest",
   "dkjson",
@@ -24,7 +25,6 @@ dependencies = {
   "hashids",
   "jwt",
   "lpeg",
-  "layeredata",
   "luaossl",
   "luaposix",
   "luasec",
@@ -37,6 +37,7 @@ dependencies = {
   "net-url",
   "rapidjson",
   "redis-lua",
+  "uuid",
 }
 
 build = {
@@ -53,6 +54,7 @@ build = {
     ["ardoises.editor"               ] = "src/ardoises/editor/init.lua",
     ["ardoises.editor.bin"           ] = "src/ardoises/editor/bin.lua",
     ["ardoises.editor.test"          ] = "src/ardoises/editor/test.lua",
+    ["ardoises.data"                 ] = "src/ardoises/data/init.lua",
     ["ardoises.sandbox"              ] = "src/ardoises/sandbox.lua",
     ["ardoises.server"               ] = "src/ardoises/server/init.lua",
     ["ardoises.server.keys"          ] = "src/ardoises/server/keys.lua",

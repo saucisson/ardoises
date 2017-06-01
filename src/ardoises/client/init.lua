@@ -1,9 +1,9 @@
 local Coromake  = require "coroutine.make"
 local Copas     = require "copas"
+local Data      = require "ardoises.data"
 local Gettime   = os.time
 local Http      = require "ardoises.jsonhttp.copas"
 local Json      = require "rapidjson"
-local Layer     = require "layeredata"
 local Lustache  = require "lustache"
 local Patterns  = require "ardoises.patterns"
 local Sandbox   = require "ardoises.sandbox"
@@ -351,7 +351,7 @@ function Ardoise.edit (ardoise)
     return nil, "authentication failure"
   end
   local editor = setmetatable ({
-    Layer       = setmetatable ({}, { __index = Layer }),
+    Data        = setmetatable ({}, { __index = Data }),
     ardoise     = ardoise,
     client      = client,
     url         = info.editor_url,
@@ -374,7 +374,7 @@ function Ardoise.edit (ardoise)
       pcall (Editor.answer, editor)
     end
   end)
-  editor.Layer.require = function (name)
+  editor.Data.require = function (name)
     if not Patterns.require:match (name) then
       name = name .. "@" .. assert (editor.current)
     end
@@ -470,21 +470,20 @@ function Editor.require (editor, name)
   if not ok then
     return nil, "invalid layer: " .. tostring (chunk)
   end
-  local remote, ref = Layer.new {
+  local remote, ref = Data.new {
     name = module.name,
   }
   local oldcurrent = editor.current
   editor.current   = Lustache:render ("{{{owner}}}/{{{repository}}}:{{{branch}}}", module)
-  local ok_apply, err_apply = pcall (chunk, editor.Layer, remote, ref)
+  local ok_apply, err_apply = pcall (chunk, editor.Data, remote, ref)
   if not ok_apply then
     return nil, "invalid layer: " .. tostring (err_apply)
   end
   editor.current = oldcurrent
-  local layer = Layer.new {
-    temporary = true,
+  local layer = Data.new {
+    above = remote,
   }
-  layer [Layer.key.refines] = { remote }
-  Layer.write_to (layer, false) -- read-only
+  Data.write_to (layer, false) -- read-only
   editor.modules [module.name] = {
     name   = module.name,
     layer  = layer,
@@ -507,26 +506,25 @@ function Editor.create (editor, name)
   if editor.modules [module.name] then
     return nil, "module exists already"
   end
-  local remote, ref = Layer.new {
+  local remote, ref = Data.new {
     name = module.name,
   }
-  local layer = Layer.new {
-    temporary = true,
+  local layer = Data.new {
+    above = remote,
   }
-  layer [Layer.key.refines] = { remote }
-  Layer.write_to (layer, false) -- read-only
+  Data.write_to (layer, false) -- read-only
   editor.modules [module.name] = {
     name   = module.name,
     layer  = layer,
     remote = remote,
     ref    = ref,
-    code   = [[return function (Layer, layer, ref) end]],
+    code   = [[return function (Data, layer, ref) end]],
   }
   local request = {
     id     = #editor.requests+1,
     type   = "create",
     module = module.name,
-    code   = [[return function (Layer, layer, ref) end]],
+    code   = [[return function (Data, layer, ref) end]],
   }
   editor.requests  [request.id] = request
   editor.callbacks [request.id] = function ()
@@ -569,116 +567,46 @@ function Editor.delete (editor, name)
   return true
 end
 
-function Editor.patch (editor, what)
+function Editor.patch (editor, module, f)
   assert (getmetatable (editor) == Editor)
-  if type (what) ~= "table" then
-    return nil, "argument must be a table"
+  assert (type (f) == "function")
+  local patch = Data.new {}
+  do
+    Data.write_to (module.layer, nil)
+    local refines = module.layer [Data.key.refines]
+    refines [Data.len (refines)+1] = patch
+    Data.write_to (module.layer, patch)
   end
-  local modules = {}
-  local function rollback ()
-    for _, module in pairs (editor.modules) do
-      if type (module) == "table" then
-        if module.current then
-          Layer.write_to (module.layer, nil)
-          local refines = module.layer [Layer.key.refines]
-          refines [Layer.len (refines)] = nil
+  local ok, err = pcall (function ()
+    assert (pcall (f, editor.Data, module.layer, module.ref))
+    local request = {
+      id      = #editor.requests+1,
+      type    = "patch",
+      module  = module.name,
+      code    = Data.dump (patch),
+    }
+    editor.requests  [request.id] = request
+    editor.callbacks [request.id] = function ()
+      assert (request.success, request.error)
+      assert (pcall (f, editor.Data, module.remote, module.ref))
+      module.code = Data.dump (module.remote)
+    end
+    assert (editor:send (request))
+  end)
+  do
+    Data.write_to (module.layer, nil)
+    local refines = module.layer [Data.key.refines]
+    for i, l in ipairs (refines or {}) do
+      if l == patch then
+        for j = i+1, #refines do
+          refines [j-1] = refines [j]
         end
-        Layer.write_to (module.layer, false)
-        module.current = nil
+        refines [#refines] = nil
       end
     end
+    Data.write_to (module.layer, false)
   end
-  for name, code in pairs (what) do
-    if  not Patterns.require:match (name)
-    and Patterns.module:match (name) then
-      name = name .. "@" .. assert (editor.current)
-    end
-    local module = editor:require (name)
-    if not module then
-      return nil, "unknown module: " .. tostring (name)
-    end
-    if type (code) == "string" then
-      local chunk, err_chunk = _G.load (code, name, "t", Sandbox)
-      if not chunk then
-        return nil, "invalid patch: " .. tostring (err_chunk)
-      end
-      local ok_loaded, loaded = pcall (chunk)
-      if not ok_loaded then
-        return nil, "invalid patch: " .. tostring (loaded)
-      end
-      code = loaded
-    elseif type (code) == "function" then
-      code = code
-    end
-    module.current = Layer.new {
-      temporary = true,
-    }
-    modules [module] = {
-      code    = code,
-      current = module.current,
-    }
-    Layer.write_to (module.layer, nil)
-    local refines = module.layer [Layer.key.refines]
-    refines [Layer.len (refines)+1] = module.current
-    Layer.write_to (module.layer, module.current)
-    local ok_apply, err_apply = pcall (code, editor.Layer, module.layer, module.ref)
-    Layer.write_to (module.layer, false)
-    if not ok_apply then
-      rollback ()
-      return nil, err_apply
-    end
-  end
-  -- send patches
-  local request = {
-    id      = #editor.requests+1,
-    type    = "patch",
-    patches = {},
-  }
-  for module in pairs (modules) do
-    local dumped, err = Layer.dump (module.current)
-    if not dumped then
-      rollback ()
-      return nil, "unable to dump patch: " .. tostring (err)
-    end
-    request.patches [#request.patches+1] = {
-      module = module.name,
-      code   = dumped,
-    }
-    module.current = nil
-  end
-  editor.requests  [request.id] = request
-  editor.callbacks [request.id] = function ()
-    for module, t in pairs (modules) do
-      Layer.write_to (module.layer, nil)
-      local refines = module.layer [Layer.key.refines]
-      for i, l in ipairs (refines or {}) do
-        if t.current == l then
-          for j = i+1, #refines do
-            refines [j-1] = refines [j]
-          end
-          refines [#refines] = nil
-        end
-      end
-      Layer.write_to (module.layer, false)
-    end
-    if not request.success then
-      return nil, request.error
-    end
-    for module, t in pairs (modules) do
-      local layer   = Layer.new { temporary = true }
-      local current = Layer.new { temporary = true }
-      layer [Layer.key.refines] = {
-        module.remote,
-        current,
-      }
-      Layer.write_to (layer, current)
-      t.code (editor.Layer, layer, module.ref)
-      Layer.merge (current, module.remote)
-      module.code = Layer.dump (module.remote)
-    end
-  end
-  assert (editor:send (request))
-  return true
+  return ok, err
 end
 
 function Editor.answer (editor)
@@ -711,28 +639,18 @@ function Editor.answer (editor)
   elseif message.type == "delete" then
     editor.modules [message.module] = nil
   elseif message.type == "patch" then
-    for _, patch in ipairs (message.patches) do
-      local module = editor.modules [patch.module]
-      if module then
-        local chunk, err_chunk = _G.load (patch.code, module.name, "t", Sandbox)
-        if not chunk then
-          return nil, "invalid patch: " .. tostring (err_chunk)
-        end
-        local ok_loaded, loaded = pcall (chunk)
-        if not ok_loaded then
-          return nil, "invalid patch: " .. tostring (loaded)
-        end
-        local layer   = Layer.new { temporary = true }
-        local current = Layer.new { temporary = true }
-        layer [Layer.key.refines] = {
-          module.remote,
-          current,
-        }
-        Layer.write_to (layer, current)
-        loaded (editor.Layer, layer, module.ref)
-        Layer.merge (current, module.remote)
-        module.code = Layer.dump (module.remote)
+    local module = editor.modules [message.module]
+    if module then
+      local chunk, err_chunk = _G.load (message.code, module.name, "t", Sandbox)
+      if not chunk then
+        return nil, "invalid patch: " .. tostring (err_chunk)
       end
+      local ok_loaded, loaded = pcall (chunk)
+      if not ok_loaded then
+        return nil, "invalid patch: " .. tostring (loaded)
+      end
+      loaded (editor.Data, module.remote, module.ref)
+      module.code = Data.dump (module.remote)
     end
   end
   for observer in pairs (editor.observers) do
@@ -753,7 +671,7 @@ function Editor.events (editor, t)
     for name, f in pairs (t or {}) do
       local module = editor:require (name)
       if module then
-        what.observers [#what.observers+1] = Layer.observe (module.remote, function (_coroutine, proxy, key, value)
+        what.observers [#what.observers+1] = Data.observe (module.remote, function (_coroutine, proxy, key, value)
           if f == true or f (proxy, key, value) then
             local r = {
               type      = "update",

@@ -1,12 +1,21 @@
 local Url = require "net.url"
 local Data
 
-do
-  local file = assert (io.open ("/etc/ardoises/config.lua", "r"))
-  local data = assert (file:read "*a")
-  file:close ()
-  Data = assert (_G.load (data, "/etc/ardoises/config.lua")) ()
+for _, filename in ipairs {
+  "/etc/ardoises/config.lua",
+  "./etc/ardoises/config.lua",
+  os.getenv "HOME" and os.getenv "HOME" .. "/.ardoises/config.lua",
+} do
+  if pcall (function ()
+    local file = assert (io.open (filename, "r"))
+    local data = assert (file:read "*a")
+    file:close ()
+    Data = assert (_G.load (data, filename)) ()
+  end) then
+    break
+  end
 end
+assert (Data, "no configuration file found")
 
 local result = {
   ardoises = {

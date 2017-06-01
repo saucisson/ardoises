@@ -6,6 +6,9 @@ _G.print = function (...)
   io.stdout:flush ()
 end
 
+local setenv = require "posix.stdlib".setenv
+setenv ("HOSTNAME", "localhost")
+
 local Arguments = require "argparse"
 local Basexx    = require "basexx"
 local Client    = require "ardoises.client"
@@ -43,6 +46,9 @@ parser:option "--ardoises" {
     return url
   end,
 }
+parser:option "--require" {
+  description = "module to require",
+}
 
 local arguments = parser:parse ()
 
@@ -55,7 +61,7 @@ Copas.addthread (function ()
     ardoises     = arguments.ardoises,
     branch       = Patterns.branch:match ("-/-:" .. arguments.port),
     timeout      = 600,
-    token        = client.user.tokens.github,
+    token        = Config.github.token,
     port         = arguments.port,
     application  = "Ardoises",
     nopush       = true,
@@ -85,5 +91,15 @@ Copas.addthread (function ()
     port   = arguments.ardoises.port,
     domain = domain,
   }))
+  if arguments.require then
+    io.write ("Loading " .. arguments.require .. "...")
+    io.flush ()
+    local ok, err = editor:require (arguments.require .. "@-/-:" .. arguments.port)
+    if ok then
+      print (" success.")
+    else
+      print (" failure: " .. err)
+    end
+  end
 end)
 Copas.loop ()

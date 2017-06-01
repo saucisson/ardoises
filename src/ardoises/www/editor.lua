@@ -11,8 +11,9 @@ _G.js.global.document.head:appendChild (script)
 
 local Coromake = require "coroutine.make"
 local Client   = require "ardoises.client"
+local Data     = require "ardoises.data"
 local Et       = require "etlua"
-local Layer    = require "layeredata"
+local Sandbox  = require "ardoises.sandbox"
 
 local branch = Et.render ("<%- owner %>/<%- repository %>:<%- branch %>", {
   owner      = _G.configuration.repository.owner.login,
@@ -242,8 +243,8 @@ renderers.ardoise = Copas.addthread (function ()
       local _ = true -- do nothing
     elseif edited and current ~= active.module then
       Ardoise.innerHTML = ""
-      local togui  = edited.layer [Layer.key.meta]
-                 and edited.layer [Layer.key.meta] [interaction.gui]
+      local togui  = edited.layer [Data.key.meta]
+                 and edited.layer [Data.key.meta] [interaction.gui]
                   or default_togui
       local coroutine = Coromake ()
       local co        = coroutine.create (togui)
@@ -292,7 +293,7 @@ default_togui = function (parameters)
   local edited        = editor:require (module)
   local running       = true
   local default_patch = [[
-return function (Layer, layer, ref)
+return function (Data, layer, ref)
   -- Write your patch here...
   ...
 end
@@ -400,22 +401,42 @@ end
     local save = Copas.addthread (function ()
       while running do
         Copas.sleep (-math.huge)
-        local ok, err = editor:patch {
-          [module] = patch:getValue (),
-        }
-        if ok then
-          patch:setValue (default_patch)
-          patch:gotoLine (3, 5, true)
-          patch:focus ()
-        else
-          patch:getSession ():setAnnotations (tojs {
-            { row    = 0,
-              column = 0,
-              text   = tostring (err),
-              type   = "error",
-            },
-          })
-        end
+        pcall (function ()
+          local chunk, err_chunk = _G.load (patch:getValue (), module.name, "t", Sandbox)
+          if not chunk then
+            return patch:getSession ():setAnnotations (tojs {
+              { row    = 0,
+                column = 0,
+                text   = tostring (err_chunk),
+                type   = "error",
+              },
+            })
+          end
+          local ok_loaded, loaded = pcall (chunk)
+          if not ok_loaded then
+            return patch:getSession ():setAnnotations (tojs {
+              { row    = 0,
+                column = 0,
+                text   = tostring (loaded),
+                type   = "error",
+              },
+            })
+          end
+          local ok, err = editor:patch (edited, loaded)
+          if ok then
+            patch:setValue (default_patch)
+            patch:gotoLine (3, 5, true)
+            patch:focus ()
+          else
+            return patch:getSession ():setAnnotations (tojs {
+              { row    = 0,
+                column = 0,
+                text   = tostring (err),
+                type   = "error",
+              },
+            })
+          end
+        end)
       end
     end)
     keydown = _G.js.global.document:addEventListener ("keydown", function (_, e)
