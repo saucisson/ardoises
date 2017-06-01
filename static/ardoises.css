@@ -12,10 +12,13 @@ body {
   font-weight: 400;
   color: white;
   line-height: 1.5;
+  background-size: 100% 100%;
   background-size: cover;
   background-position: center;
   background-color: DimGrey;
   background-image: url(/static/ardoises.jpg);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   padding-top: 50px;
   padding-bottom: 50px;
 }
