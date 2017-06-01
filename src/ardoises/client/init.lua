@@ -367,6 +367,12 @@ function Ardoise.edit (ardoise)
       branch     = ardoise.branch.name,
     }),
   }, Editor)
+  editor.pinger = Copas.addthread (function ()
+    while editor.running do
+      pcall (Editor.ping, editor)
+      Copas.sleep (15)
+    end
+  end)
   editor.receiver = Copas.addthread (function ()
     while editor.running do
       pcall (Editor.answer, editor)
@@ -490,6 +496,17 @@ function Editor.require (editor, name)
     code   = code,
   }
   return editor.modules [module.name]
+end
+
+function Editor.ping (editor)
+  assert (getmetatable (editor) == Editor)
+  local request = {
+    id     = #editor.requests+1,
+    type   = "ping",
+  }
+  editor.requests  [request.id] = request
+  assert (editor:send (request))
+  return true
 end
 
 function Editor.create (editor, name)
@@ -718,6 +735,7 @@ function Editor.close (editor)
   editor.running = false
   editor.websocket:close ()
   Copas.wakeup (editor.receiver)
+  Copas.wakeup (editor.pinger)
 end
 
 return Client
