@@ -146,6 +146,9 @@ renderers.layers = Copas.addthread (function ()
         event:preventDefault  ()
         event:stopPropagation ()
         Copas.addthread (function ()
+          progress = Progress {
+            expected = 10, -- seconds
+          }
           active = {
             module = layer.module,
           }
@@ -253,10 +256,12 @@ renderers.ardoise = Copas.addthread (function ()
         module    = active.module,
         target    = Ardoise,
         coroutine = coroutine,
+        progress  = progress,
       })
       if ok then
         renderer = co
       else
+        progress.finished = true
         print (err)
         Ardoise.innerHTML = [[
           <section>
@@ -290,6 +295,7 @@ default_togui = function (parameters)
   local module        = assert (parameters.module)
   local target        = assert (parameters.target)
   local coroutine     = assert (parameters.coroutine)
+  local guiprogress   = assert (parameters.progress)
   local edited        = editor:require (module)
   local running       = true
   local default_patch = [[
@@ -298,10 +304,11 @@ return function (Data, layer, ref)
   ...
 end
 ]]
-  local top    = _G.js.global.document:getElementById "top-bar"
-  local bottom = _G.js.global.document:getElementById "bottom-bar"
-  local size   = (bottom.offsetTop - bottom.scrollTop + bottom.clientTop - 50)
-               - (top.offsetTop - top.scrollTop + top.clientTop + 50)
+  local top       = _ENV.js.global.document:getElementById "top-bar"   :getBoundingClientRect ()
+  local bottom    = _ENV.js.global.document:getElementById "bottom-bar":getBoundingClientRect ()
+  local height    = _ENV.window.innerHeight
+                  - top.height
+                  - bottom.height
   target.innerHTML = Et.render ([[
     <div class="container-fluid">
       <div class="row">
@@ -334,8 +341,8 @@ end
     </div>
   ]], {
     editable     = editor.permissions.push,
-    model_height = editor.permissions.push and 0.7 * size  or size,
-    patch_height = editor.permissions.push and 0.25 * size or 0,
+    model_height = editor.permissions.push and 0.7  * height or height,
+    patch_height = editor.permissions.push and 0.25 * height or 0,
   })
   local source = _G.window.ace:edit "editor-model"
   source:setReadOnly (true)
@@ -451,6 +458,7 @@ end
     end
   end
   source:setValue (edited.code)
+  guiprogress.finished = true
   coroutine.yield ()
   running = false
   _G.js.global.document:removeEventListener ("keydown", keydown, false)

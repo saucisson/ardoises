@@ -475,7 +475,7 @@ function Editor.require (editor, name)
     return nil, "invalid layer: " .. tostring (chunk)
   end
   local remote, ref = Data.new {
-    name = module.name,
+    name = module.owner == "-" and module.module or module.name,
   }
   local oldcurrent = editor.current
   editor.current   = Lustache:render ("{{{owner}}}/{{{repository}}}:{{{branch}}}", module)
@@ -522,7 +522,7 @@ function Editor.create (editor, name)
     return nil, "module exists already"
   end
   local remote, ref = Data.new {
-    name = module.name,
+    name = module.owner == "-" and module.module or module.name,
   }
   local layer = Data.new {
     above = remote,
@@ -603,7 +603,13 @@ function Editor.patch (editor, module, f)
     editor.requests  [request.id] = request
     editor.callbacks [request.id] = function ()
       assert (request.success, request.error)
-      assert (pcall (f, editor.Data, module.remote, module.ref))
+      local chunk  = assert (_G.load (request.code, request.module, "t", Sandbox))
+      local loaded = assert (chunk ())
+      local proxy = Data.new {
+        above = module.remote,
+      }
+      loaded (editor.Data, proxy, module.ref)
+      assert (Data.merge (proxy, module.remote))
       module.code = Data.dump (module.remote)
     end
     assert (editor:send (request))
@@ -656,15 +662,13 @@ function Editor.answer (editor)
   elseif message.type == "patch" then
     local module = editor.modules [message.module]
     if module then
-      local chunk, err_chunk = _G.load (message.code, module.name, "t", Sandbox)
-      if not chunk then
-        return nil, "invalid patch: " .. tostring (err_chunk)
-      end
-      local ok_loaded, loaded = pcall (chunk)
-      if not ok_loaded then
-        return nil, "invalid patch: " .. tostring (loaded)
-      end
-      loaded (editor.Data, module.remote, module.ref)
+      local chunk  = assert (_G.load (message.code, module.name, "t", Sandbox))
+      local loaded = assert (chunk ())
+      local proxy = Data.new {
+        above = module.remote,
+      }
+      loaded (editor.Data, proxy, module.ref)
+      assert (Data.merge (proxy, module.remote))
       module.code = Data.dump (module.remote)
     end
   end

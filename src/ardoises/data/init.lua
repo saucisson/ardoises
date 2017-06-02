@@ -52,7 +52,7 @@ Data.hidden       = setmetatable ({}, IgnoreKeys  )
 Data.loaded       = setmetatable ({}, IgnoreValues)
 Data.children     = setmetatable ({}, IgnoreKeys  )
 Data.references   = setmetatable ({}, IgnoreKeys  )
-Data.replacements = setmetatable ({}, { __mode = "k" })
+Data.replacements = setmetatable ({}, IgnoreKeys  )
 
 function Data.new (t)
   assert (t == nil or type (t) == "table")
@@ -127,12 +127,14 @@ function Data.clear ()
     dependencies = setmetatable ({}, Metatable),
   }
   Data.messages = setmetatable ({}, IgnoreKeys)
+  return true
 end
 
 function Data.replace (proxy, with)
   assert (getmetatable (proxy) == Proxy)
   assert (getmetatable (with ) == Proxy or with == nil)
   Data.replacements [proxy] = with
+  return true
 end
 
 function Data.ref (proxy)
@@ -359,12 +361,21 @@ function Data.merge (source, target)
       or k == Data.key.defaults
       or k == Data.key.labels
       or v == Data.key.deleted
-      or k == Data.key.refines
       or getmetatable (v) == Reference
       or getmetatable (v) == Proxy
       or type (v) ~= "table"
       then
         t [k] = v
+      elseif k == Data.key.refines then
+        local r = {}
+        for _, refine in ipairs (v) do
+          if refine ~= target then
+            r [#r+1] = refine
+          end
+        end
+        if #r ~= 0 then
+          t [k] = r
+        end
       elseif type (t [k]) == "table" then
         iterate (v, t [k])
       else
@@ -375,13 +386,26 @@ function Data.merge (source, target)
   end
   source = Data.hidden [source].layer
   iterate (Data.hidden [source].data, target)
+  return true
 end
 
-function Data.convert (x)
+function Data.convert (x, except)
   if getmetatable (x) == Proxy then
-    return Data.replacements [x] or x
+    local layer = Data.hidden [x].layer
+    local proxy = Data.hidden [layer].proxy
+    if proxy ~= except then
+      proxy = Data.replacements [proxy] or proxy
+    end
+    for _, key in ipairs (Data.hidden [x].keys) do
+      proxy = proxy [Data.convert (key, except)]
+    end
+    return proxy
   elseif getmetatable (x) == Reference then
-    return x
+    local ref = Reference.new (Data.hidden [x].from)
+    for _, key in ipairs (Data.hidden [x].keys) do
+      ref = ref [Data.convert (key, except)]
+    end
+    return ref
   elseif x == Data.key.checks
       or x == Data.key.defaults
       or x == Data.key.deleted
@@ -392,7 +416,7 @@ function Data.convert (x)
   elseif type (x) == "table" then
     local result = {}
     for k, v in pairs (x) do
-      result [Data.convert (k)] = Data.convert (v)
+      result [Data.convert (k, except)] = Data.convert (v, except)
     end
     return result
   else
@@ -470,14 +494,14 @@ end
 function Proxy.child (proxy, key)
   assert (getmetatable (proxy) == Proxy)
   assert (key ~= nil)
-  key         = Data.convert (key)
+  local hidden = Data.hidden [proxy]
+  key         = Data.convert (key, Data.hidden [hidden.layer].proxy)
   local found = Data.children [proxy]
             and Data.children [proxy] [key]
   if found then
     return found
   end
   local result = setmetatable ({}, Proxy)
-  local hidden = Data.hidden [proxy]
   local keys   = {}
   for i, k in ipairs (hidden.keys) do
     keys [i] = k
@@ -610,9 +634,9 @@ function Proxy.__newindex (proxy, key, value)
         or getmetatable (key) == Proxy
         or getmetatable (key) == Reference
         or getmetatable (key) == Key)
-  key             = Data.convert (key)
-  value           = Data.convert (value)
   local layer     = Data.hidden [proxy].layer
+  key             = Data.convert (key  , Data.hidden [layer].proxy)
+  value           = Data.convert (value, Data.hidden [layer].proxy)
   local info      = Data.hidden [layer]
   local keys      = Data.hidden [proxy].keys
   local coroutine = Coromake ()
@@ -845,7 +869,7 @@ function Proxy.dependencies (proxy)
 end
 
 function Proxy.__lt (lhs, rhs)
-  assert (getmetatable (lhs) == Proxy)
+  assert (getmetatable (lhs) == Proxy, debug.traceback ())
   assert (getmetatable (rhs) == Proxy)
   if not Data.caches.lt [lhs] then
     Data.caches.lt [lhs] = setmetatable ({}, IgnoreNone)

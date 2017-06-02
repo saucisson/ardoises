@@ -351,7 +351,7 @@ function Editor.require (editor, x)
     return nil, "invalid layer: " .. tostring (chunk)
   end
   local layer, ref = Data.new {
-    name = x,
+    name = req.owner == "-" and req.module or req.name,
   }
   local oldcurrent = editor.current
   editor.current = req.full_name
@@ -555,7 +555,7 @@ function Editor.handlers.patch (editor, message)
   if not module then
     return nil, err
   end
-  -- check if patch is a string:
+  -- load patch string:
   if type (message.code) ~= "string" then
     return nil, "patch code is not a string"
   end
@@ -576,7 +576,7 @@ function Editor.handlers.patch (editor, message)
     return nil, "invalid layer: " .. tostring (err_apply)
   end
   -- apply really:
-  assert (pcall (loaded, editor.Data, module.layer, module.ref))
+  assert (Data.merge (proxy, module.layer))
   -- commit
   local repository   = editor.repositories [editor.branch.full_name]
   local patches_file = io.open (repository.path .. "/.ardoises-patches.md", "w")
