@@ -1,6 +1,6 @@
 ## What is Ardoises?
 
-Ardoises is a platform dedicated to formal modeling and verification.
+Ardoises is a platform dedicated to formal modeling and verification,
 that runs as a service at https://ardoises.ovh.
 It differs from other (meta)modeling tools and platforms in several ways:
 
@@ -19,6 +19,8 @@ Depending on your role, you may want to visit the following pages:
 * [Ardoises for Formalism Developers](/Formalism.md)
 * [Ardoises for Tool Developers](/Tool.md)
 * [Ardoises for its own Developers](/Developers.md)
+
+<img src="{{ site.url }}/ardoises/assets/poster.png">
 
 ## License and Source code
 
