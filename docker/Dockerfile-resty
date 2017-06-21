@@ -31,7 +31,7 @@ RUN apk add --no-cache --virtual .build-deps \
         readline \
         sed \
  && pip install hererocks \
- && hererocks --luajit=2.1 --luarocks=^ --compat=5.2 /usr \
+ && hererocks --luajit=2.0 --luarocks=^ --compat=5.2 /usr \
  && luarocks install luasec \
  && cd /tmp \
  && curl -fSL https://openresty.org/download/openresty-${RESTY_VERSION}.tar.gz -o openresty-${RESTY_VERSION}.tar.gz \
@@ -50,7 +50,6 @@ RUN apk add --no-cache --virtual .build-deps \
  && adduser  -u 82 -D -S -G www-data www-data \
  && cd /src/ardoises/  \
  && luarocks install rockspec/lua-websockets-develop-0.rockspec \
- && luarocks install rockspec/lulpeg-develop-0.rockspec \
  && luarocks install rockspec/redis-lua-develop-0.rockspec \
  && luarocks make    --only-deps \
                      rockspec/ardoises-master-1.rockspec \

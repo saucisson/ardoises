@@ -22,7 +22,6 @@ dependencies = {
   "coronest",
   "dkjson",
   "etlua",
-  "hashids",
   "jwt",
   "lpeg",
   "luaossl",

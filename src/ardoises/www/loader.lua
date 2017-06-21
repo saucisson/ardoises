@@ -41,10 +41,6 @@ package.preload ["jit"] = function ()
   return false
 end
 
-package.preload ["lpeg"] = function ()
-  return require "lulpeg"
-end
-
 package.preload ["cjson"] = function ()
   return require "dkjson"
 end

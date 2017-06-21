@@ -23,11 +23,10 @@ RUN apk add --no-cache --virtual .build-deps \
  && git config --global user.email "editor@ardoises.ovh" \
  && git config --global user.name  "Ardoises" \
  && pip3 install hererocks \
- && hererocks --luajit=2.1 --luarocks=^ --compat=5.2 /usr \
+ && hererocks --luajit=2.0 --luarocks=^ --compat=5.2 /usr \
  && luarocks install luasec \
  && cd /src/ardoises/  \
  && luarocks install rockspec/lua-websockets-develop-0.rockspec \
- && luarocks install rockspec/lulpeg-develop-0.rockspec \
  && luarocks install rockspec/redis-lua-develop-0.rockspec \
  && luarocks make    --only-deps \
                      rockspec/ardoises-master-1.rockspec \
