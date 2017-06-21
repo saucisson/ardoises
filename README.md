@@ -20,7 +20,7 @@ Depending on your role, you may want to visit the following pages:
 * [Ardoises for Tool Developers](/Tool.md)
 * [Ardoises for its own Developers](/Developers.md)
 
-<img src="{{ site.url }}/ardoises/assets/poster.png">
+[<img src="{{ site.url }}/ardoises/assets/poster.png">]({{ site.url }}/ardoises/assets/poster.pdf)
 
 ## License and Source code
 
