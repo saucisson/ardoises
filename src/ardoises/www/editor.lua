@@ -30,10 +30,26 @@ Content.innerHTML = Et.render ([[
             <div class="list-group-item text-center">
               <%= branch %>
             </div>
+            <div class="list-group-item text-right">
+              <div id="editor-type" class="btn-group btn-toggle">
+                <button id="editor-text"
+                        class="btn btn-sm btn-default"
+                        disabled>
+                  <i class="fa fa-pencil-square fa-inverse" aria-hidden="true"></i>
+                </button>
+                <button id="editor-graphical"
+                        class="btn btn-sm btn-default"
+                        disabled>
+                  <i class="fa fa-image fa-inverse" aria-hidden="true"></i>
+                </button>
+              </div>
+            </div>
             <div id="layers"></div>
           </div>
         </div>
-        <div id="ardoise" class="col-sm-8 col-md-9">
+        <div class="col-sm-8 col-md-9">
+          <div id="ardoise" class="col-sm-12">
+          </div>
         </div>
       </div>
     </div>
@@ -42,10 +58,14 @@ Content.innerHTML = Et.render ([[
   branch = branch,
 })
 
-local Layers  = _G.js.global.document:getElementById "layers"
-local Ardoise = _G.js.global.document:getElementById "ardoise"
-local active  = nil
-local layers  = {}
+local Layers   = _G.js.global.document:getElementById "layers"
+local Ardoise  = _G.js.global.document:getElementById "ardoise"
+local Type     = _G.js.global.document:getElementById "editor-type"
+local As_text  = _G.js.global.document:getElementById "editor-text"
+local As_graph = _G.js.global.document:getElementById "editor-graphical"
+local active   = nil
+local layers   = {}
+
 local client  = Client {
   server = _G.configuration.server,
   token  = _G.configuration.user.tokens.ardoises,
@@ -237,6 +257,14 @@ renderers.ardoise = Copas.addthread (function ()
   local renderer
   local current
   local interaction = editor:require "interaction@ardoises/formalisms:dev".layer
+  Type.onclick = function ()
+    if not As_text.disabled and not As_graph.disabled then
+      current = nil
+      As_text .classList:toggle "active"
+      As_graph.classList:toggle "active"
+      Copas.wakeup (renderers.ardoise)
+    end
+  end
   while true do
     local edited
     if active then
@@ -246,9 +274,37 @@ renderers.ardoise = Copas.addthread (function ()
       local _ = true -- do nothing
     elseif edited and current ~= active.module then
       Ardoise.innerHTML = ""
-      local togui  = edited.layer [Data.key.meta]
-                 and edited.layer [Data.key.meta] [interaction.gui]
-                  or default_togui
+      local togui = edited.layer [Data.key.meta]
+                and edited.layer [Data.key.meta] [interaction.gui]
+                 or default_togui
+      if togui == default_togui then
+        As_text .classList:remove "active"
+        As_graph.classList:remove "active"
+        As_text .classList:remove "btn-warning"
+        As_graph.classList:remove "btn-warning"
+        As_text .classList:add    "btn-default"
+        As_graph.classList:add    "btn-default"
+        As_text .disabled = true
+        As_graph.disabled = true
+      else
+        As_text .disabled = false
+        As_graph.disabled = false
+        if As_text.classList:contains "active" then
+          As_text .classList:add    "active"
+          As_text .classList:add    "btn-warning"
+          As_text .classList:remove "btn-default"
+          As_graph.classList:remove "btn-warning"
+          As_graph.classList:add    "btn-default"
+          togui = default_togui
+        else
+          As_graph.classList:add    "active"
+          As_graph.classList:add    "btn-warning"
+          As_graph.classList:remove "btn-default"
+          As_text .classList:remove "btn-warning"
+          As_text .classList:add    "btn-default"
+          togui = edited.layer [Data.key.meta] [interaction.gui]
+        end
+      end
       local coroutine = Coromake ()
       local co        = coroutine.create (togui)
       local ok, err   = coroutine.resume (co, {
@@ -262,6 +318,14 @@ renderers.ardoise = Copas.addthread (function ()
         renderer = co
       else
         progress.finished = true
+        As_text .classList:remove "active"
+        As_graph.classList:remove "active"
+        As_text .classList:remove "btn-warning"
+        As_graph.classList:remove "btn-warning"
+        As_text .classList:add    "btn-default"
+        As_graph.classList:add    "btn-default"
+        As_text .disabled = true
+        As_graph.disabled = true
         print (err)
         Ardoise.innerHTML = [[
           <section>
@@ -281,6 +345,14 @@ renderers.ardoise = Copas.addthread (function ()
       if renderer then
         coroutine.resume (renderer)
         renderer = nil
+        As_text .classList:remove "active"
+        As_graph.classList:remove "active"
+        As_text .classList:remove "btn-warning"
+        As_graph.classList:remove "btn-warning"
+        As_text .classList:add    "btn-default"
+        As_graph.classList:add    "btn-default"
+        As_text .disabled = true
+        As_graph.disabled = true
       end
       Ardoise.innerHTML = ardoise.branch.readme
     end
