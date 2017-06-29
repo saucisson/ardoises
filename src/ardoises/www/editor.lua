@@ -127,8 +127,8 @@ renderers.layers = Copas.addthread (function ()
       </div>
       <% end %>
       <% for _, layer in ipairs (layers) do %>
-      <div class="list-group-item" id="layer-get-<%- layer.id %>">
-        <%= layer.name %>
+      <div class="list-group-item">
+        <a href="#" id="layer-get-<%- layer.id %>"><%= layer.name %></a>
         <span class="pull-right">
           <button id="layer-close-<%- layer.id %>" class="btn btn-sm btn-warning hidden">
             <i class="fa fa-times" aria-hidden="true"></i>
@@ -145,21 +145,6 @@ renderers.layers = Copas.addthread (function ()
       layers   = layers,
       editable = editor.permissions.push,
     })
-    do
-      local link = _G.js.global.document:getElementById "layer-create"
-      link.onclick = function (_, event)
-        event:preventDefault  ()
-        event:stopPropagation ()
-        local name = _G.js.global.document:getElementById "layer-name".value
-        Copas.addthread (function ()
-          active = {
-            module = editor:create (name),
-          }
-          Copas.wakeup (renderers.ardoise)
-        end)
-        return false
-      end
-    end
     for _, layer in ipairs (layers) do
       local link = _G.js.global.document:getElementById ("layer-get-" .. tostring (layer.id))
       link.onclick = function (_, event)
@@ -178,42 +163,63 @@ renderers.layers = Copas.addthread (function ()
         return false
       end
     end
+    do
+      local link = _G.js.global.document:getElementById "layer-create"
+      if link then
+        link.onclick = function (_, event)
+          event:preventDefault  ()
+          event:stopPropagation ()
+          local name = _G.js.global.document:getElementById "layer-name".value
+          Copas.addthread (function ()
+            active = {
+              module = editor:create (name),
+            }
+            Copas.wakeup (renderers.ardoise)
+          end)
+          return false
+        end
+      end
+    end
     for _, layer in ipairs (layers) do
       local link = _G.js.global.document:getElementById ("layer-close-" .. tostring (layer.id))
-      link.onclick = function (_, event)
-        event:preventDefault  ()
-        event:stopPropagation ()
-        Copas.addthread (function ()
-          active = nil
-          Copas.wakeup (renderers.layers)
-          Copas.wakeup (renderers.ardoise)
-          Copas.wakeup (renderers.active)
-        end)
-        return false
+      if link then
+        link.onclick = function (_, event)
+          event:preventDefault  ()
+          event:stopPropagation ()
+          Copas.addthread (function ()
+            active = nil
+            Copas.wakeup (renderers.layers)
+            Copas.wakeup (renderers.ardoise)
+            Copas.wakeup (renderers.active)
+          end)
+          return false
+        end
       end
     end
     for _, layer in ipairs (layers) do
       local link = _G.js.global.document:getElementById ("layer-delete-" .. tostring (layer.id))
-      link.onclick = function (_, event)
-        event:preventDefault  ()
-        event:stopPropagation ()
-        _G.window:swal (tojs {
-          title = Et.render ("Do you really want to delete <%- name %>?", layer),
-          text  = "You will not be able to recover this layer!",
-          type  = "warning",
-          showCancelButton  = true,
-          confirmButtonText = "Confirm",
-          closeOnConfirm    = true,
-        }, function ()
-          Copas.addthread (function ()
-            if active and active.module == layer.module then
-              active = nil
-            end
-            editor:delete (layer.module)
-            Copas.wakeup (renderers.ardoise)
+      if link then
+        link.onclick = function (_, event)
+          event:preventDefault  ()
+          event:stopPropagation ()
+          _G.window:swal (tojs {
+            title = Et.render ("Do you really want to delete <%- name %>?", layer),
+            text  = "You will not be able to recover this layer!",
+            type  = "warning",
+            showCancelButton  = true,
+            confirmButtonText = "Confirm",
+            closeOnConfirm    = true,
+          }, function ()
+            Copas.addthread (function ()
+              if active and active.module == layer.module then
+                active = nil
+              end
+              editor:delete (layer.module)
+              Copas.wakeup (renderers.ardoise)
+            end)
           end)
-        end)
-        return false
+          return false
+        end
       end
     end
     Copas.wakeup (renderers.active)
