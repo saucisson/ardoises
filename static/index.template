@@ -85,11 +85,6 @@
                 </a>
               </li>
               <li>
-              <a href="#">
-                <img src="{{{user.avatar_url}}}" height="20px" width="20px"></img>
-                <span class="navbar-username">{{user.name}}</span>
-              </a>
-              </li>
               {{/user}}
               {{^user}}
               <li>
