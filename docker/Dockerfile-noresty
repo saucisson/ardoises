@@ -1,0 +1,37 @@
+FROM alpine:edge
+
+ADD . /src/ardoises
+
+RUN apk add --no-cache --virtual .build-deps \
+        build-base \
+        cmake \
+        curl \
+        make \
+        openssl-dev \
+        perl \
+        python3 \
+        readline-dev \
+        unzip \
+        zlib-dev \
+ && apk add --no-cache --repository http://dl-3.alpinelinux.org/alpine/edge/testing/ \
+        dockerize \
+ && apk add --no-cache \
+        bash \
+        git \
+        libstdc++ \
+        openssl \
+ && git config --global user.email "editor@ardoises.ovh" \
+ && git config --global user.name  "Ardoises" \
+ && pip3 install hererocks \
+ && hererocks --luajit=2.1 --luarocks=^ --compat=5.2 /usr \
+ && luarocks install luasec \
+ && cd /src/ardoises/  \
+ && luarocks install rockspec/lua-websockets-develop-0.rockspec \
+ && luarocks install rockspec/lulpeg-develop-0.rockspec \
+ && luarocks install rockspec/redis-lua-develop-0.rockspec \
+ && luarocks make    rockspec/ardoises-master-1.rockspec \
+ && rm -rf /src/ardoises \
+ && apk del .build-deps \
+ && true
+
+ENTRYPOINT ["/bin/bash"]

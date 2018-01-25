@@ -1,0 +1,12 @@
+#! /usr/bin/env bash
+
+certbot \
+  --non-interactive \
+  --agree-tos \
+  --email=admin@ardoises.ovh \
+  register
+certbot \
+  certonly \
+  --standalone \
+  -w "/" \
+  -d "ardoises.ovh"

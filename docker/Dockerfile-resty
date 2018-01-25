@@ -1,0 +1,64 @@
+FROM alpine:edge
+
+ARG RESTY_VERSION="1.11.2.1"
+
+ADD . /src/ardoises
+
+RUN apk add --no-cache --virtual .build-deps \
+        build-base \
+        cmake \
+        curl \
+        git \
+        make \
+        openssl-dev \
+        pcre-dev \
+        perl \
+        py-pip \
+        readline-dev \
+        unzip \
+        zlib-dev \
+ && apk add --no-cache --repository http://dl-3.alpinelinux.org/alpine/edge/testing/ \
+        dockerize \
+ && apk add --no-cache \
+        bash \
+        curl \
+        diffutils \
+        grep \
+        libstdc++ \
+        openssl \
+        pcre \
+        readline \
+        sed \
+ && pip install hererocks \
+ && hererocks --luajit=2.1 --luarocks=^ --compat=5.2 /usr \
+ && luarocks install luasec \
+ && cd /tmp \
+ && curl -fSL https://openresty.org/download/openresty-${RESTY_VERSION}.tar.gz -o openresty-${RESTY_VERSION}.tar.gz \
+ && tar xzf openresty-${RESTY_VERSION}.tar.gz \
+ && cd /tmp/openresty-${RESTY_VERSION} \
+ && ./configure --with-ipv6 \
+                --with-pcre-jit \
+                --with-threads \
+                --with-luajit=/usr \
+ && make \
+ && make install \
+ && rm -rf openresty-${RESTY_VERSION}.tar.gz openresty-${RESTY_VERSION} \
+ && ln -sf /dev/stdout /usr/local/openresty/nginx/logs/access.log \
+ && ln -sf /dev/stderr /usr/local/openresty/nginx/logs/error.log \
+ && addgroup -g 82 -S www-data \
+ && adduser  -u 82 -D -S -G www-data www-data \
+ && cd /src/ardoises/  \
+ && luarocks install rockspec/lua-websockets-develop-0.rockspec \
+ && luarocks install rockspec/lulpeg-develop-0.rockspec \
+ && luarocks install rockspec/redis-lua-develop-0.rockspec \
+ && luarocks make    rockspec/ardoises-master-1.rockspec \
+ && mkdir -p /etc/nginx \
+ && cp src/ardoises/server/nginx.conf /etc/nginx/nginx.conf \
+ && apk del .build-deps \
+ && rm -rf /src/ardoises \
+ && rm -rf /tmp/* \
+ && true
+
+ENV PATH /usr/local/openresty/bin/:/usr/local/openresty/nginx/sbin/:$PATH
+VOLUME ["/static", "/etc/letsencrypt"]
+EXPOSE 80 443

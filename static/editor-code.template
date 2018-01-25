@@ -1,0 +1,400 @@
+local Progress = require "progressbar"
+local progress = Progress {
+  expected = 5, -- seconds
+}
+
+local Copas  = require "copas"
+local Client = require "ardoises.client"
+local Et     = require "etlua"
+local Layer  = require "layeredata"
+local tojs   = require "tojs"
+local client = Client {
+  server = "{{{server}}}",
+  tokens = {
+    ardoises = "{{{user.tokens.ardoises}}}",
+    github   = "{{{user.tokens.github}}}",
+  },
+}
+
+local ardoise
+for _, a in ipairs (client:ardoises ()) do
+  if  a.repository.full_name == "{{{repository.full_name}}}"
+  and a.branch == "{{{branch}}}" then
+    ardoise = a
+    break
+  end
+end
+assert (ardoise)
+local editor = ardoise:edit ()
+progress.finished = true
+
+local Content = _G.js.global.document:getElementById "content"
+Content.innerHTML = [[
+  <section>
+    <div class="container-fluid">
+      <div class="row" style="height: 90vh; min-height: 90vh;">
+        <div class="col-sm-4 col-md-3">
+          <div class="list-group">
+            <div class="list-group-item text-center">
+              {{repository.owner.login}}/{{repository.name}}:{{branch}}
+            </div>
+            <div id="layers"></div>
+          </div>
+        </div>
+        <div id="ardoise" class="col-sm-8 col-md-9">
+        </div>
+      </div>
+    </div>
+  </section>
+]]
+
+Copas.addthread (function ()
+  while true do
+    Copas.sleep (10)
+    if editor.websocket.state ~= "OPEN" then
+      Content.innerHTML = [[
+        <section>
+          <div class="container-fluid">
+            <div class="row">
+              <div class="col-sm-12 col-md-8 col-md-offset-2">
+                <div class="alert alert-danger">
+                  <strong>Disconnected!</strong> This page will be reloaded soon.
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      ]]
+      Copas.sleep (5)
+      _G.js.global.location:reload ()
+    end
+  end
+end)
+
+local Layers  = _G.js.global.document:getElementById "layers"
+local Ardoise = _G.js.global.document:getElementById "ardoise"
+local active  = nil
+local layers  = {}
+
+local renderers = {
+  layers  = nil,
+  ardoise = nil,
+  active  = nil,
+}
+
+renderers.layers = Copas.addthread (function ()
+  while true do
+    layers = {}
+    for name, module in editor:list () do
+      layers [#layers+1] = {
+        id     = #layers+1,
+        name   = name,
+        module = module,
+      }
+    end
+    table.sort (layers, function (l, r) return l.name < r.name end)
+    Layers.innerHTML = Et.render ([[
+      <div class="list-group-item">
+        <div class="input-group">
+          <input id="layer-name" type="text" class="form-control" placeholder="New module" />
+          <span id="layer-create" class="input-group-addon"><i class="fa fa-plus fa-inverse" aria-hidden="true"></i></span>
+        </div>
+      </div>
+      <% for _, layer in ipairs (layers) do %>
+      <div class="list-group-item" id="layer-get-<%- layer.id %>">
+        <%= layer.name %>
+        <span class="pull-right">
+          <button id="layer-delete-<%- layer.id %>" class="btn btn-md btn-warning">
+            <i class="fa fa-trash" style="color: black;" aria-hidden="true"></i>
+          </button>
+        </span>
+      </div>
+      <% end %>
+    ]], {
+      layers = layers,
+    })
+    do
+      local link = _G.js.global.document:getElementById "layer-create"
+      link.onclick = function ()
+        local name = _G.js.global.document:getElementById "layer-name".value
+        Copas.addthread (function ()
+          active = {
+            module = editor:create (name),
+          }
+          Copas.wakeup (renderers.ardoise)
+        end)
+        return false
+      end
+    end
+    for _, layer in ipairs (layers) do
+      local link = _G.js.global.document:getElementById ("layer-get-" .. tostring (layer.id))
+      link.onclick = function ()
+        Copas.addthread (function ()
+          active = {
+            module = layer.module,
+          }
+          Copas.wakeup (renderers.ardoise)
+          Copas.wakeup (renderers.active)
+        end)
+        return false
+      end
+    end
+    for _, layer in ipairs (layers) do
+      local link = _G.js.global.document:getElementById ("layer-delete-" .. tostring (layer.id))
+      link.onclick = function ()
+        _G.window:swal (tojs {
+          title = Et.render ("Do you really want to delete <%- name %>?", layer),
+          text  = "You will not be able to recover this layer!",
+          type  = "warning",
+          showCancelButton  = true,
+          confirmButtonText = "Confirm",
+          closeOnConfirm    = true,
+        }, function ()
+          if active and active.module == layer.module then
+            active = nil
+          end
+          editor:delete (layer.module)
+          Copas.wakeup (renderers.ardoise)
+        end)
+        return false
+      end
+    end
+    Copas.wakeup (renderers.active)
+    Copas.sleep (-math.huge)
+  end
+end)
+
+Copas.addthread (function ()
+  for data in editor:events {} do
+    if data.type == "create" or data.type == "delete" then
+      Copas.wakeup (renderers.layers)
+    end
+  end
+end)
+
+renderers.active = Copas.addthread (function ()
+  while true do
+    for _, layer in ipairs (layers) do
+      local link = _G.js.global.document:getElementById ("layer-get-" .. tostring (layer.id))
+      if active and active.module == layer.module then
+        link.classList:add "active"
+      else
+        link.classList:remove "active"
+      end
+    end
+    Copas.sleep (-math.huge)
+  end
+end)
+
+_G.window:addEventListener ("resize", function ()
+  Copas.wakeup (renderers.layers)
+  Copas.wakeup (renderers.ardoise)
+end, false)
+
+local default_togui
+
+renderers.ardoise = Copas.addthread (function ()
+  local renderer
+  local current
+  while true do
+    local edited
+    if active then
+      edited = editor:require (active.module)
+    end
+    if edited and current == active.module then
+      local _ = true -- do nothing
+    elseif edited and current ~= active.module then
+      current = active.module
+      Ardoise.innerHTML = ""
+      local gui    = edited.layer [Layer.key.meta]
+                 and edited.layer [Layer.key.meta].gui
+      local togui  = edited.layer [Layer.key.meta]
+                 and edited.layer [Layer.key.meta] [gui]
+                 and edited.layer [Layer.key.meta] [gui].render
+                  or default_togui
+      local ok, r = pcall (togui, {
+        editor = editor,
+        module = active.module,
+        target = Ardoise,
+      })
+      if ok then
+        renderer = r
+      else
+        print (r)
+        Ardoise.innerHTML = [[
+          <section>
+            <div class="container-fluid">
+              <div class="row">
+                <div class="col-sm-12">
+                  <div class="alert alert-danger">
+                    <strong>Renderering problem!</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        ]]
+      end
+    else
+      if renderer then
+        renderer:close ()
+        renderer = nil
+      end
+      Ardoise.innerHTML = ""
+    end
+    Copas.sleep (-math.huge)
+  end
+end)
+
+default_togui = function (parameters)
+  assert (type (parameters) == "table")
+  local renderer = {}
+  renderer.editor  = assert (parameters.editor)
+  renderer.module  = assert (parameters.module)
+  renderer.target  = assert (parameters.target)
+  renderer.edited  = editor:require (renderer.module)
+  renderer.running = true
+  renderer.default_patch = [[
+return function (Layer, layer, ref)
+  -- Write your patch here...
+  ...
+end
+]]
+  local top    = _G.js.global.document:getElementById "top-bar"
+  local bottom = _G.js.global.document:getElementById "bottom-bar"
+  local size   = (bottom.offsetTop - bottom.scrollTop + bottom.clientTop - 50)
+               - (top.offsetTop - top.scrollTop + top.clientTop + 50)
+  renderer.target.innerHTML = Et.render ([[
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-sm-12">
+          <div class="panel panel-default">
+            <div class="panel-body">
+              <div id="editor-model" class="editor" style="height: <%- model_height %>px;">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <% if editable then %>
+      <div class="row">
+        <div class="col-sm-11">
+          <div class="panel panel-default">
+            <div class="panel-body">
+              <div id="editor-patch" class="editor" style="height: <%- patch_height %>px;">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-1">
+          <button id="patch-submit" class="btn btn-xs">
+            <i class="fa fa-paper-plane fa-inverse" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
+      <% end %>
+    </div>
+  ]], {
+    editable     = editor.permissions.push,
+    model_height = editor.permissions.push and 0.7 * size  or size,
+    patch_height = editor.permissions.push and 0.25 * size or 0,
+  })
+  renderer.source = _G.window.ace:edit "editor-model"
+  renderer.source:setReadOnly (true)
+  renderer.source ["$blockScrolling"] = true
+  renderer.source:setTheme "ace/theme/monokai"
+  renderer.source:getSession ():setMode "ace/mode/lua"
+  renderer.patch = _G.window.ace:edit "editor-patch"
+  renderer.patch:setReadOnly (false)
+  renderer.patch ["$blockScrolling"] = true
+  renderer.patch:setTheme "ace/theme/monokai"
+  renderer.patch:getSession ():setMode "ace/mode/lua"
+  local changed = 0
+  local submit  = _G.js.global.document:getElementById "patch-submit"
+  renderer.patch:on ("change", function ()
+    changed = os.clock ()
+  end)
+  renderer.observe = Copas.addthread (function ()
+    for data in editor:events {} do
+      if not renderer.running then
+        return
+      end
+      if data.type == "update" or data.type == "patch" or data.type == "require" then
+        renderer.source:setValue (renderer.edited.code)
+      end
+    end
+  end)
+  renderer.check = Copas.addthread (function ()
+    local last = -math.huge
+    while renderer.running do
+      if os.clock () - changed > 1 and changed ~= last then
+        last = changed
+        local code = renderer.patch:getValue ()
+        local ok, err = load (code, "patch", "t")
+        renderer.patch:getSession ():clearAnnotations ()
+        if ok then
+          submit.disabled = false
+          submit.classList:remove "btn-danger"
+          submit.classList:add    "btn-success"
+        else
+          local pattern = [[%[string "patch"%]:(%d+):%s+(.*)]]
+          local line, problem = err:match (pattern)
+          submit.classList:remove "btn-success"
+          submit.classList:add    "btn-danger"
+          submit.disabled = true
+          renderer.patch:getSession ():setAnnotations (tojs {
+            { row    = line-1,
+              column = 0,
+              text   = problem,
+              type   = "error",
+            },
+          })
+        end
+      end
+      Copas.sleep (1)
+    end
+  end)
+  renderer.save = Copas.addthread (function ()
+    while renderer.running do
+      Copas.sleep (-math.huge)
+      local ok, err = editor:patch {
+        [renderer.module] = renderer.patch:getValue (),
+      }
+      if ok then
+        renderer.patch:setValue (renderer.default_patch)
+        renderer.patch:gotoLine (3, 5, true)
+        renderer.patch:focus ()
+      else
+        renderer.patch:getSession ():setAnnotations (tojs {
+          { row    = 0,
+            column = 0,
+            text   = tostring (err),
+            type   = "error",
+          },
+        })
+      end
+    end
+  end)
+  renderer.source:setValue (renderer.edited.code)
+  renderer.patch :setValue (renderer.default_patch)
+  renderer.patch :gotoLine (3, 5, true)
+  renderer.patch :focus ()
+  renderer.keydown = _G.js.global.document:addEventListener ("keydown", function (_, e)
+    if e.keyCode == 83 and (e.metaKey or e.ctrlKey) and not submit.disabled then
+      Copas.wakeup (renderer.save)
+      return false
+    end
+  end, false)
+  renderer.resize = _G.window:addEventListener ("resize", function ()
+  end, false)
+  submit.onclick = function ()
+    Copas.wakeup (renderer.save)
+    return false
+  end
+  function renderer.close ()
+    renderer.running = false
+    _G.js.global.document:removeEventListener ("keydown", renderer.keydown, false)
+    _G.js.global.document:removeEventListener ("resize" , renderer.resize , false)
+  end
+  return renderer
+end

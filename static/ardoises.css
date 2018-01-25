@@ -1,0 +1,73 @@
+html,
+body {
+  height: 100%;
+  width: 100%;
+}
+body {
+  min-height: 100%;
+  font-family: 'Lato';
+  font-size: 16px;
+  font-style: normal;
+  font-variant: normal;
+  font-weight: 400;
+  color: white;
+  line-height: 1.5;
+  background-size: cover;
+  background-position: center;
+  background-color: DimGrey;
+  background-image: url(/static/ardoises.jpg);
+  padding-top: 50px;
+  padding-bottom: 50px;
+}
+
+.text-primary, .text-info {
+  color: DarkOrange;
+  font-family: 'La Belle Aurore';
+  font-size: 32px;
+  font-style: normal;
+  font-variant: normal;
+  font-weight: 400;
+}
+
+.navbar {
+  color: DarkOrange;
+  font-size: 12px;
+  font-style: normal;
+  font-variant: normal;
+}
+.navbar-username {
+  color: DarkOrange;
+  font-size: 14px;
+  font-style: normal;
+  font-variant: normal;
+}
+
+.circle {
+    padding: 0px;
+    border-radius: 20%;
+    width: 50px;
+    height: 50px;
+}
+
+.fully-centered {
+  position: fixed;
+  top: 45%;
+  left: 45%;
+}
+
+a:link {
+  color: DarkOrange;
+  text-decoration: none;
+}
+a:visited {
+  color: DarkOrange;
+  text-decoration: none;
+}
+a:hover {
+  color: DarkOrange;
+  text-decoration: none;
+}
+a:active {
+  color: DarkOrange;
+  text-decoration: none;
+}

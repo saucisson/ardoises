@@ -1,0 +1,12 @@
+FROM ardoises-resty
+
+ADD . /src/ardoises
+
+RUN true \
+ && cd /src/ardoises/  \
+ && luarocks make rockspec/ardoises-master-1.rockspec \
+ && mkdir -p /etc/nginx/ \
+ && cp src/ardoises/server/nginx.conf /etc/nginx/nginx.conf \
+ && rm -rf /src/ardoises \
+ && rm -rf /tmp/* \
+ && true

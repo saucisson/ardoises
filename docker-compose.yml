@@ -1,0 +1,38 @@
+version: "2"
+services:
+  redis:
+    image: redis:alpine
+  docker:
+    image: shipyard/docker-proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+  clean:
+    env_file: .environment
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-noresty-quick
+    entrypoint: ardoises-clean
+  invitation:
+    env_file: .environment
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-noresty-quick
+    entrypoint: ardoises-invitation
+  webhook:
+    env_file: .environment
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-noresty-quick
+    entrypoint: ardoises-webhook
+  ardoises:
+    env_file: .environment
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-resty-quick
+    entrypoint: ardoises-server
+    ports:
+      - "8080:80"
+      - "8081:443"
+    volumes:
+      - ./static:/static
+      - ./etc/letsencrypt:/etc/letsencrypt

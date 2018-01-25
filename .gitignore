@@ -1,0 +1,5 @@
+.environment
+.wercker
+etc/
+rockspec/*.src.rock
+ENVIRONMENT
