@@ -1,4 +1,4 @@
-local Config   = require "ardoises.server.config"
+local Config   = require "ardoises.config"
 local Common   = require "ardoises.jsonhttp.common"
 local Json     = require "rapidjson"
 local Http     = require "socket.http"
@@ -13,7 +13,7 @@ local delay  = 1 * 24 * 60 * 60 -- 1 day
 return Common (function (request, cache)
   assert (type (request) == "table")
   local json  = {}
-  local redis = assert (Redis.connect (Config.redis.host, Config.redis.port))
+  local redis = assert (Redis.connect (Config.redis.url.host, Config.redis.url.port))
   if cache then
     json.request = Json.encode (request, {
       sort_keys = true,
@@ -39,6 +39,11 @@ return Common (function (request, cache)
     url    = request.url,
   }))
   result = table.concat (result)
+  local hs = {}
+  for key, value in pairs (headers) do
+    hs [key:lower ()] = value
+  end
+  headers = hs
   if status == 304 then
     redis:expire (prefix .. json.request, delay)
     return json.answer

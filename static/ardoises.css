@@ -12,10 +12,13 @@ body {
   font-weight: 400;
   color: white;
   line-height: 1.5;
+  background-size: 100% 100%;
   background-size: cover;
   background-position: center;
   background-color: DimGrey;
   background-image: url(/static/ardoises.jpg);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   padding-top: 50px;
   padding-bottom: 50px;
 }
@@ -34,6 +37,9 @@ body {
   font-size: 12px;
   font-style: normal;
   font-variant: normal;
+  background-size: cover;
+  background-position: center;
+  background-color: transparent;
 }
 .navbar-username {
   color: DarkOrange;
@@ -70,4 +76,17 @@ a:hover {
 a:active {
   color: DarkOrange;
   text-decoration: none;
+}
+
+/* http://stackoverflow.com/questions/26173376/rotate-font-awesome-icon-on-click */
+.rotate {
+  -moz-transition: all .2s linear;
+  -webkit-transition: all .2s linear;
+  transition: all .2s linear;
+}
+.rotate.down {
+  -ms-transform:rotate(-90deg);
+  -moz-transform:rotate(-90deg);
+  -webkit-transform:rotate(-90deg);
+  transform:rotate(-90deg);
 }

@@ -1,6 +1,15 @@
 local Json = require "rapidjson"
 local Url  = require "net.url"
 
+-- http://25thandclement.com/~william/projects/luaossl.pdf
+local function tohex (b)
+  local x = ""
+  for i = 1, #b do
+    x = x .. string.format ("%.2x", string.byte (b, i))
+  end
+  return x
+end
+
 return function (what)
   return function (options)
     assert (type (options) == "table")
@@ -13,21 +22,36 @@ return function (what)
     request.timeout = options.timeout
     request.url     = tostring (url)
     request.method  = options.method or "GET"
-    request.body    = options.body   and Json.encode (options.body, {
-      sort_keys = true,
-    })
     request.headers = {}
     for name, header in pairs (options.headers or  {}) do
       request.headers [name] = header
     end
+    request.headers ["Content-type"  ] = request.headers ["Content-type"] or "application/json"
+    request.headers ["Accept"        ] = request.headers ["Accept"      ] or "application/json"
+    request.body = options.body
+    if request.headers ["Content-type"]:match "json" then
+      request.body = request.body and Json.encode (request.body, {
+        sort_keys = true,
+      })
+    end
     request.headers ["Content-length"] = request.body and #request.body
-    request.headers ["Content-type"  ] = request.body and "application/json"
-    request.headers ["Accept"        ] = request.headers ["Accept"] or "application/json"
+    if options.signature then
+      local Config = require "ardoises.config"
+      local Hmac   = require "openssl.hmac"
+      local hmac   = Hmac.new (Config.github.secret)
+      request.headers [options.signature] = "sha1=" .. tohex (hmac:final (request.body))
+    end
     local cache = request.method == "GET"
                or options.cache
     repeat
       local result = what (request, cache)
-      if result.body then
+      assert (result)
+      if result.body
+      and not result.headers ["content-type"] then
+        result.headers ["content-type"] = request.headers ["Accept"] or request.headers ["accept"]
+      end
+      if  result.body
+      and result.headers ["content-type"]:match "json" then
         local ok, json = pcall (Json.decode, result.body)
         if ok then
           result.body = json
@@ -36,7 +60,7 @@ return function (what)
       answer.status  = answer.status  or result.status
       answer.headers = answer.headers or result.headers
       if not answer.body then
-        answer.body  = result.body
+        answer.body = result.body
       else
         for _, entry in ipairs (result.body) do
           answer.body [#answer.body+1] = entry

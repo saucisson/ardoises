@@ -54,11 +54,11 @@ services:
       dockerfile: docker/Dockerfile-resty
     entrypoint: lua -l ardoises.server.bin
     ports:
-      - "80:80"
-      - "443:443"
+      - "8080:80"
+      - "8443:443"
     volumes:
       - ./data:/data
       - ./static:/static
       - ./src/ardoises:/usr/share/lua/5.1/ardoises
-      - ./etc/ardoises:/etc/ardoises
       - ./etc/letsencrypt:/etc/letsencrypt
+      - ./etc/ardoises:/etc/ardoises

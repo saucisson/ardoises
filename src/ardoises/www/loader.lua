@@ -1,5 +1,3 @@
-local Copas
-
 -- _G.js
 -- _G.window
 -- _G.js.global
@@ -7,6 +5,14 @@ local Copas
 -- _G.js.global.navigator
 -- _G.js.global.navigator.language
 -- _G.js.global.location.origin
+local Coromake
+do
+  local xhr = _G.js.new (_G.window.XMLHttpRequest)
+  xhr:open ("GET", "/lua/coroutine.make", false)
+  assert (pcall (xhr.send, xhr))
+  assert (xhr.status == 200)
+  Coromake = load (xhr.responseText, "coroutine.make") ()
+end
 
 local function tojs (t)
   if type (t) ~= "table" then
@@ -35,10 +41,6 @@ package.preload ["jit"] = function ()
   return false
 end
 
-package.preload ["lpeg"] = function ()
-  return require "lulpeg"
-end
-
 package.preload ["cjson"] = function ()
   return require "dkjson"
 end
@@ -52,6 +54,7 @@ package.preload ["socket.url"] = function ()
 end
 
 package.preload ["progressbar"] = function ()
+  local Copas       = require "copas"
   local Progress_mt = {}
   local Progress    = setmetatable ({}, Progress_mt)
   function Progress_mt.__call (_, options)
@@ -93,6 +96,34 @@ package.preload ["progressbar"] = function ()
       Copas.sleep (0.5)
       Content.innerHTML = ""
     end)
+    Copas.addthread (function ()
+      Copas.sleep (2 * progress.expected)
+      if progress.finished then
+        Content.innerHTML = ""
+        return
+      end
+      Content.innerHTML = [[
+        <section>
+          <div class="container-fluid">
+            <div class="row">
+              <div class="col-sm-12 col-md-8 col-md-offset-2">
+                <div class="alert alert-danger">
+                  <p><strong>It takes too long...</strong></p>
+                  <p>We will try to reload this page.
+                  If the problem persists, <a href="https://gitter.im/ardoises/Lobby">please contact us</a>.
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      ]]
+      Copas.sleep (5)
+      if progress.finished then
+        Content.innerHTML = ""
+        return
+      end
+      _G.js.global.location:reload ()
+    end)
     return progress
   end
   return Progress
@@ -100,7 +131,8 @@ end
 
 package.preload ["ardoises.jsonhttp.copas"] = function ()
   local Common = require "ardoises.jsonhttp.common"
-  local Json   = require "dkjson"
+  local Copas  = require "copas"
+  local Json   = require "cjson"
   return Common (function (request)
     assert (type (request) == "table")
     local running = {
@@ -134,6 +166,7 @@ package.preload ["ardoises.jsonhttp.copas"] = function ()
     end)
     r2:catch (function (_, e)
       err = e
+      print (e)
       if running.copas then
         Copas.wakeup (running.copas)
       else
@@ -164,7 +197,7 @@ package.preload ["ardoises.jsonhttp.copas"] = function ()
       until data.done
       return {
         status  = response.status,
-        headers = response.headers,
+        headers = headers,
         body    = json,
       }
     else
@@ -174,7 +207,6 @@ package.preload ["ardoises.jsonhttp.copas"] = function ()
 end
 
 package.preload ["copas"] = function ()
-  local Coromake = require "coroutine.make"
   local copas    = {
     co        = nil,
     running   = nil,
@@ -251,6 +283,7 @@ package.preload ["copas"] = function ()
 end
 
 package.preload ["websocket"] = function ()
+  local Copas     = require "copas"
   local Websocket = {}
   Websocket.__index = Websocket
   Websocket.client  = {}
@@ -340,6 +373,7 @@ end
 
 -- Taken from lua.vm.js:
 local function load_lua_over_http (url)
+  local Copas   = require "copas"
   local running = {
     copas = Copas and Copas.running,
     co    = coroutine.running (),
@@ -394,6 +428,9 @@ end
 package.searchers [#package.searchers] = nil
 package.searchers [#package.searchers] = nil
 table.insert (package.searchers, function (mod_name)
+  return package.preload [mod_name] or "not in package.preload"
+end)
+table.insert (package.searchers, function (mod_name)
   if not mod_name:match "/" then
     local full_url  = "/lua/" .. mod_name
     local func, err = load_lua_over_http (full_url)
@@ -401,23 +438,3 @@ table.insert (package.searchers, function (mod_name)
     return "\n    " .. tostring (err)
   end
 end)
-
--- run client:
-local co = coroutine.create (function ()
-  xpcall (function ()
-    Copas = require "copas"
-    Copas.addthread (function ()
-      {{{code}}}
-    end)
-    Copas.addthread (function ()
-      while true do
-        Copas.sleep (60)
-      end
-    end)
-    Copas.loop ()
-  end, function (err)
-    print ("error:", err)
-    print (debug.traceback ())
-  end)
-end)
-coroutine.resume (co)

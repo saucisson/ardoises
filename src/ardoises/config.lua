@@ -1,0 +1,69 @@
+local Url = require "net.url"
+local Data
+
+for _, filename in ipairs {
+  "/etc/ardoises/config.lua",
+  "./etc/ardoises/config.lua",
+  os.getenv "HOME" and os.getenv "HOME" .. "/.ardoises/config.lua",
+} do
+  if pcall (function ()
+    local file = assert (io.open (filename, "r"))
+    local data = assert (file:read "*a")
+    file:close ()
+    Data = assert (_G.load (data, filename)) ()
+  end) then
+    break
+  end
+end
+assert (Data, "no configuration file found")
+
+local result = {
+  ardoises = {
+    url = Data.ardoises
+      and Data.ardoises.url
+      and assert (Url.parse (Data.ardoises.url))
+       or "https://ardoises.ovh",
+  },
+  docker = {
+    url = Data.docker
+      and Data.docker.url
+      and assert (Url.parse (Data.docker.url))
+       or assert (Url.parse ("tcp://docker:2375")),
+    container = assert (os.getenv "HOSTNAME"),
+  },
+  redis  = {
+    url = Data.redis
+      and Data.redis.url
+      and assert (Url.parse (Data.redis.url))
+       or assert (Url.parse ("tcp://redis:6379")),
+  },
+  github = {
+    id     = assert (Data.github and Data.github.id),
+    secret = assert (Data.github and Data.github.secret),
+    token  = assert (Data.github and Data.github.token),
+  },
+  twilio = {
+    username = Data.twilio and Data.twilio.username,
+    password = Data.twilio and Data.twilio.password,
+    phone    = Data.twilio and Data.twilio.phone,
+  },
+  administrator = {
+    phone = Data.administrator and Data.administrator.phone,
+    email = Data.administrator and Data.administrator.email,
+  },
+  locks = {
+    timeout = Data.locks
+          and Data.locks.timeout
+           or 5, -- seconds
+  },
+  test = Data.test,
+}
+
+if type (result.administrator.phone) ~= "table" then
+  result.administrator.phone = { result.administrator.phone }
+end
+if type (result.administrator.email) ~= "table" then
+  result.administrator.email = { result.administrator.email }
+end
+
+return result

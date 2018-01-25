@@ -24,7 +24,7 @@ local tojs  = require "tojs"
 Copas.addthread (function ()
   local data, status = Http {
     url    = "/register",
-    query  = Json.decode [[{{{query}}}]],
+    query  = Json.decode (_G.configuration.query),
     method = "GET",
   }
   if status ~= 200 then

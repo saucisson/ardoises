@@ -7,10 +7,11 @@ _G.print = function (...)
 end
 
 local Arguments = require "argparse"
-local Config    = require "ardoises.server.config"
+local Config    = require "ardoises.config"
 local Gettime   = require "socket".gettime
 local Http      = require "ardoises.jsonhttp.socket-redis"
 local Lustache  = require "lustache"
+local Url       = require "net.url"
 
 local parser = Arguments () {
   name        = "ardoises-webhook",
@@ -18,10 +19,17 @@ local parser = Arguments () {
 }
 parser:option "--delay" {
   description = "Delay between iterations (in seconds)",
-  default     = "60",
+  default     = tostring (60),
   convert     = tonumber,
 }
 local arguments = parser:parse ()
+
+print "Waiting for services to run..."
+os.execute (Lustache:render ([[
+  dockerize -wait "{{{ardoises}}}"
+]], {
+  ardoises = Url.build (Config.ardoises.url),
+}))
 
 while true do
   print "Setting webhooks..."
@@ -32,7 +40,7 @@ while true do
       method  = "GET",
       headers = {
         ["Accept"       ] = "application/vnd.github.v3+json",
-        ["Authorization"] = "token " .. Config.application.token,
+        ["Authorization"] = "token " .. Config.github.token,
         ["User-Agent"   ] = "Ardoises",
       },
     }
@@ -45,33 +53,36 @@ while true do
           method  = "GET",
           headers = {
             ["Accept"       ] = "application/vnd.github.v3+json",
-            ["Authorization"] = "token " .. Config.application.token,
+            ["Authorization"] = "token " .. Config.github.token,
             ["User-Agent"   ] = "Ardoises",
           },
         }
         assert (status == 200, status)
         local found = false
         for _, hook in ipairs (hooks) do
-          if hook.config.url == Config.ardoises.url .. "/webhook" then
+          if hook.config.url == Url.build (Config.ardoises.url) .. "/webhook" then
             found = true
             break
           end
         end
         if not found then
+          print (Lustache:render ("  ...setting webhook for {{{repository}}}.", {
+            repository = repository.full_name,
+          }))
           _, status = Http {
             url     = repository.hooks_url,
             method  = "POST",
             headers = {
               ["Accept"       ] = "application/vnd.github.v3+json",
-              ["Authorization"] = "token " .. Config.application.token,
+              ["Authorization"] = "token " .. Config.github.token,
               ["User-Agent"   ] = "Ardoises",
             },
             body    = {
               name   = "web",
               config = {
-                url          = Config.ardoises.url .. "/webhook",
+                url          = Url.build (Config.ardoises.url) .. "/webhook",
                 content_type = "json",
-                secret       = Config.application.secret,
+                secret       = Config.github.secret,
                 insecure_ssl = "0",
               },
               events = { "*" },

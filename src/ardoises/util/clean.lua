@@ -7,12 +7,14 @@ _G.print = function (...)
 end
 
 local Arguments = require "argparse"
-local Config    = require "ardoises.server.config"
+local Config    = require "ardoises.config"
 local Gettime   = require "socket".gettime
 local Http      = require "ardoises.jsonhttp.socket-redis"
 local Json      = require "rapidjson"
+local Keys      = require 'ardoises.server.keys'
 local Lustache  = require "lustache"
 local Redis     = require "redis"
+local Url       = require "net.url"
 
 local parser = Arguments () {
   name        = "ardoises-clean",
@@ -20,7 +22,7 @@ local parser = Arguments () {
 }
 parser:option "--delay" {
   description = "Delay between iterations (in seconds)",
-  default     = "15",
+  default     = tostring (15),
   convert     = tonumber,
 }
 local arguments = parser:parse ()
@@ -30,11 +32,11 @@ os.execute (Lustache:render ([[
   dockerize -wait "{{{redis}}}" \
             -wait "{{{docker}}}"
 ]], {
-  redis  = Config.redis.url,
-  docker = Config.docker.url,
+  redis  = Url.build (Config.redis.url),
+  docker = Url.build (Config.docker.url),
 }))
 
-local redis  = assert (Redis.connect (Config.redis.host, Config.redis.port))
+local redis  = assert (Redis.connect (Config.redis.url.host, Config.redis.url.port))
 local cursor = "0"
 local keys
 
@@ -55,7 +57,7 @@ while true do
   local start = Gettime ()
   xpcall (function ()
     cursor, keys = unpack (redis:scan (cursor, {
-        match = Config.patterns.editor ({
+        match = Keys.editor ({
           owner = { login = "*" },
           name  = "*",
         }, "*"),
@@ -69,8 +71,8 @@ while true do
         or not editor.created_at
         or Gettime () - editor.created_at > 120) then
         local docker_url = Lustache:render ("http://{{{host}}}:{{{port}}}/containers/{{{id}}}", {
-          host = Config.docker.host,
-          port = Config.docker.port,
+          host = Config.docker.url.host,
+          port = Config.docker.url.port,
           id   = editor.docker_id,
         })
         local info, status = Http {

@@ -8,7 +8,7 @@ return Common (function (request)
   assert (type (request) == "table")
   local result   = {}
   request.sink   = Ltn12.sink.table (result)
-  request.source = request.body  and Ltn12.source.string (request.body)
+  request.source = request.body and Ltn12.source.string (request.body)
   local http = request.url:match "https://" and Https or Http
   local _, status, headers = http.request (request)
   print (Lustache:render ("{{{method}}} {{{status}}} {{{url}}}", {
@@ -17,6 +17,11 @@ return Common (function (request)
     url    = request.url,
   }))
   result = table.concat (result)
+  local hs = {}
+  for key, value in pairs (headers) do
+    hs [key:lower ()] = value
+  end
+  headers = hs
   return {
     status  = status,
     headers = headers,

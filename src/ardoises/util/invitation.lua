@@ -7,12 +7,14 @@ _G.print = function (...)
 end
 
 local Arguments = require "argparse"
-local Config    = require "ardoises.server.config"
+local Config    = require "ardoises.config"
 local Gettime   = require "socket".gettime
 local Http      = require "ardoises.jsonhttp.socket-redis"
 local Json      = require "rapidjson"
+local Keys      = require 'ardoises.server.keys'
 local Lustache  = require "lustache"
 local Redis     = require "redis"
+local Url       = require "net.url"
 
 local parser = Arguments () {
   name        = "ardoises-clean",
@@ -20,7 +22,7 @@ local parser = Arguments () {
 }
 parser:option "--delay" {
   description = "Delay between iterations (in seconds)",
-  default     = "60",
+  default     = tostring (60),
   convert     = tonumber,
 }
 local arguments = parser:parse ()
@@ -30,10 +32,10 @@ os.execute (Lustache:render ([[
   dockerize -wait "{{{redis}}}" \
             -wait "{{{docker}}}"
 ]], {
-  redis  = Config.redis.url,
-  docker = Config.docker.url,
+  redis  = Url.build (Config.redis.url),
+  docker = Url.build (Config.docker.url),
 }))
-local redis = assert (Redis.connect (Config.redis.host, Config.redis.port))
+local redis = assert (Redis.connect (Config.redis.url.host, Config.redis.url.port))
 
 while true do
   print "Answering to invitations..."
@@ -44,13 +46,11 @@ while true do
       method  = "GET",
       headers = {
         ["Accept"       ] = "application/vnd.github.swamp-thing-preview+json",
-        ["Authorization"] = "token " .. Config.application.token,
+        ["Authorization"] = "token " .. Config.github.token,
         ["User-Agent"   ] = "Ardoises",
       },
     }
-    if status ~= 200 then
-      return nil
-    end
+    assert (status == 200, status)
     for _, invitation in ipairs (invitations) do
       print (Lustache:render ("  ...accepting invitation for {{{repository}}}.", {
         repository = invitation.repository.full_name,
@@ -60,12 +60,12 @@ while true do
         method  = "PATCH",
         headers = {
           ["Accept"       ] = "application/vnd.github.swamp-thing-preview+json",
-          ["Authorization"] = "token " .. Config.application.token,
+          ["Authorization"] = "token " .. Config.github.token,
           ["User-Agent"   ] = "Ardoises",
         },
       }
       assert (status == 204, status)
-      local user = redis:get (Config.patterns.user (invitation.repository.owner))
+      local user = redis:get (Keys.user (invitation.repository.owner))
       assert (user)
       user = Json.decode (user)
       assert (user)
@@ -80,10 +80,10 @@ while true do
         body    = {
           name   = "web",
           config = {
-            url          = Config.ardoises.url .. "/webhook",
+            url          = Url.build (Config.ardoises.url) .. "/webhook",
             content_type = "json",
-            secret       = Config.application.secret,
-            insecure_ssl = "1",
+            secret       = Config.github.secret,
+            insecure_ssl = "0",
           },
           events = { "*" },
           active = true,

@@ -24,13 +24,14 @@ RUN apk add --no-cache --virtual .build-deps \
         curl \
         diffutils \
         grep \
+        inotify-tools \
         libstdc++ \
         openssl \
         pcre \
         readline \
         sed \
  && pip install hererocks \
- && hererocks --luajit=2.1 --luarocks=^ --compat=5.2 /usr \
+ && hererocks --luajit=2.0 --luarocks=^ --compat=5.2 /usr \
  && luarocks install luasec \
  && cd /tmp \
  && curl -fSL https://openresty.org/download/openresty-${RESTY_VERSION}.tar.gz -o openresty-${RESTY_VERSION}.tar.gz \
@@ -49,16 +50,18 @@ RUN apk add --no-cache --virtual .build-deps \
  && adduser  -u 82 -D -S -G www-data www-data \
  && cd /src/ardoises/  \
  && luarocks install rockspec/lua-websockets-develop-0.rockspec \
- && luarocks install rockspec/lulpeg-develop-0.rockspec \
  && luarocks install rockspec/redis-lua-develop-0.rockspec \
- && luarocks make    rockspec/ardoises-master-1.rockspec \
+ && luarocks make    --only-deps \
+                     rockspec/ardoises-master-1.rockspec \
  && mkdir -p /etc/nginx \
- && cp src/ardoises/server/nginx.conf /etc/nginx/nginx.conf \
+ && ln -s /usr/share/lua/5.1/ardoises/server/nginx.conf \
+          /etc/nginx/nginx.conf \
  && apk del .build-deps \
  && rm -rf /src/ardoises \
  && rm -rf /tmp/* \
  && true
 
+ENTRYPOINT ["/bin/bash"]
+CMD ["-c"]
 ENV PATH /usr/local/openresty/bin/:/usr/local/openresty/nginx/sbin/:$PATH
-VOLUME ["/static", "/etc/letsencrypt"]
 EXPOSE 80 443

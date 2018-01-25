@@ -1,5 +1,7 @@
-.environment
+.config*
 .wercker
 etc/
+/data/
 rockspec/*.src.rock
-ENVIRONMENT
+docker-compose.yml
+DEVELOPERS.md

@@ -1,15 +1,16 @@
 local Copas     = require "copas"
+local Data      = require "ardoises.data"
 local Et        = require "etlua"
 local Http      = require "ardoises.jsonhttp.copas"
 local Json      = require "rapidjson"
-local Layer     = require "layeredata"
 local Patterns  = require "ardoises.patterns"
+local Sandbox   = require "ardoises.sandbox"
 local Url       = require "socket.url"
 local Websocket = require "websocket"
 
 -- # Messages
 -- { id = ..., type = "authenticate", token = "..." }
--- { id = ..., type = "patch"       , patches = { module = ..., code = ... } }
+-- { id = ..., type = "patch"       , module = ..., code = ... }
 -- { id = ..., type = "require"     , module = "..." }
 -- { id = ..., type = "list"        }
 -- { id = ..., type = "create"      , module = "..." }
@@ -25,6 +26,7 @@ Client.__index = Client
 
 function Mt.__call (_, options)
   local editor = setmetatable ({
+    ardoises_url = assert (options.ardoises),
     branch       = assert (options.branch),
     token        = assert (options.token),
     timeout      = assert (options.timeout),
@@ -39,27 +41,47 @@ function Mt.__call (_, options)
     tasks        = {},
     queue        = {},
     repositories = {}, -- branch.full_name -> module_name -> { ... }
-    Layer        = setmetatable ({}, { __index = Layer }),
+    Data         = setmetatable ({}, { __index = Data }),
   }, Editor)
-  local repository, status = Http {
-    url     = Et.render ("https://api.github.com/repos/<%- owner %>/<%- repository %>", editor.branch),
-    method  = "GET",
-    headers = {
-      ["Accept"       ] = "application/vnd.github.v3+json",
-      ["Authorization"] = "token " .. tostring (editor.token),
-      ["User-Agent"   ] = editor.application,
-    },
-  }
-  if status ~= 200 then
-    return nil, "unable to obtain repository information: " .. tostring (status)
+  local repository
+  if editor.branch.owner == "-" then
+    repository = {
+      owner          = { login = "-" },
+      name           = editor.branch.repository,
+      full_name      = "-/" .. editor.branch.repository,
+      default_branch = editor.branch.branch,
+      path           = ".",
+      modules        = {},
+      permissions    = {
+        admin = true,
+        push  = true,
+        pull  = true,
+      },
+    }
+    editor.port = tonumber (editor.branch.branch)
+    editor.repositories [editor.branch.full_name] = repository
+  else
+    local status
+    repository, status = Http {
+      url     = Et.render ("https://api.github.com/repos/<%- owner %>/<%- repository %>", editor.branch),
+      method  = "GET",
+      headers = {
+        ["Accept"       ] = "application/vnd.github.v3+json",
+        ["Authorization"] = "token " .. tostring (editor.token),
+        ["User-Agent"   ] = editor.application,
+      },
+    }
+    if status ~= 200 then
+      return nil, "unable to obtain repository information: " .. tostring (status)
+    end
   end
   editor.permissions = repository.permissions
   if not editor.permissions.pull then
     return nil, "missing permission to read repository"
   end
-  editor.Layer.require = function (name)
+  editor.Data.require = function (name)
     if not Patterns.require:match (name) then
-      name = tostring (name) .. "@" .. editor.current.full_name
+      name = tostring (name) .. "@" .. editor.current
     end
     local result, err = editor:require (name)
     if not result then
@@ -146,8 +168,8 @@ end
 
 function Editor.stop (editor)
   assert (getmetatable (editor) == Editor)
-  editor.running = false
-  Copas.addthread (function ()
+  if editor.running then
+    editor.running = false
     if  not editor.nopush
     and editor.permissions.push then
       editor:push ()
@@ -156,7 +178,7 @@ function Editor.stop (editor)
     for _, task in pairs (editor.tasks) do
       Copas.wakeup (task)
     end
-  end)
+  end
   return true
 end
 
@@ -320,7 +342,7 @@ function Editor.require (editor, x)
   end
   local code = file:read "*a"
   file:close ()
-  local loaded, err_loaded = _G.load (code, x, "t", _G)
+  local loaded, err_loaded = _G.load (code, x, "t", Sandbox)
   if not loaded then
     return nil, "invalid layer: " .. tostring (err_loaded)
   end
@@ -328,26 +350,21 @@ function Editor.require (editor, x)
   if not ok then
     return nil, "invalid layer: " .. tostring (chunk)
   end
-  local remote, ref = Layer.new {
-    name = x,
+  local layer, ref = Data.new {
+    name = req.owner == "-" and req.module or req.name,
   }
   local oldcurrent = editor.current
   editor.current = req.full_name
-  local ok_apply, err_apply = pcall (chunk, editor.Layer, remote, ref)
+  local ok_apply, err_apply = pcall (chunk, editor.Data, layer, ref)
   if not ok_apply then
     return nil, "invalid layer: " .. tostring (err_apply)
   end
   editor.current = oldcurrent
-  local layer = Layer.new {
-    temporary = true,
-  }
-  layer [Layer.key.refines] = { remote }
-  Layer.write_to (layer, false) -- read-only
+  Data.write_to (layer, false) -- read-only
   repository.modules [req.module] = {
-    layer  = layer,
-    remote = remote,
-    ref    = ref,
-    code   = code,
+    layer = layer,
+    ref   = ref,
+    code  = code,
   }
   return repository.modules [req.module]
 end
@@ -356,70 +373,40 @@ Editor.handlers = {}
 
 function Editor.handlers.authenticate (editor, message)
   assert (getmetatable (editor) == Editor)
-  do
-    local user, status = Http {
-      url     = "https://api.github.com/user",
-      method  = "GET",
-      headers = {
-        ["Accept"       ] = "application/vnd.github.v3+json",
-        ["Authorization"] = "token " .. tostring (message.token),
-        ["User-Agent"   ] = editor.application,
-      },
-    }
-    if status ~= 200 then
-      return nil, "authentication failure: " .. tostring (status)
-    end
-    message.client.user  = user
-    message.client.token = message.token
+  local info
+  local url = Url.build {
+    scheme = editor.ardoises_url.scheme,
+    host   = editor.ardoises_url.host,
+    port   = editor.ardoises_url.port,
+    path   = "/check-token",
+  }
+  local status
+  info, status = Http {
+    url     = url,
+    method  = "GET",
+    headers = {
+      ["Accept"       ] = "application/json",
+      ["Authorization"] = "token " .. tostring (message.token),
+      ["User-Agent"   ] = editor.application,
+    },
+  }
+  if status ~= 200 then
+    return nil, "authentication failure: " .. tostring (status)
   end
-  do
-    local emails, status = Http {
-      url     = "https://api.github.com/user/emails",
-      method  = "GET",
-      headers = {
-        ["Accept"       ] = "application/vnd.github.v3+json",
-        ["Authorization"] = "token " .. tostring (message.token),
-        ["User-Agent"   ] = editor.application,
-      },
-    }
-    if status ~= 200 then
-      return nil, "cannot obtain email address: " .. tostring (status)
-    end
-    message.client.user.emails = emails
-    for _, t in ipairs (emails) do
-      if t.primary then
-        message.client.user.email = t.email
-      end
-    end
-  end
-  do
-    local repo = Patterns.repository:match (editor.branch.full_name)
-    local result, status = Http {
-      url     = Et.render ("https://api.github.com/repos/<%- owner %>/<%- repository %>", repo),
-      method  = "GET",
-      headers = {
-        ["Accept"       ] = "application/vnd.github.v3+json",
-        ["Authorization"] = "token " .. tostring (message.token),
-        ["User-Agent"   ] = editor.application,
-      },
-    }
-    if status ~= 200 then
-      return nil, "cannot obtain repository: " .. tostring (status)
-    end
-    if not result.permissions.pull then
-      message.client.handlers.authenticate = nil
-      return nil, "pull permission denied"
-    end
-    message.client.permissions           = result.permissions
+  if not info.repository.permissions.pull then
     message.client.handlers.authenticate = nil
-    message.client.handlers.patch        = Editor.handlers.patch
-    message.client.handlers.require      = Editor.handlers.require
-    message.client.handlers.list         = Editor.handlers.list
-    message.client.handlers.create       = Editor.handlers.create
-    message.client.handlers.delete       = Editor.handlers.delete
-    message.client.handlers.patch        = Editor.handlers.patch
-    return result.permissions
+    return nil, "pull permission denied"
   end
+  message.client.user                  = info.user
+  message.client.permissions           = info.repository.permissions
+  message.client.handlers.authenticate = nil
+  message.client.handlers.patch        = Editor.handlers.patch
+  message.client.handlers.require      = Editor.handlers.require
+  message.client.handlers.list         = Editor.handlers.list
+  message.client.handlers.create       = Editor.handlers.create
+  message.client.handlers.delete       = Editor.handlers.delete
+  message.client.handlers.patch        = Editor.handlers.patch
+  return info.repository.permissions
 end
 
 function Editor.handlers.require (editor, message)
@@ -558,91 +545,38 @@ function Editor.handlers.patch (editor, message)
   if not message.client.permissions.push then
     return nil, "forbidden"
   end
-  local errors  = {}
-  local modules = {}
-  local function rollback ()
-    for _, module in pairs (modules) do
-      if module.current then
-        Layer.write_to (module.layer, nil)
-        local refines = module.layer [Layer.key.refines]
-        refines [Layer.len (refines)] = nil
-      end
-      Layer.write_to (module.layer, false)
-      module.current = nil
-    end
+  -- check if module is handled locally:
+  local req = Patterns.require:match (message.module)
+  if req.full_name ~= editor.branch.full_name then
+    return nil, "invalid module"
   end
-  -- check modules
-  for _, patch in ipairs (message.patches) do
-    local ok, err = (function ()
-      local req = Patterns.require:match (patch.module)
-      if req.full_name ~= editor.branch.full_name then
-        return nil, "invalid module"
-      end
-      return true
-    end) ()
-    if not ok then
-      errors [patch.module] = err
-    end
+  -- load module:
+  local module, err = editor:require (message.module)
+  if not module then
+    return nil, err
   end
-  if next (errors) then
-    rollback ()
-    return nil, errors
+  -- load patch string:
+  if type (message.code) ~= "string" then
+    return nil, "patch code is not a string"
   end
-  -- load modules
-  for _, patch in ipairs (message.patches) do
-    local ok, err = (function ()
-      local module, err = editor:require (patch.module)
-      if not module then
-        return nil, err
-      end
-      modules [patch.module] = module
-      return true
-    end) ()
-    if not ok then
-      errors [patch.module] = err
-    end
+  local chunk, err_chunk = _G.load (message.code, message.module, "t", Sandbox)
+  if not chunk then
+    return nil, "invalid layer: " .. tostring (err_chunk)
   end
-  if next (errors) then
-    rollback ()
-    return nil, errors
+  local ok_loaded, loaded = pcall (chunk)
+  if not ok_loaded then
+    return nil, "invalid layer: " .. tostring (loaded)
   end
-  -- apply patches
-  for _, patch in ipairs (message.patches) do
-    local ok, err = (function ()
-      if type (patch.code) ~= "string" then
-        return nil, "patch code is not a string"
-      end
-      local chunk, err_chunk = _G.load (patch.code, patch.module, "t", _G)
-      if not chunk then
-        return nil, "invalid layer: " .. tostring (err_chunk)
-      end
-      local ok_loaded, loaded = pcall (chunk)
-      if not ok_loaded then
-        return nil, "invalid layer: " .. tostring (loaded)
-      end
-      local module = modules [patch.module]
-      module.current = Layer.new {
-        temporary = true,
-      }
-      Layer.write_to (module.layer, nil)
-      local refines = module.layer [Layer.key.refines]
-      refines [Layer.len (refines)+1] = module.current
-      Layer.write_to (module.layer, module.current)
-      local ok_apply, err_apply = pcall (loaded, editor.Layer, module.layer, module.ref)
-      Layer.write_to (module.layer, false)
-      if not ok_apply then
-        return nil, "invalid layer: " .. tostring (err_apply)
-      end
-      return true
-    end) ()
-    if not ok then
-      errors [patch.module] = err
-    end
+  -- test:
+  local proxy = Data.new {
+    above = module.layer,
+  }
+  local ok_apply, err_apply = pcall (loaded, editor.Data, proxy, module.ref)
+  if not ok_apply then
+    return nil, "invalid layer: " .. tostring (err_apply)
   end
-  if next (errors) then
-    rollback ()
-    return nil, errors
-  end
+  -- apply really:
+  assert (Data.merge (proxy, module.layer))
   -- commit
   local repository   = editor.repositories [editor.branch.full_name]
   local patches_file = io.open (repository.path .. "/.ardoises-patches.md", "w")
@@ -654,39 +588,34 @@ function Editor.handlers.patch (editor, message)
     email = message.client.user.email,
     date  = os.date ("%c", os.time ())
   }))
-  for _, patch in ipairs (message.patches) do
-    local module = modules [patch.module]
-    Layer.merge (module.current, module.remote)
-    local req   = assert (Patterns.require:match (patch.module))
-    local parts = {}
-    for part in req.module:gmatch "[^%.]+" do
-      parts [#parts+1] = part
-    end
-    module.code    = Layer.dump (module.remote)
-    local filename = "src/" .. table.concat (parts, "/") .. ".lua"
-    local file = io.open (repository.path .. "/" .. filename, "w")
-    file:write (module.code .. "\n")
-    file:close ()
-    patches_file:write (Et.render ([[
+  local parts = {}
+  for part in req.module:gmatch "[^%.]+" do
+    parts [#parts+1] = part
+  end
+  module.code    = Data.dump (module.layer)
+  local filename = "src/" .. table.concat (parts, "/") .. ".lua"
+  local file = io.open (repository.path .. "/" .. filename, "w")
+  file:write (module.code .. "\n")
+  file:close ()
+  patches_file:write (Et.render ([[
 ## Update of <%- module %>
 
 ```lua
 <%- code %>
 ```
 
-]], { module = patch.module,
-      code   = patch.code,
-    }))
-    assert (os.execute (Et.render ([[
-      cd <%- path %> && \
-      git add <%- filename %>
-    ]], {
-      path     = repository.path,
-      filename = filename,
-    })))
-  end
+]], {
+    module = message.module,
+    code   = message.code,
+  }))
+  assert (os.execute (Et.render ([[
+    cd <%- path %> && \
+    git add <%- filename %>
+  ]], {
+    path     = repository.path,
+    filename = filename,
+  })))
   patches_file:close ()
-  rollback ()
   os.execute (Et.render ([[
     cd <%- path %> && \
     git add .ardoises-patches.md && \
@@ -702,8 +631,9 @@ function Editor.handlers.patch (editor, message)
   for client in pairs (editor.clients) do
     if client ~= message.client then
       client.websocket:send (Json.encode {
-        type    = "patch",
-        patches = message.patches,
+        type   = "patch",
+        module = message.module,
+        code   = message.code,
       })
     end
   end

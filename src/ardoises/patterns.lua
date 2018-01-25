@@ -2,10 +2,13 @@ local Lpeg = require "lpeg"
 
 local Patterns = {}
 Lpeg.locale (Patterns)
+
 Patterns.module =
   (Patterns.alnum + Lpeg.P"-" + Lpeg.P"_" + Lpeg.P".")^1 / tostring
+
 Patterns.identifier =
   (Patterns.alnum + Lpeg.P"-")^1 / tostring
+
 Patterns.repository =
   Lpeg.Ct (
       Patterns.identifier
@@ -18,6 +21,7 @@ Patterns.repository =
       full_name  = t [1] .. "/" .. t [2],
     }
   end
+
 Patterns.branch =
   Lpeg.Ct (
       Patterns.identifier
@@ -33,6 +37,7 @@ Patterns.branch =
       full_name  = t [1] .. "/" .. t [2] .. ":" .. t [3],
     }
   end
+
 Patterns.require =
   Lpeg.Ct (
     Patterns.module * Lpeg.P"@" * Patterns.branch
@@ -41,9 +46,10 @@ Patterns.require =
     t [2].name   = t [1] .. "@" .. t [2].full_name
     return t [2]
   end
+
 Patterns.authorization =
     Lpeg.P"token"
-  * Lpeg.S"\r\n\f\t "^1
-  * (Patterns.alnum^1 / tostring)
+  * Patterns.space^1
+  * ((Patterns.alnum + Patterns.punct)^1 / tostring)
 
 return Patterns
