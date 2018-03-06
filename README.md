@@ -45,17 +45,7 @@ Ardoises could not exist without the following institutions:
 
 | ---: | :--- |
 | [<img src="{{ site.url }}/ardoises/assets/unige.png" height="128">](http://www.unige.ch)                | [<img src="{{ site.url }}/ardoises/assets/cui.png" height="128">](http://cui.unige.ch)            |
-| [<img src="{{ site.url }}/ardoises/assets/upmc.png" height="128">](http://www.upmc.fr)                  | [<img src="{{ site.url }}/ardoises/assets/lip6.png" height="128">](https://www.lip6.fr)            |
-| [<img src="{{ site.url }}/ardoises/assets/ens-cachan.png" height="128">](http://www.ens-cachan.fr)      | [<img src="{{ site.url }}/ardoises/assets/lsv.png" height="128">](http://www.lsv.fr)              |
-| [<img src="{{ site.url }}/ardoises/assets/paris-nord.png" height="128">](https://www.univ-paris13.fr)   | [<img src="{{ site.url }}/ardoises/assets/lipn.png" height="128">](https://lipn.univ-paris13.fr)   |
-| [<img src="{{ site.url }}/ardoises/assets/cnrs.png" height="128">](http://www.cnrs.fr)                  | [<img src="{{ site.url }}/ardoises/assets/inria.png" height="128">](https://www.inria.fr)           |
 
 Ardoises has been developed with <i class="fa fa-heart fa-inverse" aria-hidden="true"></i> by the following people:
 
 * [Alban Linard](https://github.com/saucisson): lead developer
-* [Clément Démoulins](https://github.com/cdemoulins): model/formalism language
-* [Benoît Barbot](https://github.com/barbot): model/formalism language
-* [Alexis Martin](https://github.com/Alexis-Martin): formalisms for graphs
-* [Paul Panganiban](https://github.com/Ppanganiban): formalisms for expressions
-* [Nizar Hdadech](https://github.com/Seriane): formalisms for expressions
-* ...
